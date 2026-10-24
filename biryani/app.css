@@ -27,7 +27,8 @@ code { font-size: .9em; }
 p.warn { background: var(--warn-bg); padding: 8px 10px; border-radius: 8px; }
 
 header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: var(--bg); }
-header.top h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+header.top h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+header.top .logo { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2px var(--accent); }
 main { padding: 0 16px; max-width: 640px; margin: 0 auto; }
 
 nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: flex; justify-content: space-around; align-items: center; background: var(--card); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
