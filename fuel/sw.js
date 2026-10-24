@@ -1,5 +1,5 @@
 // Offline shell: app files are cache-first (refreshed in the background); API calls always go to the network.
-const CACHE = 'fuel-v2';
+const CACHE = 'fuel-v3';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png',
   'js/app.js', 'js/db.js', 'js/nutrition.js', 'js/food.js', 'js/scan.js', 'js/sync.js', 'js/goals.js', 'js/charts.js', 'js/voice.js'];
 const LIBS = /cdn\.jsdelivr\.net\/npm\/(@zxing|tesseract)/;

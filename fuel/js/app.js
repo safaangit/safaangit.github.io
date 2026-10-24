@@ -884,7 +884,7 @@ bind.settings = root => {
   $('#export', root).onclick = async () => {
     const out = {};
     for (const k of await db.kv.keys()) if (String(k).startsWith('f:')) out[k.slice(2)] = await db.kv.get(k);
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' })), download: `fuel-export-${today()}.json` });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' })), download: `baros-biryani-export-${today()}.json` });
     a.click();
   };
 };
