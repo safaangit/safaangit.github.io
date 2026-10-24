@@ -14,7 +14,15 @@ async function gh(path, opts = {}) {
     headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', ...opts.headers },
   });
   if (r.status === 404) return null;
-  if (!r.ok) { const e = new Error(`GitHub ${r.status}: ${(await r.text()).slice(0, 160)}`); e.status = r.status; throw e; }
+  if (!r.ok) {
+    let msg = `GitHub ${r.status}: ${(await r.text()).slice(0, 160)}`;
+    if (r.status === 401) msg = 'GitHub rejected the token: it was mistyped, expired or revoked. Make a new one and paste it again.';
+    else if (r.status === 403 && r.headers.get('x-ratelimit-remaining') === '0') msg = 'GitHub rate limit hit; try again in a few minutes.';
+    else if (r.status === 403) msg = path.startsWith('actions')
+      ? 'Token is missing the "Actions: Read and write" permission (only needed for Pull Garmin now).'
+      : 'Token is missing the "Contents: Read and write" permission on this repo.';
+    const e = new Error(msg); e.status = r.status; throw e;
+  }
   return r.status === 204 ? true : r.headers.get('content-type')?.includes('json') ? r.json() : r.text();
 }
 function enc(s) {
@@ -27,7 +35,10 @@ function enc(s) {
 let defaultBranch;
 async function branch() {
   if (cfg().branch) return cfg().branch;
-  defaultBranch ??= gh('').then(r => r.default_branch).catch(e => { defaultBranch = null; throw e; });
+  defaultBranch ??= gh('').then(r => {
+    if (!r) throw new Error(`Token can't see ${cfg().repo}. Edit the token: Repository access → Only select repositories → pick it.`);
+    return r.default_branch;
+  }).catch(e => { defaultBranch = null; throw e; });
   return defaultBranch;
 }
 const ref = async () => `ref=${encodeURIComponent(await branch())}`;

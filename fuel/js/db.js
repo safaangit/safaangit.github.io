@@ -101,11 +101,14 @@ export const DEFAULT_SETTINGS = {
     run: { label: 'Run', kcal: 2450, mode: 'g', p: 180, c: 265, f: 75 },
     long: { label: 'Long run', kcal: 2900, mode: 'g', p: 180, c: 370, f: 80 },
   },
-  meals: ['Meal 1', 'Meal 2', 'Meal 3', 'Snacks'],
+  meals: ['Food'],
+  hiddenRecents: [],
 };
 export async function settings() {
   const s = await get('settings', 'main');
-  return s ? { ...structuredClone(DEFAULT_SETTINGS), ...s } : structuredClone(DEFAULT_SETTINGS);
+  if (!s) return structuredClone(DEFAULT_SETTINGS);
+  if (s.meals?.join() === 'Meal 1,Meal 2,Meal 3,Snacks') s.meals = ['Food']; // old default -> single running list
+  return { ...structuredClone(DEFAULT_SETTINGS), ...s };
 }
 export const saveSettings = s => put('settings', { ...s, id: 'main' });
 

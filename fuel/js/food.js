@@ -99,9 +99,10 @@ async function usdaBarcode(code) {
 
 // ---- Ranking ----
 const SRC_W = { mine: 1.3, recipe: 1.25, usda: 1.0, 'usda-b': 0.85, off: 0.7 };
-function relevance(q, f) {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const hay = `${f.name} ${f.brand || ''}`.toLowerCase();
+const stem = w => (w.length > 3 ? w.replace(/(ies)$/, 'y').replace(/(es|s)$/, '') : w);
+export function relevance(q, f) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean).map(stem);
+  const hay = `${f.name} ${f.brand || ''}`.toLowerCase().replace(/[’']/g, '');
   if (!words.length) return 1;
   const hits = words.filter(w => hay.includes(w)).length / words.length;
   const starts = hay.startsWith(words[0]) ? 0.15 : 0;

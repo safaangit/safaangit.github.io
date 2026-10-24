@@ -130,3 +130,23 @@ details summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
 
 #toast { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 9px 14px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none; transition: .2s; z-index: 30; max-width: calc(100% - 32px); }
 #toast.show { opacity: 1; transform: translateX(-50%); }
+
+button.link { border: 0; background: none; color: var(--accent); padding: 2px 6px; font-size: 13px; font-weight: 600; }
+.selecting li { padding-left: 0; }
+.box { width: 22px; height: 22px; flex: none; border: 2px solid var(--line); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; }
+li.picked .box { background: var(--accent); border-color: var(--accent); }
+li.picked .box::after { content: "✓"; color: var(--accent-ink); font-size: 14px; font-weight: 700; }
+li.picked { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.selbar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; margin: 0 0 12px; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+.selbar span { flex: 1 1 100%; font-size: 13px; color: var(--muted); }
+.selbar button { flex: 1 1 auto; padding: 8px 8px; font-size: 14px; }
+li.empty { cursor: default; }
+textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: inherit; font-size: 16px; color: inherit; resize: vertical; }
+.bigbtn.mic { width: 100%; background: var(--chip); border-style: solid; color: var(--accent) !important; font-weight: 600; }
+.bigbtn.mic.on { background: var(--warn-bg); color: var(--warn) !important; animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .65; } }
+.vrow { align-items: flex-start !important; cursor: default !important; }
+.vamt { display: grid; grid-template-columns: 90px 1fr; gap: 6px; margin-top: 6px; }
+.vbtns { display: flex; flex-direction: column; gap: 6px; }
+.vbtns button { padding: 6px 8px; font-size: 13px; }
+.vbtns .rm { color: var(--muted); }

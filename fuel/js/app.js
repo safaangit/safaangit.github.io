@@ -7,6 +7,7 @@ import * as scan from './scan.js';
 import * as sync from './sync.js';
 import { goalsFor, recommend, measuredTdee, autoDayType } from './goals.js';
 import { bars, line, ema } from './charts.js';
+import * as voice from './voice.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -16,15 +17,17 @@ const nowTime = () => new Date().toTimeString().slice(0, 5);
 const fmtDate = d => d === today() ? 'Today' : d === addDays(today(), -1) ? 'Yesterday' : new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 const DT_ORDER = [null, 'rest', 'run', 'long'];
 
-const state = { date: today(), tab: local.get('tab', 'today'), s: null };
+const state = { date: today(), tab: local.get('tab', 'today'), s: null, sel: null };
 
 // ---------- shell ----------
 async function render() {
   state.s = await db.settings();
   local.set('tab', state.tab);
+  if (state.tab === 'recipes') state.tab = 'foods';
   $$('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
   const main = $('main');
-  const views = { today: viewToday, trends: viewTrends, recipes: viewRecipes, settings: viewSettings };
+  if (state.tab === 'recipes') state.tab = 'foods';
+  const views = { today: viewToday, trends: viewTrends, foods: viewFoods, settings: viewSettings };
   main.innerHTML = await views[state.tab]();
   bind[state.tab]?.(main);
   syncBadge();
@@ -47,7 +50,7 @@ async function runSync() {
 }
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3500);
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), Math.max(3500, msg.length * 70));
 }
 
 // Bottom sheet modal. Returns the sheet body element.
@@ -78,17 +81,35 @@ async function dayContext(date) {
   const g = { ...(gday || {}), activities: [...(gday?.activities || []), ...mine] };
   return { gday, g, dayRec, goals: goalsFor(state.s, g, dayRec?.dayType) };
 }
-async function recentFoods(limit = 40) {
-  const months = [monthOf(today()), monthOf(addDays(today(), -31))];
-  const seen = new Map();
-  for (const m of months) for (const e of (await db.all('log/' + m)).sort((a, b) => b.u - a.u)) {
-    const k = e.foodId || e.recipeId || e.name;
-    if (!seen.has(k)) seen.set(k, e);
+// Recents ranked by how often and how lately you ate them. One-offs drop off after a
+// week, and anything you remove stays hidden until you log it again.
+const recentKey = e => e.foodId || e.recipeId || 'n:' + e.name.toLowerCase();
+async function recentFoods(limit = 30) {
+  const hidden = new Set(state.s.hiddenRecents || []);
+  const months = [0, -31, -62].map(k => monthOf(addDays(today(), k)));
+  const cutoff = addDays(today(), -60), week = addDays(today(), -7);
+  const stats = new Map();
+  for (const m of new Set(months)) for (const e of await db.all('log/' + m)) {
+    if (e.date < cutoff) continue;
+    const k = recentKey(e), st = stats.get(k) || { uses: 0, last: '', e };
+    st.uses++;
+    if ((e.date + (e.time || '')) > st.last) { st.last = e.date + (e.time || ''); st.e = e; }
+    stats.set(k, st);
   }
-  const foods = new Map((await db.all('foods')).map(f => [f.id, f]));
+  const foods = new Map((await food.mine()).map(f => [f.id, f]));
   const recipes = new Map((await recipeFoods()).map(r => [r.recipeId, r]));
-  return [...seen.values()].slice(0, limit).map(e => (e.foodId && foods.get(e.foodId)) || (e.recipeId && recipes.get(e.recipeId)) ||
-    { name: e.name, brand: e.brand, n: e.n, units: [{ label: e.unit, mult: e.mult }], source: 'mine', srcLabel: 'Recent', _quick: true });
+  return [...stats.entries()]
+    .filter(([k, st]) => !hidden.has(k) && (st.uses >= 2 || st.last >= week || foods.get(k)?.fav))
+    .sort((a, b) => (b[1].uses + (b[1].last >= week ? 3 : 0)) - (a[1].uses + (a[1].last >= week ? 3 : 0)) || b[1].last.localeCompare(a[1].last))
+    .slice(0, limit)
+    .map(([k, { e, uses }]) => ({ ...((e.foodId && foods.get(e.foodId)) || (e.recipeId && recipes.get(e.recipeId)) ||
+      { name: e.name, brand: e.brand, n: e.n, units: [{ label: e.unit, mult: e.mult }], source: 'mine', srcLabel: 'Recent', _quick: true }), _key: k, _uses: uses }));
+}
+async function setHidden(keys, hide) {
+  const h = new Set(state.s.hiddenRecents || []);
+  keys.forEach(k => (hide ? h.add(k) : h.delete(k)));
+  state.s.hiddenRecents = [...h];
+  await db.saveSettings(state.s);
 }
 
 // Recipe nutrition per serving, resolved through nested recipes.
@@ -118,9 +139,9 @@ function checkBadge(n) {
   if (c.missingKcal) return `<span class="badge warn" title="No calories listed">no kcal listed</span>`;
   return c.ok ? '' : `<span class="badge warn" title="Label ${c.listed} kcal vs macros ${c.est} kcal">kcal ≠ macros ${Math.round(c.pct * 100)}%</span>`;
 }
-function foodRow(f, i) {
+function foodRow(f, i, selState = null) {
   const p = food.preview(f);
-  return `<li class="food" data-i="${i}"><div class="grow"><div class="name">${esc(f.name)}${f.verified ? ' <span class="badge ok">✓</span>' : ''}</div>
+  return `<li class="food ${selState || ''}" data-i="${i}">${selState != null ? '<span class="box"></span>' : ''}<div class="grow"><div class="name">${f.fav ? '★ ' : ''}${esc(f.name)}${f.verified ? ' <span class="badge ok">✓</span>' : ''}</div>
   <div class="sub">${f.brand ? esc(f.brand) + ' · ' : ''}<span class="badge src-${f.source}">${esc(f.srcLabel || f.source)}</span> ${checkBadge(f.n)}</div>
   <div class="sub">${esc(p.unit.label)} · ${kcalOf(p.n)} kcal · ${macroLine(p.n)}</div></div><span class="chev">›</span></li>`;
 }
@@ -143,15 +164,21 @@ async function viewToday() {
   const dtLabel = s.dayTypes[goals.type]?.label || goals.type;
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
 
+  const single = s.meals.length === 1, sel = state.sel;
   const byMeal = s.meals.map((m, mi) => {
-    const list = entries.filter(e => (e.meal ?? 0) === mi);
+    const list = entries.filter(e => single || (e.meal ?? 0) === mi);
     const t = N.entryTotals(list, s.caloriesFromMacros);
-    return `<section class="card meal"><header><h3>${esc(m)}</h3><span class="muted">${list.length ? r0(t.kcal) + ' kcal' : ''}</span><button class="add" data-meal="${mi}" aria-label="Add to ${esc(m)}">＋</button></header>
-    <ul class="entries">${list.map(e => {
+    return `<section class="card meal"><header><h3>${esc(m)}</h3><span class="muted">${list.length ? r0(t.kcal) + ' kcal' : ''}</span>
+      ${list.length && !sel ? '<button class="link selBtn">Select</button>' : ''}
+      ${mi === 0 && !sel ? '<button class="add voiceBtn" aria-label="Log by voice">🎤</button>' : ''}${sel ? '' : `<button class="add" data-meal="${mi}" aria-label="Add to ${esc(m)}">＋</button>`}</header>
+    <ul class="entries ${sel ? 'selecting' : ''}">${list.map(e => {
       const n = N.scale(e.n, e.qty * e.mult);
-      return `<li data-id="${e.id}"><div class="grow"><div class="name">${esc(e.name)}</div><div class="sub">${r1(e.qty)} × ${esc(e.unit)}${e.time ? ' · ' + e.time : ''}</div></div><div class="right"><div>${kcalOf(n)}</div><div class="sub">${macroLine(n)}</div></div></li>`;
-    }).join('')}</ul></section>`;
+      return `<li data-id="${e.id}" class="${sel?.has(e.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow"><div class="name">${esc(e.name)}</div><div class="sub">${r1(e.qty)} × ${esc(e.unit)}${e.time ? ' · ' + e.time : ''}</div></div><div class="right"><div>${kcalOf(n)}</div><div class="sub">${macroLine(n)}</div></div></li>`;
+    }).join('') || (single ? '<li class="empty muted small">Tap 🎤 and say everything you ate, e.g. "chicken 8.5 oz, milk 240 grams, 2 eggs".</li>' : '')}</ul></section>`;
   }).join('');
+  const selBar = sel ? `<div class="selbar"><span>${sel.size} selected</span><button id="selAll">All</button>
+    ${state.date !== today() ? '<button id="selCopy">Copy to today</button>' : '<button id="selDup">Duplicate</button>'}
+    <button id="selDel" class="danger">Delete</button><button id="selDone" class="primary">Done</button></div>` : '';
 
   const acts = g.activities || [];
   const garmin = `<section class="card">
@@ -174,6 +201,7 @@ async function viewToday() {
     </div>
   </section>
   ${byMeal}
+  ${selBar}
   ${garmin}
   <section class="card row"><h3>Weight</h3><input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="lb" value="${w ?? ''}"><span class="muted small">${!weights.find(x => x.date === date) && gday?.weightLb ? 'from Garmin' : ''}</span></section>`;
 }
@@ -182,8 +210,8 @@ function pace(sec, m) { const p = sec / (m / 1609.34); return `${Math.floor(p / 
 
 const bind = {};
 bind.today = root => {
-  $('#prev', root).onclick = () => { state.date = addDays(state.date, -1); render(); };
-  $('#next', root).onclick = () => { state.date = addDays(state.date, 1); render(); };
+  $('#prev', root).onclick = () => { state.date = addDays(state.date, -1); state.sel = null; render(); };
+  $('#next', root).onclick = () => { state.date = addDays(state.date, 1); state.sel = null; render(); };
   $('#dateLbl', root).onclick = () => { state.date = today(); render(); };
   $('#dayType', root).onclick = async () => {
     const cur = (await db.get('days', state.date))?.dayType ?? null;
@@ -191,11 +219,32 @@ bind.today = root => {
     await db.put('days', { id: state.date, dayType: next });
     render();
   };
-  $$('.meal .add', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
+  $$('.meal .add[data-meal]', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
+  $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
+  $$('.selBtn', root).forEach(b => (b.onclick = () => { state.sel = new Set(); render(); }));
   $$('.meal li[data-id]', root).forEach(li => (li.onclick = async () => {
+    if (state.sel) { state.sel.has(li.dataset.id) ? state.sel.delete(li.dataset.id) : state.sel.add(li.dataset.id); return render(); }
     const e = await db.get(logName(state.date), li.dataset.id);
     openPortion({ name: e.name, brand: e.brand, n: e.n, units: [{ label: e.unit, mult: e.mult }], id: e.foodId, recipeId: e.recipeId, source: 'mine' }, { entry: e });
   }));
+  if (state.sel) {
+    const picked = async () => (await entriesFor(state.date)).filter(e => state.sel.has(e.id));
+    $('#selDone', root).onclick = () => { state.sel = null; render(); };
+    $('#selAll', root).onclick = async () => { (await entriesFor(state.date)).forEach(e => state.sel.add(e.id)); render(); };
+    $('#selDel', root).onclick = async () => {
+      const list = await picked(); if (!list.length) return;
+      if (!confirm(`Delete ${list.length} entr${list.length === 1 ? 'y' : 'ies'}?`)) return;
+      for (const e of list) await db.remove(logName(e.date), e.id);
+      state.sel = null; render(); toast(`Deleted ${list.length}`);
+    };
+    const copyTo = async date => {
+      const list = await picked();
+      for (const { id, u, ...e } of list) await db.put(logName(date), { ...e, date, time: nowTime() });
+      state.sel = null; toast(`Copied ${list.length} to ${fmtDate(date)}`); render();
+    };
+    $('#selCopy', root)?.addEventListener('click', () => copyTo(today()));
+    $('#selDup', root)?.addEventListener('click', () => copyTo(state.date));
+  }
   $('#addEx', root).onclick = () => openExercise();
   $$('li[data-ex]', root).forEach(li => (li.onclick = () => openExercise(li.dataset.ex)));
   $('#weight', root).onchange = async e => {
@@ -234,21 +283,42 @@ function openAdd(meal, { pick } = {}) {
   const b = sheet(`
     <div class="searchbar"><input id="q" type="search" placeholder="Search foods, brands, recipes" autocomplete="off" enterkeyhint="search"></div>
     <div class="tools">
-      <button id="scanBtn">▥ Scan barcode</button><button id="labelBtn">📷 Snap label</button>
+      ${pick ? '' : '<button id="voiceBtn">🎤 Say it</button>'}<button id="scanBtn">▥ Scan</button><button id="labelBtn">📷 Label</button>
       ${pick ? '' : '<button id="quickBtn">⚡ Quick add</button>'}<button id="newBtn">＋ New food</button>
     </div>
-    <div id="results"><p class="muted">Loading recents…</p></div>`, { title: pick ? 'Pick ingredient' : `Add to ${state.s.meals[meal] || 'diary'}` });
+    <div id="results"><p class="muted">Loading recents…</p></div>`, { title: pick ? 'Pick ingredient' : state.s.meals.length > 1 ? `Add to ${state.s.meals[meal] || 'diary'}` : 'Add food' });
   const q = $('#q', b), out = $('#results', b);
   let list = [];
+  let editing = null; // Set of list indexes while cleaning up recents
   const show = (sections) => {
     list = [];
-    out.innerHTML = sections.filter(s => s.items.length).map(s => `<h4>${s.title}</h4><ul class="list">${s.items.map(f => foodRow(f, list.push(f) - 1)).join('')}</ul>`).join('') || '<p class="muted">Nothing found. Try fewer words, snap the label, or make a new food.</p>';
-    $$('li.food', out).forEach(li => (li.onclick = () => choose(list[+li.dataset.i])));
+    out.innerHTML = sections.filter(s => s.items.length).map(s => `<h4>${s.title}${s.editable ? ` <button class="link" id="editRecents">${editing ? 'Cancel' : 'Clean up'}</button>` : ''}</h4>
+      <ul class="list ${s.editable && editing ? 'selecting' : ''}">${s.items.map(f => { const i = list.push(f) - 1; return foodRow(f, i, s.editable && editing ? (editing.has(i) ? 'picked' : '') : null); }).join('')}</ul>
+      ${s.editable && editing ? `<div class="actions"><button class="danger" id="hideRecents">Remove ${editing.size || ''} from recents</button></div>` : ''}`).join('') || '<p class="muted">Nothing found. Try fewer words, snap the label, or make a new food.</p>';
+    $$('li.food', out).forEach(li => (li.onclick = () => {
+      const i = +li.dataset.i;
+      if (editing && list[i]._key) { editing.has(i) ? editing.delete(i) : editing.add(i); return show(lastSections); }
+      choose(list[i]);
+    }));
+    const er = $('#editRecents', out);
+    if (er) er.onclick = () => { editing = editing ? null : new Set(); show(lastSections); };
+    const hr = $('#hideRecents', out);
+    if (hr) hr.onclick = async () => {
+      const keys = [...editing].map(i => list[i]._key).filter(Boolean);
+      if (!keys.length) return;
+      await setHidden(keys, true);
+      editing = null; toast(`Removed ${keys.length} from recents`);
+      lastSections[0].items = lastSections[0].items.filter(f => !keys.includes(f._key));
+      show(lastSections);
+    };
+    lastSections = sections;
   };
+  let lastSections = [];
   const choose = f => (pick ? openPortion(f, { pick }) : openPortion(f, { meal }));
   (async () => {
     const [recent, pantry, recipes] = await Promise.all([recentFoods(), food.mine(), recipeFoods()]);
-    show([{ title: 'Recent', items: recent }, { title: 'Recipes & Creami', items: recipes }, { title: 'My foods', items: pantry.filter(p => !recent.some(r => r.id === p.id)).slice(0, 40) }]);
+    const favs = pantry.filter(p => p.fav && !recent.some(r => r.id === p.id));
+    show([{ title: 'Recent', items: recent, editable: true }, { title: 'Favorites', items: favs }, { title: 'Recipes & Creami', items: recipes }]);
   })();
   let t, seq = 0;
   const run = async () => {
@@ -257,6 +327,7 @@ function openAdd(meal, { pick } = {}) {
     out.innerHTML = '<p class="muted">Searching your foods, USDA and Open Food Facts…</p>';
     const res = await food.search(v, { recipes: await recipeFoods() });
     if (my !== seq) return;
+    editing = null;
     show([{ title: 'Yours', items: res.own }, { title: 'Best matches', items: res.remote }]);
     if (food.usdaThrottled && !local.get('usdaKey')) out.insertAdjacentHTML('afterbegin', '<p class="warn small">USDA demo key is rate-limited. Add your free key in Settings for better generic results.</p>');
   };
@@ -265,7 +336,7 @@ function openAdd(meal, { pick } = {}) {
   $('#scanBtn', b).onclick = () => openScanner(meal, pick);
   $('#labelBtn', b).onclick = () => openLabel({ meal, pick });
   $('#newBtn', b).onclick = () => openFoodEditor(null, { meal, pick });
-  if (!pick) $('#quickBtn', b).onclick = () => openQuick(meal);
+  if (!pick) { $('#quickBtn', b).onclick = () => openQuick(meal); $('#voiceBtn', b).onclick = () => openVoice(); }
   setTimeout(() => q.focus(), 50);
 }
 
@@ -285,6 +356,7 @@ function openQuick(meal) {
 
 async function logEntry(e) {
   await db.put(logName(state.date), { date: state.date, time: nowTime(), ...e });
+  if ((state.s.hiddenRecents || []).includes(recentKey(e))) await setHidden([recentKey(e)], false);
   closeSheet(); render(); toast(`Logged ${e.name}`);
 }
 
@@ -304,8 +376,8 @@ function openPortion(f, { meal = 0, entry, pick } = {}) {
       ${!N.check(f.n).ok && !N.check(f.n).missingKcal ? `<p class="warn small">Listed calories don't match the macros. ${state.s.caloriesFromMacros ? 'The app is counting calories from macros, so your totals stay consistent.' : 'Consider turning on "calories from macros" in Settings.'}</p>` : ''}
       <div class="qty"><input id="qty" type="number" inputmode="decimal" step="any" value="${q0}"><select id="unit">${units.map((u, i) => `<option value="${i}" ${i === ui ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select></div>
       <div id="live" class="live"></div>
-      ${pick ? '' : `<label>Meal<select id="meal">${state.s.meals.map((m, i) => `<option value="${i}" ${i === (entry?.meal ?? meal) ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`}
-      ${remote && !pick ? `<label class="check"><input type="checkbox" id="save" checked> Save to my foods</label>` : ''}
+      ${pick || state.s.meals.length < 2 ? '' : `<label>Meal<select id="meal">${state.s.meals.map((m, i) => `<option value="${i}" ${i === (entry?.meal ?? meal) ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`}
+      ${remote && !pick ? `<label class="check"><input type="checkbox" id="save"> Save to my foods (for staples; it shows in recents either way once you eat it again)</label>` : ''}
       <div class="actions">
         ${entry ? '<button class="danger" id="del">Delete</button>' : ''}
         ${f.source !== 'recipe' ? '<button id="edit">Edit nutrition</button>' : ''}
@@ -329,8 +401,8 @@ function openPortion(f, { meal = 0, entry, pick } = {}) {
       }
       const u = units[+unit.value];
       const base = { name: f.name, brand: f.brand, foodId, recipeId: f.recipeId, qty: +qty.value || 0, unit: u.label, mult: u.mult, n: f.n };
-      if (pick) return pick(base);
-      const m = +$('#meal', b).value;
+      if (pick) return pick(base, { ...f, units });
+      const m = +($('#meal', b)?.value ?? 0);
       if (entry) { await db.put(logName(entry.date), { ...entry, ...base, meal: m }); closeSheet(); render(); }
       else await logEntry({ ...base, meal: m });
     };
@@ -379,6 +451,103 @@ function openFoodEditor(f, { meal, pick, entry, barcode, prefill } = {}) {
     toast('Saved to my foods');
     openPortion({ ...saved, source: 'mine', srcLabel: saved.verified ? 'Yours ✓' : 'Yours' }, { meal, pick, entry });
   };
+}
+
+// ---------- Voice / list logging ----------
+// "chicken 8.5 oz, milk 240 g, 2 eggs" -> one row per item, matched to your foods first.
+let vstate = { text: '', rows: [] };
+async function voiceCandidates() {
+  const [mine, recipes, recent] = await Promise.all([food.mine(), recipeFoods(), recentFoods(300)]);
+  const seen = new Set(), out = [];
+  for (const f of [...mine, ...recipes, ...recent]) { const k = f.id || f._key || f.name; if (!seen.has(k)) { seen.add(k); out.push(f); } }
+  return out;
+}
+async function matchRows(text) {
+  const items = voice.parseItems(text), cands = await voiceCandidates();
+  return Promise.all(items.map(async it => {
+    const row = { said: [it.qty !== 1 || it.unit ? `${it.qty}${it.unit ? ' ' + it.unit : ''}` : '', it.text].filter(Boolean).join(' '), qty: it.qty, unit: it.unit, text: it.text };
+    const local = voice.bestLocal(it.text, cands);
+    if (local) { row.food = local.food; row.src = 'yours'; }
+    else {
+      const res = await food.search(it.text).catch(() => ({ own: [], remote: [] }));
+      row.food = res.own[0] || res.remote[0]; row.src = row.food ? 'guess' : 'none';
+    }
+    if (row.food) row.amount = voice.resolveAmount(row.food, it.qty, it.unit);
+    return row;
+  }));
+}
+function openVoice() {
+  const b = sheet(`
+    ${voice.speechSupported() ? '<button id="mic" class="bigbtn mic">🎤 Tap and talk</button>' : '<p class="muted small">This browser has no voice input here. Type it, or use your keyboard\'s mic button.</p>'}
+    <textarea id="vt" rows="3" placeholder="chicken 8.5 oz, milk 240 grams, 2 eggs, 1 josephs pita">${esc(vstate.text)}</textarea>
+    <div class="actions"><button id="parse">Match items</button></div>
+    <ul class="list" id="vrows"></ul>
+    <div id="vlog"></div>`, { title: 'Say what you ate' });
+  const ta = $('#vt', b);
+  const draw = () => {
+    const rows = vstate.rows;
+    $('#vrows', b).innerHTML = rows.map((r, i) => {
+      const units = r.food?.units?.length ? r.food.units : [{ label: 'serving', mult: 1 }];
+      const n = r.food ? N.scale(r.food.n, r.amount.qty * r.amount.mult) : null;
+      return `<li class="vrow" data-i="${i}"><div class="grow">
+        <div class="name">${r.food ? esc(r.food.name) : 'No match'} <span class="badge ${r.src === 'yours' ? 'ok' : 'warn'}">${r.src === 'yours' ? 'yours' : r.src === 'guess' ? 'best guess, check it' : 'pick one'}</span></div>
+        <div class="sub">heard "${esc(r.said)}"${n ? ` · ${kcalOf(n)} kcal · ${macroLine(n)}` : ''}</div>
+        ${r.food ? `<div class="vamt"><input class="vq" type="number" step="any" inputmode="decimal" value="${r.amount.qty}"><select class="vu">${units.map(u => `<option ${u.label === r.amount.unit ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select></div>` : ''}
+      </div><div class="vbtns"><button class="chg">Change</button><button class="rm" aria-label="Remove">✕</button></div></li>`;
+    }).join('');
+    const ok = rows.filter(r => r.food).length;
+    $('#vlog', b).innerHTML = rows.length ? `<div class="actions"><button class="primary" id="logAll" ${ok ? '' : 'disabled'}>Log ${ok} item${ok === 1 ? '' : 's'}</button></div>` : '';
+    $$('.vrow', b).forEach(li => {
+      const r = rows[+li.dataset.i];
+      $('.rm', li).onclick = () => { rows.splice(+li.dataset.i, 1); draw(); };
+      $('.chg', li).onclick = () => openAdd(0, { pick: (base, full) => {
+        r.food = full; r.src = 'yours'; r.amount = { qty: base.qty, unit: base.unit, mult: base.mult };
+        openVoice();
+      } });
+      const q = $('.vq', li), u = $('.vu', li);
+      if (q) q.onchange = () => { r.amount.qty = +q.value || 0; draw(); };
+      if (u) u.onchange = () => { const unit = r.food.units.find(x => x.label === u.value); r.amount = { ...r.amount, unit: unit.label, mult: unit.mult }; draw(); };
+    });
+    const la = $('#logAll', b);
+    if (la) la.onclick = async () => {
+      const list = rows.filter(r => r.food);
+      for (const r of list) {
+        const f = r.food;
+        await db.put(logName(state.date), { date: state.date, time: nowTime(), meal: 0, name: f.name, brand: f.brand,
+          foodId: f.source === 'mine' && !f._quick ? f.id : undefined, recipeId: f.recipeId, qty: r.amount.qty, unit: r.amount.unit, mult: r.amount.mult, n: f.n });
+      }
+      const keys = list.map(r => recentKey({ foodId: r.food.source === 'mine' && !r.food._quick ? r.food.id : undefined, recipeId: r.food.recipeId, name: r.food.name }));
+      if (keys.some(k => (state.s.hiddenRecents || []).includes(k))) await setHidden(keys, false);
+      vstate = { text: '', rows: [] };
+      closeSheet(); render(); toast(`Logged ${list.length} item${list.length === 1 ? '' : 's'}`);
+    };
+  };
+  const parse = async () => {
+    vstate.text = ta.value;
+    if (!ta.value.trim()) return;
+    $('#vrows', b).innerHTML = '<li class="muted small">Matching…</li>';
+    vstate.rows = await matchRows(ta.value);
+    draw();
+  };
+  ta.oninput = () => (vstate.text = ta.value);
+  $('#parse', b).onclick = parse;
+  const mic = $('#mic', b);
+  let rec;
+  if (mic) mic.onclick = () => {
+    if (rec) return rec.stop();
+    const before = ta.value ? ta.value.replace(/[,\s]*$/, ', ') : '';
+    mic.textContent = '● Listening… tap to stop'; mic.classList.add('on');
+    rec = voice.listen({
+      onText: t => { ta.value = before + t; vstate.text = ta.value; },
+      onEnd: (_, err) => {
+        rec = null; mic.textContent = '🎤 Tap and talk'; mic.classList.remove('on');
+        if (err && err !== 'no-speech' && err !== 'aborted') toast('Mic error: ' + err);
+        parse();
+      },
+    });
+  };
+  draw();
+  if (!vstate.rows.length && mic && !vstate.text) mic.click();
 }
 
 // ---------- Barcode ----------
@@ -452,7 +621,75 @@ function openLabel({ meal, pick, barcode } = {}) {
   };
 }
 
-// ---------- Recipes ----------
+// ---------- Foods & recipes ----------
+async function viewFoods() {
+  const seg = local.get('foodsSeg', 'foods');
+  const head = `<div class="seg" id="fseg"><button data-v="foods" class="${seg === 'foods' ? 'on' : ''}">My foods</button><button data-v="recipes" class="${seg === 'recipes' ? 'on' : ''}">Recipes & Creami</button></div>`;
+  return head + (seg === 'recipes' ? await viewRecipes() : await viewMyFoods());
+}
+// Usage per food over the last ~90 days, so one-offs are easy to find and clear out.
+async function foodUsage() {
+  const use = new Map();
+  for (const k of [0, -31, -62, -93]) for (const e of await db.all('log/' + monthOf(addDays(today(), k)))) {
+    if (!e.foodId) continue;
+    const u = use.get(e.foodId) || { n: 0, last: '' };
+    u.n++; if (e.date > u.last) u.last = e.date;
+    use.set(e.foodId, u);
+  }
+  return use;
+}
+async function viewMyFoods() {
+  const [foods, use] = await Promise.all([db.all('foods'), foodUsage()]);
+  const sort = local.get('foodSort', 'recent'), q = (state.foodQ || '').toLowerCase(), sel = state.fsel;
+  const hidden = new Set(state.s.hiddenRecents || []);
+  let list = foods.filter(f => !q || `${f.name} ${f.brand || ''}`.toLowerCase().includes(q));
+  const u = f => use.get(f.id) || { n: 0, last: '' };
+  list.sort(sort === 'az' ? (a, b) => a.name.localeCompare(b.name) : sort === 'least' ? (a, b) => u(a).n - u(b).n || a.name.localeCompare(b.name) : (a, b) => u(b).last.localeCompare(u(a).last) || a.name.localeCompare(b.name));
+  state.fview = list.map(f => f.id);
+  return `<div class="row"><input id="fq" type="search" placeholder="Filter ${foods.length} foods" value="${esc(state.foodQ || '')}">
+    <select id="fsort" style="max-width:130px"><option value="recent" ${sort === 'recent' ? 'selected' : ''}>Recently eaten</option><option value="least" ${sort === 'least' ? 'selected' : ''}>Least used</option><option value="az" ${sort === 'az' ? 'selected' : ''}>A–Z</option></select></div>
+    <div class="tools top">${sel ? '<button id="fAll">Select all shown</button><button id="fDone" class="primary">Done</button>' : '<button id="fSel">Select</button><button id="fNew">＋ New food</button>'}</div>
+    ${list.length ? `<ul class="list card ${sel ? 'selecting' : ''}" id="flist">${list.map(f => {
+      const x = u(f);
+      return `<li data-id="${f.id}" class="${sel?.has(f.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow"><div class="name">${f.fav ? '★ ' : ''}${esc(f.name)}${f.verified ? ' <span class="badge ok">✓</span>' : ''}</div>
+        <div class="sub">${f.brand ? esc(f.brand) + ' · ' : ''}${x.n ? `eaten ${x.n}× · last ${fmtDate(x.last)}` : 'not eaten in 90 days'}${hidden.has(f.id) ? ' · hidden from recents' : ''}</div></div>${sel ? '' : '<span class="chev">›</span>'}</li>`;
+    }).join('')}</ul>` : '<p class="muted">No saved foods yet. Foods you save from search, barcode or label scans land here.</p>'}
+    ${sel ? `<div class="selbar"><span>${sel.size} selected</span><button id="fFav">★ Favorite</button><button id="fHide">Hide in recents</button><button id="fDel" class="danger">Delete</button></div>` : ''}`;
+}
+bind.foods = root => {
+  $$('#fseg button', root).forEach(b => (b.onclick = () => { local.set('foodsSeg', b.dataset.v); state.fsel = null; render(); }));
+  if (local.get('foodsSeg', 'foods') === 'recipes') return bind.recipes(root);
+  const fq = $('#fq', root);
+  fq.oninput = () => { state.foodQ = fq.value; clearTimeout(fq._t); fq._t = setTimeout(async () => { await render(); const n = $('#fq'); n.focus(); n.setSelectionRange(99, 99); }, 300); };
+  $('#fsort', root).onchange = e => { local.set('foodSort', e.target.value); render(); };
+  $('#fSel', root)?.addEventListener('click', () => { state.fsel = new Set(); render(); });
+  $('#fNew', root)?.addEventListener('click', () => openFoodEditor(null, {}));
+  $('#fDone', root)?.addEventListener('click', () => { state.fsel = null; render(); });
+  $('#fAll', root)?.addEventListener('click', () => { state.fview.forEach(id => state.fsel.add(id)); render(); });
+  $$('#flist li[data-id]', root).forEach(li => (li.onclick = async () => {
+    const id = li.dataset.id;
+    if (state.fsel) { state.fsel.has(id) ? state.fsel.delete(id) : state.fsel.add(id); return render(); }
+    openFoodEditor({ ...(await db.get('foods', id)), source: 'mine' }, {});
+  }));
+  if (!state.fsel) return;
+  const ids = () => [...state.fsel];
+  $('#fDel', root).onclick = async () => {
+    if (!ids().length || !confirm(`Delete ${ids().length} food${ids().length === 1 ? '' : 's'}? Past log entries keep their numbers.`)) return;
+    for (const id of ids()) await db.remove('foods', id);
+    toast(`Deleted ${ids().length}`); state.fsel = null; render();
+  };
+  $('#fFav', root).onclick = async () => {
+    const list = await Promise.all(ids().map(id => db.get('foods', id)));
+    const on = list.some(f => !f.fav); // favorite all unless every one already is
+    for (const f of list) await db.put('foods', { ...f, fav: on || undefined });
+    toast(on ? 'Favorited' : 'Unfavorited'); state.fsel = null; render();
+  };
+  $('#fHide', root).onclick = async () => {
+    const h = new Set(state.s.hiddenRecents || []), hide = ids().some(id => !h.has(id));
+    await setHidden(ids(), hide); toast(hide ? 'Hidden from recents' : 'Back in recents'); state.fsel = null; render();
+  };
+};
+
 async function viewRecipes() {
   const rs = await recipeFoods();
   const row = (r) => `<li data-id="${r.id}"><div class="grow"><div class="name">${esc(r.name)} <span class="badge src-recipe">${r.tag === 'creami' ? 'Creami' : 'Recipe'}</span></div>
@@ -587,7 +824,7 @@ async function viewSettings() {
     <label class="check"><input type="checkbox" name="netCarbs" ${s.netCarbs ? 'checked' : ''}> Show net carbs (carbs − fiber)</label>
     <div class="grid2"><label>Long run at (mi)<input name="longRunMi" type="number" step="0.5" value="${s.longRunMi}"></label>
     <label>Eat back Garmin exercise kcal %<input name="eatBackPct" type="number" min="0" max="100" step="5" value="${s.eatBackPct}"></label></div>
-    <label>Meals (comma separated)<input name="meals" value="${esc(s.meals.join(', '))}"></label>
+    <label>Meals (one name = a single running list for the day; commas = separate meals)<input name="meals" value="${esc(s.meals.join(', '))}"></label>
   </form></section>
   <section class="card"><h3>Sync & Garmin</h3><form id="gh" class="form">
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
@@ -632,7 +869,13 @@ bind.settings = root => {
   };
   $('#gh', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); syncBadge(); };
   $('#keys', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); toast('Saved on this device'); };
-  $('#syncNow', root).onclick = runSync;
+  $('#syncNow', root).onclick = async () => {
+    for (const [k, v] of new FormData($('#gh', root))) local.set(k, String(v).trim()); // pasted but not yet blurred
+    if (!sync.configured()) return toast('Paste your GitHub token first');
+    syncBadge('syncing…');
+    try { const r = await sync.sync(); syncBadge(); toast(`Synced ✓ ${r.pulled ? `pulled ${r.pulled} file(s)` : 'token works'}`); render(); }
+    catch (e) { syncBadge('sync failed'); $('#sync').className = 'warn'; toast(e.message); }
+  };
   $('#pullG', root).onclick = async () => {
     try { await sync.runGarminSync(); toast('Garmin sync started. Data lands in a few minutes.'); }
     catch (e) { toast(e.status === 403 ? 'Token needs Actions: read & write' : e.message); }
@@ -671,7 +914,7 @@ async function openRecommend() {
 }
 
 // ---------- boot ----------
-$$('nav button').forEach(b => (b.onclick = () => { if (b.dataset.tab === 'add') return openAdd(defaultMeal()); state.tab = b.dataset.tab; render(); }));
+$$('nav button').forEach(b => (b.onclick = () => { if (b.dataset.tab === 'add') return openAdd(defaultMeal()); state.tab = b.dataset.tab; state.sel = state.fsel = null; render(); }));
 function defaultMeal() {
   const h = new Date().getHours(), n = state.s?.meals.length || 1;
   return Math.min(n - 1, h < 15 ? 0 : h < 18 ? 1 : 2);
