@@ -351,6 +351,29 @@ h4 + ul.list > li.letter:first-child { padding-top: 0 !important; }
 .donut text { font-size: 10px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.35); stroke-width: 1.5px; }
 .fitbtn { width: 100%; margin-top: 10px; border: 0; background: var(--tile); color: var(--accent); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px; font-size: 15px; }
 .fitbtn .ico { width: 20px; height: 20px; }
+
+/* Explore */
+.chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -12px 12px; padding: 0 12px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex: none; border-radius: 18px; padding: 7px 14px; font-size: 14px; background: var(--card); border-color: var(--line2); color: var(--ink); }
+.chips button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+ul.ideas { margin: 0 0 12px; padding: 0; overflow: hidden; }
+ul.ideas li:first-child { border-top: 0; }
+.idea .bc { margin-top: 4px; font-size: 14px; color: var(--ink); opacity: .85; }
+.idea .why { margin-top: 4px; font-size: 13px; color: var(--muted); }
+.idea .why .pd { font-weight: 500; color: var(--p); }
+.badge.deal { background: var(--f-bg); color: var(--f); }
+.badge.ok + .pd, .idea .why .badge.ok { margin-right: 4px; }
+.deals ul.list { margin: 0 -14px 8px; }
+.deals ul.list li, .sheet ul.list li:has(> a) { padding: 0; }
+ul.list li > a { display: flex; align-items: center; gap: 12px; padding: 11px 14px; color: inherit; text-decoration: none; flex: 1; min-width: 0; }
+ul.list li > a .name { white-space: normal; }
+ol.steps { margin: 0 0 12px; padding-left: 22px; } ol.steps li { margin: 0 0 6px; }
+p.halal { background: var(--tile); padding: 8px 10px; border-radius: 8px; }
+#exFits { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--accent); }
+.deal-p { font-size: 14px; font-weight: 500; color: var(--f); margin-top: 2px; }
+.deals h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+ul.list li.ad { cursor: default; padding: 11px 14px !important; display: block; }
 .prepbtn { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; padding: 13px 14px; text-align: left; font-size: 16px; color: var(--ink); }
 .prepbtn .ico { color: var(--accent); width: 22px; height: 22px; }
 .prepbtn .small { color: var(--muted); white-space: nowrap; }

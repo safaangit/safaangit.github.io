@@ -792,8 +792,8 @@ function openLabel({ meal, pick, barcode } = {}) {
 // ---------- Foods & recipes ----------
 async function viewFoods() {
   const seg = local.get('foodsSeg', 'foods');
-  const head = `<div class="seg" id="fseg"><button data-v="foods" class="${seg === 'foods' ? 'on' : ''}">My foods</button><button data-v="recipes" class="${seg === 'recipes' ? 'on' : ''}">Recipes & Creami</button></div>`;
-  return head + (seg === 'recipes' ? await viewRecipes() : await viewMyFoods());
+  const head = `<div class="seg" id="fseg"><button data-v="foods" class="${seg === 'foods' ? 'on' : ''}">My foods</button><button data-v="recipes" class="${seg === 'recipes' ? 'on' : ''}">Recipes & Creami</button><button data-v="explore" class="${seg === 'explore' ? 'on' : ''}">Explore</button></div>`;
+  return head + (seg === 'recipes' ? await viewRecipes() : seg === 'explore' ? await viewExplore() : await viewMyFoods());
 }
 // Usage per food over the last ~90 days, so one-offs are easy to find and clear out.
 async function foodUsage() {
@@ -827,6 +827,7 @@ async function viewMyFoods() {
 bind.foods = root => {
   $$('#fseg button', root).forEach(b => (b.onclick = () => { local.set('foodsSeg', b.dataset.v); state.fsel = null; render(); }));
   if (local.get('foodsSeg', 'foods') === 'recipes') return bind.recipes(root);
+  if (local.get('foodsSeg', 'foods') === 'explore') return bind.explore(root);
   const fq = $('#fq', root);
   fq.oninput = () => { state.foodQ = fq.value; clearTimeout(fq._t); fq._t = setTimeout(async () => { await render(); const n = $('#fq'); n.focus(); n.setSelectionRange(99, 99); }, 300); };
   $('#fsort', root).onchange = e => { local.set('foodSort', e.target.value); render(); };
@@ -915,6 +916,108 @@ function openRecipe(r) {
       openPortion(rf, { meal: 0 });
     };
   }
+}
+
+// ---------- Explore ----------
+// Curated halal ideas (app/ideas.json) built mostly from foods you already log, ranked by
+// what you've eaten lately. Deals come from data/fuel/deals.json, refreshed weekly by
+// tools/food_deals.js.
+let ideasP;
+const loadIdeas = () => (ideasP ??= fetch('ideas.json').then(r => r.json()).catch(() => { ideasP = null; return { ideas: [], buys: {} }; }));
+const EX_CHIPS = [['you', 'For you'], ['hacks', 'Hacks'], ['fits', 'Fits today'], ['high-protein', 'High protein'], ['creami', 'Creami'], ['konjac', 'Konjac'], ['josephs', "Joseph's"], ['swap', 'Swaps'], ['frozen', 'Frozen']];
+
+async function exploreData() {
+  const [{ ideas, buys }, foods, recipes, deals] = await Promise.all([loadIdeas(), db.all('foods'), db.all('recipes'), db.all('deals')]);
+  const byId = new Map(foods.map(f => [f.id, f]));
+  // Log names from the last ~60 days, counted, so "because you eat X" names your most frequent match.
+  const names = new Map(), cutoff = addDays(today(), -60);
+  for (const m of new Set([0, -31, -62].map(k => monthOf(addDays(today(), k)))))
+    for (const e of await db.all('log/' + m)) if (e.date >= cutoff) names.set(e.name, (names.get(e.name) || 0) + 1);
+  const pantry = foods.map(f => f.name);
+  // Weekly-ad deals count until the ad ends; online ones for 45 days after posting.
+  const fresh = deals.filter(d => (d.until ? d.until >= today() : d.date >= addDays(today(), -45))).sort((a, b) => !!b.until - !!a.until || b.date.localeCompare(a.date));
+  const list = ideas.map(x => {
+    // Use your own food's current numbers when the idea uses one of your foods.
+    const items = x.items.map(it => (it.foodId && byId.has(it.foodId) ? { ...it, n: byId.get(it.foodId).n } : it));
+    const n = N.zero(); items.forEach(it => N.add(n, N.scale(it.n, it.qty * it.mult)));
+    const re = new RegExp(x.like, 'i');
+    const hits = [...names].filter(([nm]) => re.test(nm)).sort((a, b) => b[1] - a[1]);
+    const owned = items.filter(it => it.foodId && byId.has(it.foodId)).length;
+    const because = hits[0]?.[0] || pantry.find(nm => re.test(nm));
+    return { ...x, items, n, k: N.countedKcal(n, state.s.caloriesFromMacros), because, owned,
+      score: hits.reduce((t, h) => t + h[1], 0) * 2 + (because ? 3 : 0) + owned,
+      saved: recipes.find(r => r.explore === x.id), deals: fresh.filter(d => x.buys?.includes(d.buy)) };
+  });
+  return { list, buys, deals: fresh };
+}
+// Ad deals show price, promo and end date; online deals link out.
+function dealRow(d, buys) {
+  const ends = d.until && new Date(d.until + 'T12:00').toLocaleDateString(undefined, { weekday: 'short' });
+  const sub = d.until ? [d.store, ends && 'until ' + ends] : [buys?.[d.buy]?.name, fmtDate(d.date), d.src];
+  const body = `<div class="grow"><div class="name">${esc(d.title)}</div>${d.until && (d.price || d.promo) ? `<div class="deal-p">${esc([d.price, d.promo].filter(Boolean).join(' · '))}</div>` : ''}<div class="sub">${esc(sub.filter(Boolean).join(' · '))}</div></div>`;
+  return d.url ? `<li><a href="${esc(d.url)}" target="_blank" rel="noopener">${body}<span class="chev">›</span></a></li>` : `<li class="ad">${body}</li>`;
+}
+async function leftToday() {
+  const s = state.s, [entries, ctx] = await Promise.all([entriesFor(today()), dayContext(today())]);
+  const tot = N.entryTotals(entries, s.caloriesFromMacros), g = ctx.goals;
+  return { kcal: g.kcal - tot.kcal, p: g.p - tot.p, c: g.c - (s.netCarbs ? tot.c - tot.fib : tot.c), f: g.f - tot.f };
+}
+
+async function viewExplore() {
+  const chip = local.get('exChip', 'you');
+  const { list, buys, deals } = await exploreData();
+  let shown = list, note = '';
+  if (chip === 'you') shown = [...list].sort((a, b) => b.score - a.score || b.n.p / b.k - a.n.p / a.k);
+  else if (chip === 'fits') {
+    const rem = await leftToday();
+    shown = list.filter(x => x.k <= rem.kcal + 40 && x.n.f <= Math.max(rem.f, 0) + 4).sort((a, b) => b.n.p - a.n.p);
+    note = `<p class="hint">Left today: <b>${r0(rem.kcal)}</b> kcal · ${macroLine(rem)}</p>`;
+  } else shown = list.filter(x => x.tags.includes(chip)).sort((a, b) => b.n.p / b.k - a.n.p / a.k);
+  state.exShown = shown;
+  const kind = x => x.kind === 'buy' ? 'Store pick' : `${{ creami: 'Creami pint', hack: 'Hack' }[x.kind] || 'Recipe'} · ${x.items.length} items`;
+  const row = (x, i) => `<li class="food idea" data-i="${i}"><div class="grow">${row2(esc(x.name), x.n, kind(x))}
+    ${x.because ? `<div class="bc">Because you eat ${esc(x.because.split(',')[0])}</div>` : ''}
+    <div class="why">${x.kind === 'creami' ? '<span class="badge src-recipe">Creami</span> ' : x.kind === 'buy' ? '<span class="badge src-usda">Buy</span> ' : ''}${x.tags.includes('halal-certified') ? '<span class="badge ok">Halal certified</span> ' : ''}${x.deals.length ? '<span class="badge deal">Deal</span> ' : ''}${x.saved ? '<span class="badge ok">✓ saved</span> ' : ''}<b class="pd">${r0((x.n.p * 100) / Math.max(1, x.k))} g protein / 100 kcal</b></div></div></li>`;
+  const order = Object.keys(buys), local_ = deals.filter(d => d.until).sort((a, b) => order.indexOf(a.buy) - order.indexOf(b.buy)), online = deals.filter(d => !d.until).slice(0, 4);
+  return `<div class="chips" id="exChips">${EX_CHIPS.map(([k, l]) => `<button data-c="${k}" class="${k === chip ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${note}
+    ${shown.length ? `<ul class="list card ideas">${shown.map(row).join('')}</ul>` : `<p class="muted pad">${chip === 'fits' ? "None of the ideas fit what's left today." : 'Nothing here yet.'}</p>`}
+    <button class="wide" id="exFits">${ico('pie')}What fits from my own foods</button>
+    <section class="card deals"><header><h3>Deals on what you buy</h3></header>
+      ${local_.length ? `<h4>This week near you</h4><ul class="list">${local_.slice(0, 6).map(d => dealRow(d, buys)).join('')}</ul>${local_.length > 6 ? `<button class="link" id="exAllDeals">All ${local_.length} weekly ad deals</button>` : ''}` : ''}
+      ${online.length ? `<h4>Online</h4><ul class="list">${online.map(d => dealRow(d, buys)).join('')}</ul>` : ''}
+      ${deals.length ? '' : '<p class="muted small">No deals synced yet. They refresh Wednesdays and Saturdays.</p>'}
+      <p class="muted small">From the Giant, Weis, ALDI, Walmart and Target weekly ads near Bellefonte plus Slickdeals, checked Wed and Sat for what you buy. Halal: ideas use vegetarian foods, seafood, or halal meat; no gelatin or alcohol.</p></section>`;
+}
+bind.explore = root => {
+  $$('#exChips button', root).forEach(b => (b.onclick = () => { local.set('exChip', b.dataset.c); render(); }));
+  $('#exFits', root).onclick = () => openFits();
+  $('#exAllDeals', root)?.addEventListener('click', async () => {
+    const { buys, deals } = await exploreData();
+    sheet(`<ul class="list">${deals.filter(d => d.until).map(d => dealRow(d, buys)).join('')}</ul>`, { title: 'This week near you' });
+  });
+  $$('li.idea', root).forEach(li => (li.onclick = () => openIdea(state.exShown[+li.dataset.i])));
+};
+
+function openIdea(x) {
+  const ing = x.items.map(it => { const n = N.scale(it.n, it.qty * it.mult); return `<li><div class="grow">${row2(esc(it.name), n, esc([it.brand, qtyText(it.qty, it.unit)].filter(Boolean).join(', ')))}</div></li>`; }).join('');
+  const b = sheet(`<div class="live"><div class="kcal">${r0(x.k)} kcal</div>${macroLine(x.n)}<div class="muted small">${[x.n.fib ? `fiber ${r1(x.n.fib)} g` : '', x.n.na ? `sodium ${r0(x.n.na)} mg` : '', x.kind === 'creami' ? 'whole pint' : ''].filter(Boolean).join(' · ')}</div></div>
+    <p class="hint">${esc(x.why)}</p>
+    <h4>${x.kind === 'buy' ? 'Item' : 'Ingredients'}</h4><ul class="list">${ing}</ul>
+    ${x.kind === 'buy' ? '' : `<h4>How</h4><ol class="steps">${x.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>`}
+    ${x.halal ? `<p class="small halal">${esc(x.halal)}</p>` : ''}
+    ${x.deals.length ? `<h4>Deals</h4><ul class="list">${x.deals.slice(0, 4).map(d => dealRow(d)).join('')}</ul>` : ''}
+    <div class="actions">${x.kind === 'buy' ? '' : `<button id="iSave">${x.saved ? 'Open my recipe' : 'Save to my recipes'}</button>`}<button class="primary" id="iLog">Log it</button></div>`, { title: x.name });
+  $('#iLog', b).onclick = async () => openPortion(x.saved
+    ? (await recipeFoods()).find(r => r.id === x.saved.id)
+    : { name: x.name, n: x.n, units: [{ label: x.kind === 'creami' ? 'pint' : x.items.length === 1 ? x.items[0].unit : 'serving', mult: 1 }], source: 'recipe', srcLabel: 'Explore' }, { meal: defaultMeal() });
+  const sv = $('#iSave', b);
+  if (sv) sv.onclick = async () => {
+    const r = x.saved || await db.put('recipes', { name: x.name, tag: x.kind === 'creami' ? 'creami' : undefined, servings: 1, servingLabel: x.kind === 'creami' ? 'pint' : 'serving',
+      items: x.items.map(({ foodId, name, brand, qty, unit, mult, n }) => ({ foodId, name, brand, qty, unit, mult, n })), explore: x.id });
+    if (!x.saved) toast('Saved to My recipes');
+    openRecipe(r);
+  };
 }
 
 // ---------- Trends ----------
