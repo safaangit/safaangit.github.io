@@ -486,3 +486,27 @@ details.how summary { list-style: none; cursor: pointer; display: flex; align-it
 details.how summary::-webkit-details-marker { display: none; }
 details.how summary h3 { margin: 0; } details.how summary::after { content: '›'; font-size: 22px; color: var(--muted); transform: rotate(90deg); }
 details.how[open] summary::after { transform: rotate(-90deg); } details.how[open] summary { margin-bottom: 8px; }
+
+/* ---- keep everything inside the phone width (no sideways scroll / zoom-out) ---- */
+html, body { max-width: 100%; overflow-x: clip; }
+header.top { gap: 4px; padding-right: 4px; max-width: 100vw; }
+header.top .hbtn { padding: 6px 5px; flex: none; }
+.datenav { min-width: 0; gap: 0; }
+.datenav button { padding: 6px 4px; }
+.datenav #dateLbl { min-width: 0; font-size: 19px; white-space: nowrap; }
+body.today header.top #sync:not(.warn) { display: none; }
+.mtot { gap: 2px; } .mtot > div { min-width: 0; } .mtot b { font-size: 15.5px; }
+ul.list.card { margin: 0 0 12px; padding: 0; overflow: hidden; }
+/* calendar: pinned pace chips + folded past weeks */
+.calstick { position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 2; background: var(--card); margin: 0 -10px 4px; padding: 6px 10px 4px; box-shadow: 0 6px 6px -6px rgba(0,0,0,.35); }
+.pchips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.pchip { font-size: 12px; font-variant-numeric: tabular-nums; padding: 3px 7px; border-radius: 7px; background: color-mix(in srgb, var(--k) 18%, var(--tile)); border-left: 3px solid var(--k); white-space: nowrap; }
+.pchip b { color: var(--k); font-weight: 700; margin-right: 4px; }
+details.pastwks { margin-top: 8px; border-radius: 10px; background: var(--tile); padding: 0 6px; }
+details.pastwks summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 4px; font-size: 14px; font-weight: 500; }
+details.pastwks summary::-webkit-details-marker { display: none; }
+details.pastwks summary::after { content: '›'; font-size: 20px; color: var(--muted); transform: rotate(90deg); margin-left: auto; }
+details.pastwks[open] summary::after { transform: rotate(-90deg); }
+details.pastwks summary .muted { font-size: 12.5px; font-weight: 400; }
+details.pastwks[open] { padding-bottom: 8px; }
+details.pastwks .wk:first-of-type { margin-top: 0; }
