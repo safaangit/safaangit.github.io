@@ -116,6 +116,19 @@ export async function garminMonth(ym, { fresh = false } = {}) {
 export async function garminDay(date, opts) { return (await garminMonth(date.slice(0, 7), opts)).days?.[date]; }
 export async function garminMeta() { try { return configured() ? await raw('data/garmin/meta.json') : null; } catch { return null; } }
 
+// ---- Halal places ----
+// data/halal/us.json, rebuilt monthly by tools/halal_places.py; kept locally and re-checked weekly.
+let halalP;
+export function halalPlaces() {
+  return (halalP ??= (async () => {
+    let d = await kv.get('halal');
+    if (configured() && (!d || Date.now() - (d.fetched || 0) > 7 * 864e5)) {
+      try { const r = await raw('data/halal/us.json'); if (r?.places) { d = { ...r, fetched: Date.now() }; await kv.set('halal', d); } } catch {}
+    }
+    return d || { places: [] };
+  })());
+}
+
 // Kicks off the Garmin workflow now (needs Actions: write on the token).
 export async function runGarminSync() {
   return gh('actions/workflows/garmin-sync.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: await branch() }) });

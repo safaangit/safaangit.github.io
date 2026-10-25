@@ -1,14 +1,12 @@
 {
- "v": 1,
+ "v": 2,
  "ideas": [
   {
    "id": "lavash-burrito",
    "name": "Bean & cheese lavash burrito",
    "kind": "recipe",
    "tags": [
-    "high-protein",
-    "josephs",
-    "under-400"
+    "high-protein"
    ],
    "like": "refried|smokey|bean|burrito|santa fe|rice & beans",
    "why": "Your refried beans + fat free cheese combo, wrapped in a 120 kcal Joseph's lavash instead of eating it from the bowl.",
@@ -87,6 +85,22 @@
     "Spread on the lavash, top with cheese and salsa, roll it up.",
     "Toast seam-side down in a dry pan 2 min a side so it holds."
    ],
+   "cat": "meal",
+   "q": "joseph's lavash burrito high protein",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "3 Joseph's Lavash Recipes For Weight Loss",
+     "by": "Jeff Pachtman Fitness",
+     "url": "https://www.youtube.com/watch?v=wkQDnHy8N8w"
+    },
+    {
+     "t": "reddit",
+     "title": "Joseph's lavash flatbread ideas",
+     "by": "r/1500isplenty",
+     "url": "https://www.reddit.com/r/1500isplenty/comments/x56aet/saw_someone_raving_about_these_josephs_brand/"
+    }
+   ],
    "buys": [
     "josephs",
     "mexican"
@@ -97,9 +111,6 @@
    "name": "Konjac baked ziti",
    "kind": "recipe",
    "tags": [
-    "swap",
-    "konjac",
-    "under-300",
     "high-protein"
    ],
    "like": "ziti|ravioli|pasta|michelina|cheese ziti",
@@ -167,6 +178,16 @@
     "Stir in sauce and cottage cheese (stands in for ricotta).",
     "Top with the cheese and broil or microwave until melted."
    ],
+   "cat": "meal",
+   "q": "konjac baked ziti low calorie",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "How to Cook Shirataki Noodles [the right way]",
+     "by": "Chowyoulater",
+     "url": "https://www.youtube.com/watch?v=n8DBqCmxC6U"
+    }
+   ],
    "buys": [
     "cottage",
     "konjac",
@@ -177,11 +198,7 @@
    "id": "sushi-bowl",
    "name": "California roll bowl",
    "kind": "recipe",
-   "tags": [
-    "swap",
-    "under-300",
-    "seafood"
-   ],
+   "tags": [],
    "like": "california|sushi|roll|crab|lobster|tempura",
    "why": "You eat California rolls a lot. Same flavors at home: fewer calories than a 15-piece tray, more protein from the tuna.",
    "items": [
@@ -272,6 +289,22 @@
     "Crumble a nori sheet on top if you have one."
    ],
    "halal": "Some imitation crab adds mirin or wine; check the label (Transocean Crab Supreme is the one you already log).",
+   "cat": "meal",
+   "q": "california roll bowl",
+   "links": [
+    {
+     "t": "reddit",
+     "title": "California roll in a bowl",
+     "by": "r/1500isplenty",
+     "url": "https://www.reddit.com/r/1500isplenty/comments/xdde7j/california_roll_in_a_bowl/"
+    },
+    {
+     "t": "youtube",
+     "title": "Easy California Roll Bowl with Wasabi Mayo Sauce",
+     "by": "Breakfast For One",
+     "url": "https://www.youtube.com/watch?v=PeLk6_1cg0w"
+    }
+   ],
    "buys": [
     "seafood"
    ]
@@ -279,11 +312,9 @@
   {
    "id": "premier-creami",
    "name": "Premier Protein Creami",
-   "kind": "creami",
+   "kind": "recipe",
    "tags": [
-    "creami",
-    "high-protein",
-    "under-200"
+    "high-protein"
    ],
    "like": "creami|premier|protein shake|oreo|yasso|ice cream",
    "why": "The classic: one shake makes a pint. 30 g protein for 180 kcal; add your 2 Oreo Thins on Mix-in if you want the cookies back.",
@@ -321,6 +352,23 @@
     "Spin on Lite Ice Cream, add a splash of milk and Re-spin if crumbly."
    ],
    "halal": "Jell-O sugar free instant pudding has no gelatin (checked the ingredient list); the Jell-O gelatin desserts do, so grab the pudding box.",
+   "cat": "sweet",
+   "serving": "pint",
+   "q": "ninja creami premier protein",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "Easy & Tasty Protein Ice Cream, 2 ingredients",
+     "by": "Larie Midkiff",
+     "url": "https://www.youtube.com/watch?v=th_-rRrxI9E"
+    },
+    {
+     "t": "reddit",
+     "title": "What's in your weekly rotation? (the healthy kind)",
+     "by": "r/ninjacreami",
+     "url": "https://www.reddit.com/r/ninjacreami/comments/1n2hymv/whats_in_your_current_weekly_rotation_the_healthy/"
+    }
+   ],
    "buys": [
     "premier",
     "pudding"
@@ -329,14 +377,12 @@
   {
    "id": "oikos-creami",
    "name": "Vanilla Oikos cheesecake Creami",
-   "kind": "creami",
+   "kind": "recipe",
    "tags": [
-    "creami",
-    "high-protein",
-    "under-200"
+    "high-protein"
    ],
    "like": "creami|yogurt|oikos|yasso|greek",
-   "why": "Two Oikos cups spin into a frozen-yogurt pint that tastes like cheesecake..",
+   "why": "Two Oikos cups spin into a frozen-yogurt pint that tastes like cheesecake.",
    "items": [
     {
      "name": "Triple Zero Vanilla Greek Yogurt",
@@ -369,6 +415,17 @@
     "Stir pudding mix into both yogurts, pack into the pint, freeze 24 h.",
     "Spin on Lite Ice Cream; Re-spin once."
    ],
+   "cat": "sweet",
+   "serving": "pint",
+   "q": "ninja creami greek yogurt cheesecake protein",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "10 Low Calorie Protein Ice Cream Recipes",
+     "by": "FitFoodAE",
+     "url": "https://www.youtube.com/watch?v=bXqnH70Zlm4"
+    }
+   ],
    "buys": [
     "oikos",
     "pudding"
@@ -379,9 +436,7 @@
    "name": "Plant chicken pita pizza",
    "kind": "recipe",
    "tags": [
-    "josephs",
-    "high-protein",
-    "under-300"
+    "high-protein"
    ],
    "like": "pizza|garlic knot|plant chicken|daring|bread",
    "why": "Pizza night for under 250 kcal using the Daring pieces you already buy.",
@@ -447,6 +502,9 @@
     "Pita on a tray, sauce, cheese, chopped plant chicken.",
     "Air fry 375\u00b0F 5\u20136 min or bake 425\u00b0F 8 min until crisp."
    ],
+   "cat": "meal",
+   "q": "joseph's pita pizza high protein",
+   "links": [],
    "buys": [
     "daring",
     "josephs",
@@ -458,9 +516,7 @@
    "name": "Chicken konjac stir-fry",
    "kind": "recipe",
    "tags": [
-    "konjac",
-    "high-protein",
-    "under-300"
+    "high-protein"
    ],
    "like": "chicken|stir fry|dumpling|noodle|veggie pasta",
    "why": "Big plate, 40 g protein, under 300 kcal. Replaces the Birds Eye veggie pasta bag (386 kcal).",
@@ -524,6 +580,22 @@
     "Cook the veggies, add sliced cooked chicken and soy sauce, toss everything."
    ],
    "halal": "Use halal chicken. Brewed soy sauce like Kikkoman contains alcohol from fermentation; La Choy and halal-certified brands don't.",
+   "cat": "meal",
+   "q": "shirataki noodle stir fry high protein",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "Shirataki Noodles are INSANE for Weight Loss",
+     "by": "Felu - Fit by cooking",
+     "url": "https://www.youtube.com/watch?v=-wRHXXyR6sc"
+    },
+    {
+     "t": "web",
+     "title": "Shirataki noodle stir-fry",
+     "by": "Diabetes Strong",
+     "url": "https://diabetesstrong.com/shirataki-noodles-shrimp-stir-fry/"
+    }
+   ],
    "buys": [
     "konjac"
    ]
@@ -533,9 +605,7 @@
    "name": "Egg white & cheese lavash wrap",
    "kind": "recipe",
    "tags": [
-    "josephs",
-    "high-protein",
-    "under-300"
+    "high-protein"
    ],
    "like": "egg|breakfast|bread|uncrustables",
    "why": "Good noon fast-breaker: 43 g protein for about 270 kcal.",
@@ -599,6 +669,16 @@
     "Scramble the egg whites, add cheese at the end.",
     "Fill the lavash, add salsa, roll and toast."
    ],
+   "cat": "meal",
+   "q": "egg white lavash breakfast wrap",
+   "links": [
+    {
+     "t": "reddit",
+     "title": "243 calorie breakfast, 25.8 g protein (egg white omelette)",
+     "by": "r/1500isplenty",
+     "url": "https://www.reddit.com/r/1500isplenty/comments/fmc1iy/243_calorie_super_filling_breakfast_258g_protein/"
+    }
+   ],
    "buys": [
     "eggw",
     "josephs",
@@ -610,8 +690,7 @@
    "name": "Protein yogurt bowl",
    "kind": "recipe",
    "tags": [
-    "high-protein",
-    "under-200"
+    "high-protein"
    ],
    "like": "yogurt|greek|oikos|granola",
    "why": "Your Great Value Greek yogurt with half a scoop of whey stirred in. Pudding-thick and doubles the protein.",
@@ -648,6 +727,16 @@
    "steps": [
     "Stir the whey into the yogurt until smooth. Top with berries if you have room."
    ],
+   "cat": "snack",
+   "q": "protein greek yogurt bowl whey",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "Whipped Greek Yogurt with Protein",
+     "by": "The Protein Chef",
+     "url": "https://www.youtube.com/watch?v=EtjPA2rS1QE"
+    }
+   ],
    "buys": [
     "yogurt"
    ]
@@ -657,8 +746,6 @@
    "name": "Saffron Road Butter Chicken Cavatappi",
    "kind": "buy",
    "tags": [
-    "frozen",
-    "halal-certified",
     "high-protein"
    ],
    "like": "ziti|ravioli|michelina|smart ones|frozen|pasta",
@@ -684,6 +771,16 @@
     "Microwave per box."
    ],
    "src": "https://giantfoodstores.com/groceries/product/saffron-road-crossroads-28g-protein-butter-chicken-cavatappi-frozen-meal-9-5-oz-box/411164",
+   "cat": "meal",
+   "q": "saffron road frozen meal review",
+   "links": [
+    {
+     "t": "web",
+     "title": "Saffron Road Butter Chicken Cavatappi",
+     "by": "Giant",
+     "url": "https://giantfoodstores.com/groceries/product/saffron-road-crossroads-28g-protein-butter-chicken-cavatappi-frozen-meal-9-5-oz-box/411164"
+    }
+   ],
    "buys": [
     "saffron"
    ]
@@ -691,11 +788,8 @@
   {
    "id": "pb-syrup",
    "name": "PB2 + sugar free syrup drizzle",
-   "kind": "hack",
-   "tags": [
-    "hacks",
-    "under-100"
-   ],
+   "kind": "recipe",
+   "tags": [],
    "like": "creami|yogurt|pancake|syrup|peanut",
    "why": "Peanut butter drizzle for 70 kcal instead of ~190 for 2 tbsp of real PB. Goes on a Creami pint, yogurt bowl, or protein pancakes.",
    "items": [
@@ -732,6 +826,10 @@
     "Stir PB2 with the syrup, then add water a teaspoon at a time until it drizzles.",
     "Thicker = less water; it firms up on frozen Creami like a magic shell."
    ],
+   "cat": "sweet",
+   "hack": true,
+   "q": "pb2 sauce sugar free syrup",
+   "links": [],
    "buys": [
     "pb2"
    ]
@@ -739,11 +837,9 @@
   {
    "id": "oikos-pb",
    "name": "Peanut butter mousse Oikos",
-   "kind": "hack",
+   "kind": "recipe",
    "tags": [
-    "hacks",
-    "high-protein",
-    "under-200"
+    "high-protein"
    ],
    "like": "yogurt|oikos|greek|yasso",
    "why": "Stir PB2 into a vanilla Oikos: tastes like peanut butter mousse, 21 g protein for 140 kcal.",
@@ -780,6 +876,10 @@
    "steps": [
     "Stir the powder straight into the cup. Add 3\u20134 chocolate morsels if you have room."
    ],
+   "cat": "sweet",
+   "hack": true,
+   "q": "pb2 greek yogurt mousse",
+   "links": [],
    "buys": [
     "oikos",
     "pb2"
@@ -788,11 +888,9 @@
   {
    "id": "cottage-queso",
    "name": "Cottage cheese queso",
-   "kind": "hack",
+   "kind": "recipe",
    "tags": [
-    "hacks",
-    "high-protein",
-    "under-200"
+    "high-protein"
    ],
    "like": "queso|salsa con queso|cottage|nacho|refried",
    "why": "Fat free cottage cheese + your fat free cheese + salsa: about half the calories of jarred queso, zero fat, and 22 g protein per batch.",
@@ -842,6 +940,17 @@
     "Blend or mash the cottage cheese smooth, stir in the cheese and salsa.",
     "Microwave 45 s, stir, 30 s more. Dip, or pour over a burrito bowl."
    ],
+   "cat": "snack",
+   "hack": true,
+   "q": "cottage cheese queso",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "Easy Cottage Cheese Queso, 3 ingredients",
+     "by": "The Protein Chef",
+     "url": "https://www.youtube.com/watch?v=mOCQokMYlyI"
+    }
+   ],
    "buys": [
     "cottage",
     "mexican"
@@ -850,11 +959,8 @@
   {
    "id": "pudding-mousse",
    "name": "Greek yogurt pudding mousse",
-   "kind": "hack",
-   "tags": [
-    "hacks",
-    "under-200"
-   ],
+   "kind": "recipe",
+   "tags": [],
    "like": "yogurt|greek|pudding|dessert",
    "why": "Whisk a quarter box of sugar free pudding into Greek yogurt and it turns into thick mousse. A sweet fix for 100 kcal.",
    "items": [
@@ -889,6 +995,17 @@
    "steps": [
     "Whisk hard for 30 s, chill 5 min. Chocolate pudding + strawberry yogurt is the move."
    ],
+   "cat": "sweet",
+   "hack": true,
+   "q": "greek yogurt sugar free pudding mix",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "The Guilt Free Protein Pudding I Eat Almost Everyday",
+     "by": "Ethan Paff",
+     "url": "https://www.youtube.com/watch?v=fT-5180vkn0"
+    }
+   ],
    "buys": [
     "pudding",
     "yogurt"
@@ -897,13 +1014,8 @@
   {
    "id": "half-konjac-pasta",
    "name": "Half-and-half konjac pasta",
-   "kind": "hack",
-   "tags": [
-    "hacks",
-    "konjac",
-    "swap",
-    "under-200"
-   ],
+   "kind": "recipe",
+   "tags": [],
    "like": "pasta|ziti|ravioli|noodle",
    "why": "Can't do full konjac? Mix it 50/50 with regular pasta. Same big bowl, about half the calories, and the real pasta hides the texture.",
    "items": [
@@ -939,8 +1051,887 @@
     "Rinse konjac, dry-fry in a hot pan with no oil 3\u20134 min until it squeaks: this is the secret to no rubbery texture.",
     "Toss with the cooked pasta and your sauce."
    ],
+   "cat": "meal",
+   "hack": true,
+   "q": "half pasta half shirataki",
+   "links": [
+    {
+     "t": "reddit",
+     "title": "50/50 is volumizing! Don't torture yourself.",
+     "by": "r/Volumeeating",
+     "url": "https://www.reddit.com/r/Volumeeating/comments/1c0p601/5050_is_volumizing_dont_torture_yourself/"
+    }
+   ],
    "buys": [
     "konjac"
+   ]
+  },
+  {
+   "id": "shawarma-bowl",
+   "name": "Chicken shawarma bowl",
+   "kind": "recipe",
+   "cat": "meal",
+   "tags": [
+    "high-protein"
+   ],
+   "like": "shawarma|gyro|pita|chickpea|mediterranean|chicken breast|kabob|kebab",
+   "why": "Skinnytaste's sheet-pan shawarma made leaner: breast instead of thighs, a little chickpea for fiber, and a Greek yogurt tzatziki instead of white sauce.",
+   "items": [
+    {
+     "foodId": "73eba626lgnpi",
+     "name": "Chicken Breast, skinless (halal)",
+     "qty": 150,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 155.2,
+      "p": 30.9,
+      "c": 0,
+      "f": 3.5
+     }
+    },
+    {
+     "name": "Chickpeas, canned, drained",
+     "qty": 60,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 139,
+      "p": 7.05,
+      "c": 22.5,
+      "f": 2.77,
+      "fib": 7.6
+     }
+    },
+    {
+     "name": "Bell pepper & onion",
+     "qty": 120,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 35,
+      "p": 1,
+      "c": 7.5,
+      "f": 0.2,
+      "fib": 1.8
+     }
+    },
+    {
+     "name": "Olive oil",
+     "qty": 1,
+     "unit": "1 tsp",
+     "mult": 1,
+     "n": {
+      "kcal": 40,
+      "p": 0,
+      "c": 0,
+      "f": 4.5
+     }
+    },
+    {
+     "name": "Plain nonfat Greek yogurt",
+     "qty": 60,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 59,
+      "p": 10.2,
+      "c": 3.6,
+      "f": 0.4
+     }
+    },
+    {
+     "name": "Cucumber",
+     "qty": 40,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 15,
+      "p": 0.7,
+      "c": 3.6,
+      "f": 0.1,
+      "fib": 0.5
+     }
+    }
+   ],
+   "steps": [
+    "Toss chicken, chickpeas, peppers and onion with the oil, cumin, smoked paprika, garlic, oregano and a pinch of cinnamon.",
+    "Roast at 425\u00b0F for 20\u201325 min (or air fry 12\u201315).",
+    "Tzatziki: Greek yogurt, grated cucumber, garlic, lemon, salt."
+   ],
+   "halal": "Use halal chicken.",
+   "q": "high protein chicken shawarma bowl",
+   "links": [
+    {
+     "t": "web",
+     "title": "Chicken Shawarma Sheet Pan Dinner",
+     "by": "Skinnytaste",
+     "url": "https://www.skinnytaste.com/chicken-shawarma-sheet-pan-dinner/"
+    },
+    {
+     "t": "youtube",
+     "title": "The High Protein Chicken Shawarma",
+     "by": "Felu - Fit by cooking",
+     "url": "https://www.youtube.com/watch?v=y1V4nCE5j2E"
+    }
+   ],
+   "buys": [
+    "yogurt"
+   ]
+  },
+  {
+   "id": "cottage-mac",
+   "name": "Cottage cheese mac & cheese",
+   "kind": "recipe",
+   "cat": "meal",
+   "tags": [
+    "high-protein"
+   ],
+   "like": "mac|pasta|ziti|kraft|ravioli|alfredo",
+   "why": "The viral blended-cottage-cheese sauce, made with your fat free cottage and shredded cheese, for 31 g protein.",
+   "items": [
+    {
+     "foodId": "73eba626c8rb5",
+     "name": "Pasta, boiled",
+     "qty": 140,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 133.6,
+      "p": 4.21,
+      "c": 28.43,
+      "f": 0.36
+     }
+    },
+    {
+     "foodId": "73eba626oy51j",
+     "name": "Fat Free Cottage Cheese",
+     "brand": "Giant",
+     "qty": 120,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 64,
+      "p": 10.6,
+      "c": 5.3,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 40,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Blend cottage cheese smooth with garlic powder, paprika and a splash of pasta water.",
+    "Toss with hot pasta and the shredded cheese over low heat until it melts and coats."
+   ],
+   "q": "cottage cheese mac and cheese high protein",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "Cottage Cheese Mac and Cheese, easy, cheap, high protein",
+     "by": "The Protein Chef",
+     "url": "https://www.youtube.com/watch?v=Kkfu09t2SUs"
+    },
+    {
+     "t": "web",
+     "title": "High Protein Cottage Cheese Mac and Cheese",
+     "by": "Eating Bird Food",
+     "url": "https://www.eatingbirdfood.com/high-protein-cottage-cheese-mac-and-cheese/"
+    }
+   ],
+   "buys": [
+    "cottage",
+    "mexican"
+   ]
+  },
+  {
+   "id": "konjac-pad-thai",
+   "name": "Shrimp konjac \"pad thai\"",
+   "kind": "recipe",
+   "cat": "meal",
+   "tags": [
+    "high-protein"
+   ],
+   "like": "pad thai|thai|noodle|shrimp|stir fry|lo mein",
+   "why": "From a 1,300+ upvote r/Volumeeating post: a 625 g plate of pad thai for about 440 kcal and 60 g protein. The PB2 sauce is the trick.",
+   "items": [
+    {
+     "name": "Konjac Fettuccine",
+     "brand": "Miracle Noodle",
+     "qty": 2.3,
+     "unit": "3 oz (85 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 5,
+      "p": 0,
+      "c": 3,
+      "f": 0,
+      "fib": 2
+     }
+    },
+    {
+     "name": "Shrimp, raw",
+     "qty": 150,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 85,
+      "p": 20.1,
+      "c": 0,
+      "f": 0.5
+     }
+    },
+    {
+     "name": "Egg, large",
+     "qty": 1,
+     "unit": "1 large egg",
+     "mult": 1,
+     "n": {
+      "kcal": 72,
+      "p": 6.3,
+      "c": 0.4,
+      "f": 4.8
+     }
+    },
+    {
+     "foodId": "73eba626v9k1c",
+     "name": "Liquid Egg Whites",
+     "brand": "Parkhurst",
+     "qty": 120,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 47.4,
+      "p": 10.8,
+      "c": 0.7,
+      "f": 0.1
+     }
+    },
+    {
+     "name": "Coleslaw mix",
+     "qty": 90,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 25,
+      "p": 1.3,
+      "c": 5.8,
+      "f": 0.1,
+      "fib": 2.5
+     }
+    },
+    {
+     "name": "Bell pepper & onion",
+     "qty": 125,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 35,
+      "p": 1,
+      "c": 7.5,
+      "f": 0.2,
+      "fib": 1.8
+     }
+    },
+    {
+     "name": "PB2 Original Powdered Peanut Butter",
+     "brand": "PB2",
+     "qty": 1.25,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 60,
+      "p": 6,
+      "c": 5,
+      "f": 1.5,
+      "fib": 1,
+      "na": 90
+     }
+    },
+    {
+     "name": "Soy sauce (alcohol-free, e.g. La Choy)",
+     "qty": 2,
+     "unit": "1 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 10,
+      "p": 1,
+      "c": 1,
+      "f": 0,
+      "na": 1000
+     }
+    },
+    {
+     "name": "Zero sugar sweet chili sauce",
+     "qty": 1,
+     "unit": "1 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 5,
+      "p": 0,
+      "c": 1,
+      "f": 0
+     }
+    },
+    {
+     "name": "Sriracha",
+     "qty": 1,
+     "unit": "1 tsp",
+     "mult": 1,
+     "n": {
+      "kcal": 5,
+      "p": 0,
+      "c": 1,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Rinse the konjac well and dry-fry 5\u20137 min until the moisture is gone; set aside.",
+    "Sauce: PB2, soy sauce, 1 tsp apple cider vinegar, sweet chili, sriracha, sweetener and 3\u20135 tbsp warm water.",
+    "Cook onion and pepper 3\u20134 min, add garlic, then the shrimp until pink.",
+    "Add slaw 1\u20132 min, push aside, scramble the egg and egg whites, then toss in noodles and sauce for 2\u20133 min."
+   ],
+   "halal": "Most scholars count shrimp as halal; some Hanafi scholars don't. Swap in chicken if that's you. Brewed soy sauce like Kikkoman has alcohol from fermentation; La Choy and halal-certified brands don't.",
+   "q": "konjac pad thai low calorie",
+   "links": [
+    {
+     "t": "reddit",
+     "title": "I finally figured out a decent low-calorie, big volume \"Pad Thai\"!!",
+     "by": "r/Volumeeating",
+     "url": "https://www.reddit.com/r/Volumeeating/comments/1tpiczt/i_finally_figured_out_a_decent_lowcalorie_big/"
+    },
+    {
+     "t": "youtube",
+     "title": "Shirataki Noodles are INSANE for Weight Loss",
+     "by": "Felu - Fit by cooking",
+     "url": "https://www.youtube.com/watch?v=-wRHXXyR6sc"
+    }
+   ],
+   "buys": [
+    "eggw",
+    "konjac",
+    "pb2",
+    "seafood"
+   ]
+  },
+  {
+   "id": "bbq-lavash-pizza",
+   "name": "BBQ chicken lavash pizza",
+   "kind": "recipe",
+   "cat": "meal",
+   "tags": [
+    "high-protein"
+   ],
+   "like": "pizza|bbq|chicken|bread|flatbread",
+   "why": "A r/1500isplenty favorite: the whole Joseph's lavash as a crust, 60 g protein for about 375 kcal with sugar free BBQ sauce.",
+   "items": [
+    {
+     "name": "Joseph's Flax Oat Bran Lavash",
+     "brand": "Joseph's",
+     "qty": 1,
+     "unit": "1 lavash (64 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 120,
+      "p": 12,
+      "c": 16,
+      "f": 3,
+      "fib": 4
+     }
+    },
+    {
+     "foodId": "73eba626lgnpi",
+     "name": "Chicken Breast, skinless (halal)",
+     "qty": 113,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 155.2,
+      "p": 30.9,
+      "c": 0,
+      "f": 3.5
+     }
+    },
+    {
+     "name": "Sugar Free Original BBQ Sauce",
+     "brand": "G Hughes",
+     "qty": 1,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 10,
+      "p": 0,
+      "c": 2,
+      "f": 0,
+      "na": 200
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 40,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    },
+    {
+     "name": "Bell pepper & onion",
+     "qty": 20,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 35,
+      "p": 1,
+      "c": 7.5,
+      "f": 0.2,
+      "fib": 1.8
+     }
+    }
+   ],
+   "steps": [
+    "Crisp the lavash at 400\u00b0F for 3 min.",
+    "Toss the chicken in most of the BBQ sauce, spread it on with cheese and red onion, drizzle the rest.",
+    "Bake 6\u20138 min until the cheese melts."
+   ],
+   "halal": "Use halal chicken. G Hughes BBQ has no alcohol or pork (checked the label).",
+   "q": "bbq chicken lavash pizza",
+   "links": [
+    {
+     "t": "reddit",
+     "title": "BBQ chicken pizza on Joseph's lavash, 464 cal, 53 g protein",
+     "by": "r/1500isplenty",
+     "url": "https://www.reddit.com/r/1500isplenty/comments/cwr8nu/tonights_dinner_is_bbq_chicken_pizza_on_josephs/"
+    },
+    {
+     "t": "youtube",
+     "title": "Low Fat, High Protein BBQ Chicken Lavash Bread Pizza",
+     "by": "JRamosWorks",
+     "url": "https://www.youtube.com/watch?v=Mtk_zYzfRVU"
+    }
+   ],
+   "buys": [
+    "josephs",
+    "mexican"
+   ]
+  },
+  {
+   "id": "cottage-flatbread",
+   "name": "Cottage cheese flatbread wrap",
+   "kind": "recipe",
+   "cat": "meal",
+   "hack": true,
+   "tags": [
+    "high-protein"
+   ],
+   "like": "wrap|bread|tortilla|egg|cottage|lavash",
+   "why": "The viral 2-ingredient wrap: cottage cheese and eggs bake into a bendy flatbread with 37 g protein. Cut it in half for two wraps.",
+   "items": [
+    {
+     "foodId": "73eba626oy51j",
+     "name": "Fat Free Cottage Cheese",
+     "brand": "Giant",
+     "qty": 226,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 64,
+      "p": 10.6,
+      "c": 5.3,
+      "f": 0
+     }
+    },
+    {
+     "name": "Egg, large",
+     "qty": 2,
+     "unit": "1 large egg",
+     "mult": 1,
+     "n": {
+      "kcal": 72,
+      "p": 6.3,
+      "c": 0.4,
+      "f": 4.8
+     }
+    }
+   ],
+   "steps": [
+    "Blend cottage cheese and eggs smooth; season (everything bagel or Italian seasoning).",
+    "Spread thin on a parchment-lined sheet, bake 350\u00b0F about 35\u201340 min until golden and dry to the touch.",
+    "Cool 5 min, peel, and fill like a tortilla."
+   ],
+   "q": "cottage cheese flatbread",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "The Viral Cottage Cheese \"Flatbread\"... But Better!",
+     "by": "Serious Keto",
+     "url": "https://www.youtube.com/watch?v=SLC3indP5pk"
+    }
+   ],
+   "buys": [
+    "cottage"
+   ]
+  },
+  {
+   "id": "buffalo-dip",
+   "name": "Buffalo chicken dip",
+   "kind": "recipe",
+   "cat": "snack",
+   "tags": [
+    "high-protein"
+   ],
+   "like": "buffalo|wing|chicken|dip|cottage|queso",
+   "why": "Cottage cheese swaps for the cream cheese and ranch, so it's 43 g protein for about 230 kcal. Eat with celery, cucumber or a Joseph's pita.",
+   "items": [
+    {
+     "foodId": "73eba626lgnpi",
+     "name": "Chicken Breast, skinless (halal)",
+     "qty": 85,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 155.2,
+      "p": 30.9,
+      "c": 0,
+      "f": 3.5
+     }
+    },
+    {
+     "foodId": "73eba626oy51j",
+     "name": "Fat Free Cottage Cheese",
+     "brand": "Giant",
+     "qty": 100,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 64,
+      "p": 10.6,
+      "c": 5.3,
+      "f": 0
+     }
+    },
+    {
+     "name": "Original Hot Sauce",
+     "brand": "Frank's RedHot",
+     "qty": 2,
+     "unit": "1 tsp",
+     "mult": 1,
+     "n": {
+      "kcal": 0,
+      "p": 0,
+      "c": 0,
+      "f": 0,
+      "na": 190
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 20,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Shred the chicken; blend the cottage cheese smooth.",
+    "Mix with Frank's, garlic powder and half the cheese; top with the rest.",
+    "Bake 375\u00b0F 15 min or microwave 2 min."
+   ],
+   "halal": "Use halal chicken. Frank's RedHot is vinegar-based with no alcohol.",
+   "q": "buffalo chicken dip cottage cheese",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "Cottage Cheese Buffalo Chicken Dip",
+     "by": "The Protein Chef",
+     "url": "https://www.youtube.com/watch?v=mtAnIsKl0pY"
+    },
+    {
+     "t": "reddit",
+     "title": "Shredded buffalo chicken with Frank's and Greek yogurt ranch",
+     "by": "r/1500isplenty",
+     "url": "https://www.reddit.com/r/1500isplenty/comments/fnn3z6/instant_pot_shredded_chicken_breast_with_franks/"
+    }
+   ],
+   "buys": [
+    "cottage",
+    "mexican"
+   ]
+  },
+  {
+   "id": "banana-pudding-creami",
+   "name": "Banana pudding Creami",
+   "kind": "recipe",
+   "cat": "sweet",
+   "serving": "pint",
+   "tags": [
+    "high-protein"
+   ],
+   "like": "creami|banana|pudding|premier|ice cream",
+   "why": "From r/ninjacreami: a Premier shake with banana pudding mix and real banana, topped with two Nilla wafers. 31 g protein for the pint.",
+   "items": [
+    {
+     "foodId": "73eba626p0xss",
+     "name": "High Protein Shake, Chocolate",
+     "brand": "Premier Protein",
+     "qty": 1,
+     "unit": "11 oz bottle",
+     "mult": 1,
+     "n": {
+      "kcal": 160,
+      "p": 30,
+      "c": 5,
+      "f": 3
+     }
+    },
+    {
+     "name": "Sugar Free Instant Pudding mix",
+     "brand": "Jell-O",
+     "qty": 1,
+     "unit": "1/4 box (dry)",
+     "mult": 1,
+     "n": {
+      "kcal": 20,
+      "p": 0,
+      "c": 5,
+      "f": 0
+     }
+    },
+    {
+     "name": "Banana",
+     "qty": 50,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 89,
+      "p": 1.1,
+      "c": 22.8,
+      "f": 0.3,
+      "fib": 2.6
+     }
+    },
+    {
+     "name": "Nilla Wafers",
+     "brand": "Nabisco",
+     "qty": 2,
+     "unit": "1 wafer",
+     "mult": 1,
+     "n": {
+      "kcal": 17.5,
+      "p": 0.1,
+      "c": 2.6,
+      "f": 0.75
+     }
+    }
+   ],
+   "steps": [
+    "Blend the shake, banana cream pudding mix and banana; freeze in the pint 24 h.",
+    "Spin on Lite Ice Cream, add a splash of milk and Re-spin.",
+    "Crumble the wafers in on Mix-in."
+   ],
+   "halal": "Jell-O sugar free pudding mixes don't use gelatin. Skip Cool Whip toppings: its emulsifiers aren't certified.",
+   "q": "ninja creami banana pudding protein",
+   "links": [
+    {
+     "t": "reddit",
+     "title": "Banana Pudding Creami! High protein, ~350 calories",
+     "by": "r/ninjacreami",
+     "url": "https://www.reddit.com/r/ninjacreami/comments/1b3fudm/banana_pudding_creami_high_protein_350_calories/"
+    },
+    {
+     "t": "youtube",
+     "title": "Ninja Creami Banana Pudding Ice Cream",
+     "by": "The Cog is Shred",
+     "url": "https://www.youtube.com/watch?v=0kselOzyEw4"
+    }
+   ],
+   "buys": [
+    "premier",
+    "pudding"
+   ]
+  },
+  {
+   "id": "cookie-dough",
+   "name": "Protein cookie dough",
+   "kind": "recipe",
+   "cat": "sweet",
+   "tags": [
+    "high-protein"
+   ],
+   "like": "cookie|dough|yogurt|pb|peanut|dessert|oreo",
+   "why": "Greek yogurt, PB2 and whey stir into an edible cookie dough: 34 g protein for about 240 kcal.",
+   "items": [
+    {
+     "name": "Plain nonfat Greek yogurt",
+     "qty": 150,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 59,
+      "p": 10.2,
+      "c": 3.6,
+      "f": 0.4
+     }
+    },
+    {
+     "name": "PB2 Original Powdered Peanut Butter",
+     "brand": "PB2",
+     "qty": 1,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 60,
+      "p": 6,
+      "c": 5,
+      "f": 1.5,
+      "fib": 1,
+      "na": 90
+     }
+    },
+    {
+     "foodId": "73eba626yu3tl",
+     "name": "Impact Whey, Salted Caramel",
+     "brand": "Myprotein",
+     "qty": 15,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 440,
+      "p": 80,
+      "c": 12,
+      "f": 8
+     }
+    },
+    {
+     "name": "Semisweet chocolate chips",
+     "qty": 5,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 479,
+      "p": 4.2,
+      "c": 63.1,
+      "f": 29.7
+     }
+    }
+   ],
+   "steps": [
+    "Stir yogurt, PB2 and whey until thick (add a splash of milk if stiff).",
+    "Fold in the chips; chill 10 min for a firmer dough."
+   ],
+   "q": "protein cookie dough greek yogurt",
+   "links": [
+    {
+     "t": "youtube",
+     "title": "Protein Cookie Dough, no-bake dessert",
+     "by": "The Protein Chef",
+     "url": "https://www.youtube.com/watch?v=YT-oDCWK5eQ"
+    },
+    {
+     "t": "web",
+     "title": "Protein Greek Yogurt Cookie Dough",
+     "by": "Matt's Fit Chef",
+     "url": "https://mattsfitchef.com/protein-greek-yogurt-cookie-dough-low-carb/"
+    }
+   ],
+   "buys": [
+    "pb2",
+    "yogurt"
+   ]
+  },
+  {
+   "id": "pb2-nutella",
+   "name": "PB2 \"Nutella\"",
+   "kind": "recipe",
+   "cat": "sweet",
+   "hack": true,
+   "tags": [],
+   "like": "nutella|peanut|pb|toast|pancake|creami",
+   "why": "PB2 + cocoa loosened with sugar free hazelnut syrup tastes like Nutella for under 60 kcal. Great on a Joseph's pita or a Creami.",
+   "items": [
+    {
+     "name": "PB2 Original Powdered Peanut Butter",
+     "brand": "PB2",
+     "qty": 0.75,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 60,
+      "p": 6,
+      "c": 5,
+      "f": 1.5,
+      "fib": 1,
+      "na": 90
+     }
+    },
+    {
+     "name": "Unsweetened cocoa powder",
+     "qty": 3,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 228,
+      "p": 19.6,
+      "c": 57.9,
+      "f": 13.7,
+      "fib": 37
+     }
+    },
+    {
+     "foodId": "73eba626hgum0",
+     "name": "Sugar Free Syrup",
+     "qty": 15,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 40,
+      "p": 0,
+      "c": 10,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Mix the powders, then add syrup about 1:1 by weight with the powder.",
+    "Add water a few drops at a time until spreadable."
+   ],
+   "halal": "Some coffee syrups use alcohol-based flavorings; check the label.",
+   "q": "pb2 nutella sugar free syrup",
+   "links": [
+    {
+     "t": "reddit",
+     "title": "55 cal, 6 g protein \"Nutella\"",
+     "by": "r/1500isplenty",
+     "url": "https://www.reddit.com/r/1500isplenty/comments/1au4b3t/55cal6g_protein_nutella/"
+    }
+   ],
+   "buys": [
+    "pb2"
    ]
   }
  ],
