@@ -15,7 +15,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const addDays = (d, k) => today(new Date(new Date(d + 'T12:00').getTime() + k * 864e5));
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 const fmtDate = d => d === today() ? 'Today' : d === addDays(today(), -1) ? 'Yesterday' : new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-const DT_ORDER = [null, 'rest', 'run', 'long'];
+const DT_ORDER = [null, 'rest']; // auto from exercise, or a plain base day
 
 // Line icons (24px grid, stroke = currentColor) so the UI doesn't lean on emoji.
 const ICONS = {
@@ -189,7 +189,6 @@ async function viewToday() {
   const col = (k, label, have, goal) => `<div class="mcol ${k}"><div class="lbl">${label}</div>${fill(have, goal)}<div class="num">${r0(have)} / ${r0(goal)} g</div><div class="rem">${have > goal ? r0(have - goal) + ' g over' : r0(goal - have) + ' g left'}</div></div>`;
   const kbar = `<button class="kbar ${left < 0 ? 'over' : ''}" id="kcalBtn" aria-label="Toggle eaten / remaining">${fill(tot.kcal, goals.kcal)}
     <div class="num">${showLeft ? `<b>${r0(Math.abs(left))}</b> kcal ${left < 0 ? 'over' : 'left'}` : `<b>${r0(tot.kcal)}</b> / ${r0(goals.kcal)} kcal`}</div></button>`;
-  const dtLabel = s.dayTypes[goals.type]?.label || goals.type;
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
 
   const single = s.meals.length === 1, sel = state.sel;
@@ -229,8 +228,9 @@ async function viewToday() {
   <section class="card summary">
     <div class="mcols">${col('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${col('p', 'Protein', tot.p, goals.p)}${col('f', 'Fat', tot.f, goals.f)}</div>
     ${kbar}
-    <div class="sumfoot"><button class="chip" id="dayType" title="Tap to change">${ico('pie')}${esc(dtLabel)} day${goals.auto ? ' · auto' : ''}</button>
-      <div class="goalline">Goal <b>${r0(goals.kcal)}</b>${goals.eatBack ? ` (+${goals.eatBack} exercise)` : ''}</div></div>
+    ${date === today() && left > 50 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}What fits my ${r0(left)} kcal left?</button>` : ''}
+    <div class="sumfoot"><button class="chip" id="dayType" title="Tap to ignore or count exercise">${ico('pie')}${esc(goals.label)}${goals.auto ? '' : ' · set by you'}</button>
+      <div class="goalline">Goal <b>${r0(goals.kcal)}</b>${goals.eatBack ? ` <span class="small">(+${goals.eatBack} exercise)</span>` : ''}</div></div>
   </section>
   ${byMeal}
   ${selBar}
@@ -254,6 +254,7 @@ bind.today = root => {
     render();
   };
   $$('.meal .addBig[data-meal]', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
+  $('#fitBtn', root)?.addEventListener('click', () => openFits());
   $('#kcalBtn', root).onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); };
   $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
   $$('.selBtn', root).forEach(b => (b.onclick = () => { state.sel = new Set(); render(); }));
@@ -431,6 +432,41 @@ function openAdd(meal, { pick } = {}) {
   if (!pick) { $('#quickBtn', b).onclick = () => openQuick(meal); $('#voiceBtn', b).onclick = () => openVoice(); }
 }
 
+// Suggest your own foods and recipes that fit what's left today, protein first.
+async function openFits() {
+  const s = state.s, [entries, ctx] = await Promise.all([entriesFor(state.date), dayContext(state.date)]);
+  const tot = N.entryTotals(entries, s.caloriesFromMacros), goals = ctx.goals;
+  const rem = { kcal: goals.kcal - tot.kcal, p: goals.p - tot.p, c: goals.c - (s.netCarbs ? tot.c - tot.fib : tot.c), f: goals.f - tot.f };
+  const [recent, pantry, recipes] = await Promise.all([recentFoods(300), food.mine(), recipeFoods()]);
+  const seen = new Set(), cands = [];
+  for (const f of [...pantry, ...recipes, ...recent]) { const k = f.id || f._key || f.name; if (!seen.has(k)) { seen.add(k); cands.push(f); } }
+  const picks = [];
+  for (const f of cands) {
+    const pv = food.preview(f), one = pv.n, k1 = N.countedKcal(one, s.caloriesFromMacros);
+    if (!(k1 > 0)) continue;
+    let best = null;
+    // One serving, or 2 of small things (egg whites, tuna) so a suggestion is a real portion.
+    for (const q of k1 < 150 ? [1, 2] : [0.5, 1]) {
+      const n = N.scale(one, q), k = k1 * q;
+      if (k > rem.kcal + 40 || n.f > Math.max(rem.f, 0) + 4 || n.c > Math.max(rem.c, 0) + 8) continue;
+      // Reward filling protein and using the calories; penalize going over any macro.
+      // Aim at a meal-sized chunk (≤700 kcal, ≤50 g protein) so a big budget doesn't just suggest doubles.
+      const tk = Math.min(rem.kcal, 700), tp = Math.min(rem.p, 50);
+      const pFill = tp > 5 ? Math.min(n.p, tp) / tp : 0, kFill = (Math.min(k, tk) - Math.max(0, k - tk)) / tk;
+      const score = pFill * 2 + kFill + (n.p * 4) / k - (q === 1 ? 0 : 0.1);
+      if (!best || score > best.score) best = { f, q, n, k, score, unit: pv.unit };
+    }
+    if (best) picks.push(best);
+  }
+  picks.sort((a, b) => b.score - a.score);
+  const top = picks.slice(0, 15);
+  const b = sheet(`<p class="hint">Left today: <b>${r0(rem.kcal)}</b> kcal · ${macroLine(rem)}</p>
+    ${top.length ? `<ul class="list">${top.map((x, i) => `<li class="food" data-i="${i}"><div class="grow">${row2(esc(x.f.name), x.n, esc(`${x.q === 1 ? '' : x.q + ' × '}${unitText(x.unit.label)}${x.f.brand ? ', ' + x.f.brand : ''}`))}</div></li>`).join('')}</ul>`
+      : '<p class="muted">Nothing in your foods fits what\'s left. A protein shake or egg whites usually does.</p>'}
+    <p class="muted small" style="margin-top:12px">Ranked by how much protein it covers and how well it uses your calories without going over. Tap one to log it.</p>`, { title: 'What fits' });
+  $$('li.food', b).forEach(li => (li.onclick = () => { const x = top[+li.dataset.i]; openPortion(x.f, { meal: 0, qty: x.q }); }));
+}
+
 function openQuick(meal) {
   const b = sheet(`<form id="qa" class="form"><label>Name<input name="name" value="Quick add"></label>
     <div class="grid4"><label>Carbs<input name="c" type="number" step="any" inputmode="decimal"></label><label>Protein<input name="p" type="number" step="any" inputmode="decimal"></label>
@@ -452,14 +488,14 @@ async function logEntry(e) {
 }
 
 // Portion picker: log a food, edit a logged entry, or pick a recipe ingredient.
-function openPortion(f, { meal = 0, entry, pick } = {}) {
+function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
   (async () => {
     // A logged entry's food may have more units now; reload it if it still exists.
     if (entry && f.id) { const live = await db.get('foods', f.id); if (live) f = { ...live, source: 'mine' }; }
     const units = f.units?.length ? f.units : [{ label: 'serving', mult: 1 }];
     let ui = entry ? Math.max(0, units.findIndex(u => u.label === entry.unit)) : Math.max(0, units.findIndex(u => u.label.startsWith('serving')));
     if (entry && units[ui]?.label !== entry.unit) { units.unshift({ label: entry.unit, mult: entry.mult }); ui = 0; }
-    let q0 = entry ? entry.qty : 1;
+    let q0 = entry ? entry.qty : qStart || 1;
     if (!entry && !units[ui].label.startsWith('serving') && units.some(u => u.label === 'g') && !units.some(u => !['g', 'oz'].includes(u.label))) { ui = units.findIndex(u => u.label === 'g'); q0 = 100; }
     const remote = !['mine', 'recipe'].includes(f.source) || f._quick;
     const b = sheet(`
@@ -869,7 +905,7 @@ async function viewTrends() {
   const tdee = measuredTdee(rows.map(r => ({ kcal: r.kcal, weight: r.weight })));
   const w = rows.map(r => r.weight ?? NaN), wt = ema(w);
   const wFirst = wt.find(Number.isFinite), wLast = [...wt].reverse().find(Number.isFinite);
-  const runs = rows.filter(r => r.type !== 'rest').length;
+  const runs = rows.filter(r => r.type !== 'rest').length; // days with real exercise
   const card = (k, v, sub = '', cls = '') => `<div class="stat ${cls}"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="k">${sub}</div>` : ''}</div>`;
   const steps = rows.map(r => r.gd?.steps || 0);
   return `<div class="seg" id="range">${[7, 30, 90, 180].map(n => `<button data-n="${n}" class="${n === range ? 'on' : ''}">${n}d</button>`).join('')}</div>
@@ -878,7 +914,7 @@ async function viewTrends() {
     ${card('Avg protein', r0(avg('p')) + ' g', 'goal ' + r0(avgGoal('p')), 'p')}${card('Avg fat', r0(avg('f')) + ' g', 'goal ' + r0(avgGoal('f')), 'f')}
     ${card('On target', logged.length ? Math.round((hit / logged.length) * 100) + '%' : '–', `${logged.length}/${range} days logged`, 'steps')}
     ${card('Weight trend', wFirst != null ? (wLast - wFirst >= 0 ? '+' : '') + r1(wLast - wFirst) + ' lb' : '–', wLast != null ? 'now ' + r1(wLast) : '', 'sleep')}
-    ${card('Measured TDEE', tdee ? r0(tdee) : '–', tdee ? 'from logs + weight' : 'needs 14+ days', 'burn')}${card('Run days', runs, 'of ' + range, 'run')}
+    ${card('Measured TDEE', tdee ? r0(tdee) : '–', tdee ? 'from logs + weight' : 'needs 14+ days', 'burn')}${card('Active days', runs, 'of ' + range, 'run')}
   </div></section>
   <section class="card"><h3>🔥 Calories vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.kcal), rows.map(r => r.goal.kcal), { title: 'Calories vs goal' })}</section>
   <section class="card"><h3>💪 Protein vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.p), rows.map(r => r.goal.p), { title: 'Protein', cls: 'p' })}</section>
@@ -900,7 +936,7 @@ async function viewSettings() {
   const meta = await sync.garminMeta().catch(() => null);
   const dt = (k) => {
     const d = s.dayTypes[k], g = N.goalGrams(d), mk = r0(4 * g.p + 4 * g.c + 9 * g.f);
-    return `<fieldset data-dt="${k}" class="dt-${k}"><legend>${{ rest: '🛋️', run: '🏃', long: '🏁' }[k]} ${esc(d.label)} day</legend>
+    return `<fieldset data-dt="${k}" class="dt-${k}"><legend>${k === 'rest' ? 'Base day' : esc(d.label) + ' day'}</legend>
       <div class="grid2"><label>Calories<input name="kcal" type="number" inputmode="numeric" value="${d.kcal}"></label>
       <label>Macros by<select name="mode"><option value="g" ${d.mode === 'g' ? 'selected' : ''}>grams</option><option value="%" ${d.mode === '%' ? 'selected' : ''}>percent</option></select></label></div>
       <div class="grid3"><label class="lc">Carbs ${d.mode === '%' ? '%' : 'g'}<input class="ic" name="c" type="number" step="any" inputmode="decimal" value="${d.c}"></label>
@@ -911,9 +947,10 @@ async function viewSettings() {
   };
   return `
   <section class="card"><h3>🎯 Daily goals</h3>
-    <p class="hint">Picked from Garmin each day (long run = ${s.longRunMi}+ mi). Tap the chip on Today to change.</p>
+    <p class="hint">Set your base day (no exercise). Each day the app adds what you actually burned from Garmin or manual exercise, so a hard 9.5 mi run, a lift, or an hour of basketball all count, mostly as extra carbs. Big days (over ~500 exercise kcal) also get up to half your deficit back for recovery.</p>
     <button id="calc" class="primary wide">Recommend from my stats</button>
-    <form id="dts">${dt('rest')}${dt('run')}${dt('long')}</form>
+    <form id="dts">${dt('rest')}</form>
+    <form id="fuel" class="form"><label>Exercise calories to eat back (%)<input name="fuelPct" type="number" min="0" max="150" step="5" inputmode="numeric" value="${s.fuelPct ?? 100}"></label></form>
   </section>
   <section class="card"><h3>👤 Profile</h3><form id="prof" class="form">
     <div class="grid3"><label>Sex<select name="sex"><option value="male" ${p.sex === 'male' ? 'selected' : ''}>male</option><option value="female" ${p.sex === 'female' ? 'selected' : ''}>female</option></select></label>
@@ -927,8 +964,6 @@ async function viewSettings() {
   <details><summary>Tracking options</summary><form id="opts" class="form">
     <label class="check"><input type="checkbox" name="caloriesFromMacros" ${s.caloriesFromMacros ? 'checked' : ''}> Count calories from macros (4/4/9). Keeps totals consistent when labels disagree.</label>
     <label class="check"><input type="checkbox" name="netCarbs" ${s.netCarbs ? 'checked' : ''}> Show net carbs (carbs − fiber)</label>
-    <div class="grid2"><label>Long run at (mi)<input name="longRunMi" type="number" step="0.5" value="${s.longRunMi}"></label>
-    <label>Eat back Garmin exercise kcal %<input name="eatBackPct" type="number" min="0" max="100" step="5" value="${s.eatBackPct}"></label></div>
     <label>Meals (one name = a single running list for the day; commas = separate meals)<input name="meals" value="${esc(s.meals.join(', '))}"></label>
   </form></details>
   <details><summary>Sync & Garmin</summary><form id="gh" class="form">
@@ -975,6 +1010,7 @@ bind.settings = root => {
     }
     await db.saveSettings(s); render();
   };
+  $('#fuel', root).onchange = async e => { s.fuelPct = Math.max(0, +e.target.value || 0); await db.saveSettings(s); toast('Saved'); };
   $('#prof', root).onchange = async e => {
     const f = Object.fromEntries(new FormData(e.currentTarget));
     s.profile = { sex: f.sex, age: +f.age, heightIn: +f.heightIn, weightLb: +f.weightLb, neat: +f.neat };
@@ -983,7 +1019,7 @@ bind.settings = root => {
   };
   $('#opts', root).onchange = async e => {
     const f = new FormData(e.currentTarget);
-    Object.assign(s, { caloriesFromMacros: f.get('caloriesFromMacros') === 'on', netCarbs: f.get('netCarbs') === 'on', longRunMi: +f.get('longRunMi') || 10, eatBackPct: +f.get('eatBackPct') || 0,
+    Object.assign(s, { caloriesFromMacros: f.get('caloriesFromMacros') === 'on', netCarbs: f.get('netCarbs') === 'on',
       meals: String(f.get('meals')).split(',').map(x => x.trim()).filter(Boolean) });
     if (!s.meals.length) s.meals = ['Meal 1'];
     await db.saveSettings(s); toast('Saved');
@@ -1025,8 +1061,9 @@ async function openRecommend() {
   const rec = recommend(s, { avgRunKcal: mean(runD.map(exK)), avgLongKcal: mean(longD.map(exK)), measuredTdee: tdee });
   const row = k => `<tr><th>${rec[k].label}</th><td>${rec[k].kcal}</td><td>${rec[k].c}</td><td>${rec[k].p}</td><td>${rec[k].f}</td></tr>`;
   const b = sheet(`<p class="small muted">Based on ${rec.basis}${runD.length ? `, ${runD.length} run days and ${longD.length} long runs from Garmin` : ''}. Protein ${s.goal.type === 'cut' ? '1.0' : '0.85'} g/lb, fat at least 0.3 g/lb or 25%, carbs fill the rest and rise with mileage.</p>
-    <table class="tbl"><tr><th></th><th>kcal</th><th>C</th><th>P</th><th>F</th></tr>${row('rest')}${row('run')}${row('long')}</table>
-    <p class="small muted">Long-run days get half the deficit so you can recover; check the numbers against how you feel and train.</p>
+    <table class="tbl"><tr><th></th><th>kcal</th><th>C</th><th>P</th><th>F</th></tr>${row('rest')}</table>
+    <p class="small muted">That's your base day. Exercise days add what Garmin says you burned on top.</p>
+    <p class="small muted">Check the numbers against how you feel and train.</p>
     <div class="actions"><button class="primary" id="apply">Apply these goals</button></div>`, { title: 'Recommended goals' });
   $('#apply', b).onclick = async () => {
     for (const k of ['rest', 'run', 'long']) s.dayTypes[k] = rec[k];

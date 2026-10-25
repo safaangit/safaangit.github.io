@@ -1,5 +1,5 @@
-// Daily goals: pick rest / run / long-run targets from that day's Garmin activities
-// (or a manual override), and recommend targets from your stats.
+// Daily goals: a base day plus whatever exercise Garmin (or you) logged, and recommended
+// base targets from your stats.
 import { goalGrams } from './nutrition.js';
 
 const RUN_TYPES = /running|treadmill|track|trail_run|ultra/i;
@@ -13,15 +13,43 @@ export function autoDayType(gday, s) {
   return 'rest';
 }
 
-// override: the day record's dayType, if you set one by hand.
+// Exercise calories above what you'd burn sitting still. Garmin's activity kcal is gross and
+// already reflects pace and heart rate, so a harder run counts for more than an easy one.
+// Manual entries (basketball, etc.) are taken as entered.
+export function exerciseNet(gday, s) {
+  const restPerMin = (gday?.bmrKcal || bmr(s.profile)) / 1440;
+  return (gday?.activities || []).reduce((t, a) => {
+    const min = a.manual ? 0 : (a.duration || 0) / 60;
+    return t + Math.max(0, (a.kcal || 0) - restPerMin * min);
+  }, 0);
+}
+
+// "18 mi run", "5 mi run + strength", "Basketball"…
+function dayLabel(gday) {
+  const acts = gday?.activities || [];
+  const runMi = acts.filter(a => RUN_TYPES.test(a.type || '')).reduce((t, a) => t + mi(a.distance), 0);
+  const other = [...new Set(acts.filter(a => !RUN_TYPES.test(a.type || '')).map(a => /strength/.test(a.type || '') ? 'strength' : a.name || 'workout'))];
+  return [runMi >= 0.5 ? `${Math.round(runMi * 10) / 10} mi run` : '', ...other].filter(Boolean).join(' + ');
+}
+
+// Goals start from your base (rest) day and grow with the exercise you actually did: every
+// net exercise calorie is added back (Settings → exercise fuel %), mostly as carbs. Big days
+// also get up to half the diet deficit back, ramping smoothly, so there are no mileage cutoffs.
+// override: a day type you picked by hand ('rest' = ignore exercise; older 'run'/'long' still work).
 export function goalsFor(s, gday, override) {
-  const type = override || autoDayType(gday, s);
-  const g = goalGrams(s.dayTypes[type] || s.dayTypes.rest);
-  // Optional eat-back of Garmin activity calories, added as carbs.
-  const exKcal = (gday?.activities || []).reduce((t, a) => t + (a.kcal || 0), 0);
-  const back = Math.round((exKcal * (s.eatBackPct || 0)) / 100);
-  if (back > 0) { g.kcal += back; g.c += back / 4; }
-  return { type, auto: !override, ...g, eatBack: back };
+  if (override && s.dayTypes[override]) {
+    const g = goalGrams(s.dayTypes[override]);
+    return { type: override, label: s.dayTypes[override].label + ' day', auto: false, ...g, eatBack: 0, exKcal: 0 };
+  }
+  const g = goalGrams(s.dayTypes.rest);
+  const net = exerciseNet(gday, s);
+  const fuel = net * (s.fuelPct ?? 100) / 100;
+  const deficit = s.goal?.type === 'cut' ? (s.goal.rateLbWk || 0.5) * 500 : 0;
+  const recovery = deficit * 0.5 * Math.min(1, Math.max(0, (net - 500) / 1000));
+  const back = Math.round((fuel + recovery) / 10) * 10;
+  if (back > 0) { g.kcal += back; g.c += (back * 0.85) / 4; g.f += (back * 0.15) / 9; }
+  const active = net >= 150 || (gday?.activities || []).length > 0;
+  return { type: active ? 'active' : 'rest', label: active ? dayLabel(gday) || 'Active day' : 'Rest day', auto: true, ...g, eatBack: back, exKcal: Math.round(net) };
 }
 
 // Mifflin-St Jeor BMR.

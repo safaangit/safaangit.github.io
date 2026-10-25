@@ -295,3 +295,5 @@ h4 + ul.list > li.letter:first-child { padding-top: 0 !important; }
 .donut { width: 92px; flex: none; }
 .donut path { stroke: var(--tile); stroke-width: 1.5; } .donut .c { fill: var(--c); } .donut .p { fill: var(--p); } .donut .f { fill: var(--f); }
 .donut text { font-size: 10px; font-weight: 700; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.35); stroke-width: 1.5px; }
+.fitbtn { width: 100%; margin-top: 10px; border: 0; background: var(--tile); color: var(--accent); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px; font-size: 15px; }
+.fitbtn .ico { width: 20px; height: 20px; }
