@@ -257,3 +257,32 @@ li.picked { background: color-mix(in srgb, var(--accent) 10%, var(--card)) !impo
 .daypick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 14px; }
 .daypick button { padding: 12px 6px; font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .daypick small { font-size: 12px; opacity: .85; }
+
+/* ---- full-screen pages (Add food) ---- */
+.sheet-wrap.full { background: var(--bg); align-items: stretch; }
+.sheet-wrap.full .sheet { max-height: none; height: 100%; border-radius: 0; background: var(--bg); animation: none; }
+.sheet-wrap.full .sheet > header { background: var(--bar); color: var(--bar-ink); padding: calc(8px + env(safe-area-inset-top)) 8px 4px; gap: 6px; }
+.sheet-wrap.full .sheet > header h2 { font-size: 21px; }
+.sheet-wrap.full .x { color: inherit; display: flex; padding: 8px; }
+.sheet-wrap.full .body { padding: 0 0 calc(18px + env(safe-area-inset-bottom)); }
+.sbar { position: sticky; top: 0; z-index: 2; background: var(--bar); padding: 6px 12px 0; }
+.sbar .searchbar { display: flex; align-items: center; gap: 4px; background: var(--card); color: var(--ink); border-radius: 14px; padding: 0 6px 0 14px; }
+.sbar .searchbar input { background: none; border: 0; outline: 0; padding: 13px 8px; font-size: 17px; }
+.sbar .searchbar input::-webkit-search-cancel-button { display: none; }
+.iconbtn { border: 0; background: none; padding: 8px; display: flex; align-items: center; color: inherit; font-size: 18px; }
+.tabs { display: flex; margin-top: 4px; }
+.tabs button { flex: 1; border: 0; background: none; color: var(--bar-ink); opacity: .75; padding: 12px 4px 10px; font-size: 16px; border-radius: 0; border-bottom: 3px solid transparent; }
+.tabs button.on { opacity: 1; border-bottom-color: var(--bar-ink); }
+.sheet-wrap.full .tools.quick { padding: 10px 12px 0; margin: 0; }
+.sheet-wrap.full .tools.quick button { background: var(--card); }
+.sheet-wrap.full #results > p.warn { margin: 10px 12px 0; }
+.sheet-wrap.full ul.list { margin: 0; }
+.sheet-wrap.full .sheet h4 { margin: 10px 0 0; background: var(--bg); padding: 12px 16px 10px; font-size: 16px; }
+h4.fold { cursor: pointer; }
+.caret { display: inline-flex; margin-left: 8px; vertical-align: middle; transform: rotate(90deg); transition: transform .15s; }
+.caret.up { transform: rotate(-90deg); }
+.caret .ico { width: 20px; height: 20px; }
+li.letter { background: var(--bg) !important; border: 0 !important; padding: 10px 16px 4px !important; font-size: 15px; color: var(--muted); cursor: default !important; }
+.pad { padding: 12px 16px; margin: 0; }
+.iconbtn[hidden] { display: none; }
+h4 + ul.list > li.letter:first-child { padding-top: 0 !important; }

@@ -24,7 +24,7 @@ const ICONS = {
   add: '<path d="M12 5v14M5 12h14"/>',
   foods: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-  prev: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 18 6-6-6-6"/>',
+  prev: '<path d="m15 18-6-6 6-6"/>', back: '<path d="M19 12H5M12 19l-7-7 7-7"/>', next: '<path d="m9 18 6-6-6-6"/>',
   cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/>',
   plusc: '<circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>',
@@ -74,11 +74,12 @@ function toast(msg) {
 }
 
 // Bottom sheet modal. Returns the sheet body element.
-function sheet(html, { title = '' } = {}) {
+function sheet(html, { title = '', full = false } = {}) {
   closeSheet();
   const wrap = document.createElement('div');
-  wrap.className = 'sheet-wrap';
-  wrap.innerHTML = `<div class="sheet" role="dialog" aria-label="${esc(title)}"><header><h2>${esc(title)}</h2><button class="x" aria-label="Close">✕</button></header><div class="body">${html}</div></div>`;
+  wrap.className = 'sheet-wrap' + (full ? ' full' : '');
+  const x = full ? `<button class="x" aria-label="Back">${ico('back')}</button><h2>${esc(title)}</h2>` : `<h2>${esc(title)}</h2><button class="x" aria-label="Close">✕</button>`;
+  wrap.innerHTML = `<div class="sheet" role="dialog" aria-label="${esc(title)}"><header>${x}</header><div class="body">${html}</div></div>`;
   wrap.addEventListener('click', e => { if (e.target === wrap || e.target.closest('.x')) closeSheet(); });
   document.body.append(wrap);
   history.pushState({ sheet: 1 }, '');
@@ -321,65 +322,113 @@ function openExercise(id) {
 }
 
 // ---------- Add food ----------
+// Full-screen search, laid out like Macros: search bar with scan, then My foods / My recipes / Library tabs.
 function openAdd(meal, { pick } = {}) {
+  const tab0 = local.get('addTab', 'mine') === 'library' ? 'mine' : local.get('addTab', 'mine');
   const b = sheet(`
-    <div class="searchbar"><input id="q" type="search" placeholder="Search foods, brands, recipes" autocomplete="off" enterkeyhint="search"></div>
-    <div class="tools quick">
-      ${pick ? '' : `<button id="voiceBtn">${ico('mic')}Say it</button>`}<button id="scanBtn">${ico('scan')}Scan</button><button id="labelBtn">${ico('camera')}Label</button>
-      ${pick ? '' : `<button id="quickBtn">${ico('zap')}Quick</button>`}<button id="newBtn">${ico('add')}New</button>
+    <div class="sbar">
+      <div class="searchbar"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Search" autocomplete="off" enterkeyhint="search"><button id="qx" class="iconbtn" aria-label="Clear" hidden>✕</button><button id="scanBtn" class="iconbtn" aria-label="Scan barcode">${ico('scan')}</button></div>
+      <div class="tabs" role="tablist">${[['mine', 'My foods'], ['recipes', 'My recipes'], ['library', 'Library']].map(([k, l]) => `<button role="tab" data-t="${k}" class="${k === tab0 ? 'on' : ''}">${l}</button>`).join('')}</div>
     </div>
-    <div id="results"><p class="muted">Loading recents…</p></div>`, { title: pick ? 'Pick ingredient' : state.s.meals.length > 1 ? `Add to ${state.s.meals[meal] || 'diary'}` : 'Add food' });
+    <div class="tools quick">
+      ${pick ? '' : `<button id="voiceBtn">${ico('mic')}Say it</button>`}<button id="labelBtn">${ico('camera')}Label</button>
+      ${pick ? '' : `<button id="quickBtn">${ico('zap')}Quick</button>`}<button id="newBtn">${ico('add')}New food</button>
+    </div>
+    <div id="results"><p class="muted">Loading…</p></div>`, { title: pick ? 'Pick ingredient' : state.s.meals.length > 1 ? `Add to ${state.s.meals[meal] || 'diary'}` : 'Search', full: true });
   const q = $('#q', b), out = $('#results', b);
-  let list = [];
+  let tab = tab0, list = [], lastSections = [];
   let editing = null; // Set of list indexes while cleaning up recents
-  const show = (sections) => {
+  let data = null, libQ = '', libRes = null, libSeq = 0;
+  const words = () => q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hit = f => { const t = `${f.name} ${f.brand || ''}`.toLowerCase(); return words().every(w => t.includes(w)); };
+  const show = (sections, extra = '') => {
     list = [];
-    out.innerHTML = sections.filter(s => s.items.length).map(s => `<h4>${s.title}${s.editable ? ` <button class="link" id="editRecents">${editing ? 'Cancel' : 'Clean up'}</button>` : ''}</h4>
-      <ul class="list ${s.editable && editing ? 'selecting' : ''}">${s.items.map(f => { const i = list.push(f) - 1; return foodRow(f, i, s.editable && editing ? (editing.has(i) ? 'picked' : '') : null); }).join('')}</ul>
-      ${s.editable && editing ? `<div class="actions"><button class="danger" id="hideRecents">Remove ${editing.size || ''} from recents</button></div>` : ''}`).join('') || '<p class="muted">Nothing found. Try fewer words, snap the label, or make a new food.</p>';
+    out.innerHTML = sections.filter(s => s.items.length || s.letters).map(s => {
+      const open = !s.fold || local.get('fold:' + s.fold, true);
+      let letter = '';
+      const rows = s.items.map(f => {
+        const i = list.push(f) - 1, L = (f.name[0] || '#').toUpperCase();
+        const head = s.letters && L !== letter ? `<li class="letter">${esc((letter = L))}</li>` : '';
+        return head + foodRow(f, i, s.editable && editing ? (editing.has(i) ? 'picked' : '') : null);
+      }).join('');
+      return `<h4 ${s.fold ? `class="fold" data-fold="${s.fold}"` : ''}><span>${s.title}</span><span>${s.editable && open ? `<button class="link" id="editRecents">${editing ? 'Cancel' : 'Clean up'}</button>` : ''}${s.fold ? `<span class="caret ${open ? 'up' : ''}">${ico('next')}</span>` : ''}</span></h4>
+      ${open ? `<ul class="list ${s.editable && editing ? 'selecting' : ''}">${rows || '<li class="empty small">Nothing here yet.</li>'}</ul>` : ''}
+      ${open && s.editable && editing ? `<div class="actions"><button class="danger" id="hideRecents">Remove ${editing.size || ''} from recents</button></div>` : ''}`;
+    }).join('') + extra || '<p class="muted pad">Nothing found. Try the Library tab, snap the label, or make a new food.</p>';
     $$('li.food', out).forEach(li => (li.onclick = () => {
       const i = +li.dataset.i;
-      if (editing && list[i]._key) { editing.has(i) ? editing.delete(i) : editing.add(i); return show(lastSections); }
+      if (editing && list[i]._key) { editing.has(i) ? editing.delete(i) : editing.add(i); return show(lastSections, extra); }
       choose(list[i]);
     }));
+    $$('h4.fold', out).forEach(h => (h.onclick = e => { if (e.target.closest('#editRecents')) return; const k = 'fold:' + h.dataset.fold; local.set(k, !local.get(k, true)); draw(); }));
     const er = $('#editRecents', out);
-    if (er) er.onclick = () => { editing = editing ? null : new Set(); show(lastSections); };
+    if (er) er.onclick = () => { editing = editing ? null : new Set(); show(lastSections, extra); };
     const hr = $('#hideRecents', out);
     if (hr) hr.onclick = async () => {
       const keys = [...editing].map(i => list[i]._key).filter(Boolean);
       if (!keys.length) return;
       await setHidden(keys, true);
       editing = null; toast(`Removed ${keys.length} from recents`);
-      lastSections[0].items = lastSections[0].items.filter(f => !keys.includes(f._key));
-      show(lastSections);
+      data.recent = data.recent.filter(f => !keys.includes(f._key));
+      draw();
     };
+    $('#toLib', out)?.addEventListener('click', () => setTab('library'));
     lastSections = sections;
   };
-  let lastSections = [];
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  const draw = () => {
+    if (!data) return;
+    const typed = words().length > 0;
+    $('#qx', b).hidden = !typed;
+    if (tab === 'mine') {
+      const recent = data.recent.filter(hit), recentIds = new Set(recent.map(f => f.id).filter(Boolean));
+      const mine = data.pantry.filter(f => hit(f) && !(typed && recentIds.has(f.id))).sort(byName);
+      show([{ title: 'Recent foods', items: recent, editable: !typed, fold: 'recent' }, { title: 'My foods', items: mine, letters: true }],
+        typed ? `<div class="pad"><button class="wide" id="toLib">Search the library for “${esc(q.value.trim())}”</button></div>` : '');
+    } else if (tab === 'recipes') {
+      show([{ title: 'My recipes', items: data.recipes.filter(hit).sort(byName), letters: true }]);
+    } else {
+      if (!typed) { out.innerHTML = '<p class="muted pad">Type a food or brand to search USDA and Open Food Facts.</p>'; return; }
+      if (libQ !== q.value.trim()) return runLib();
+      if (!libRes) { out.innerHTML = '<p class="muted pad">Searching USDA and Open Food Facts…</p>'; return; }
+      show([{ title: 'Library', items: libRes }], libRes.length ? '' : '<p class="muted pad">No library matches. Try fewer words, scan the barcode, or snap the label.</p>');
+      if (food.usdaThrottled && !local.get('usdaKey')) out.insertAdjacentHTML('afterbegin', '<p class="warn small">USDA demo key is rate-limited. Add your free key in Settings for better generic results.</p>');
+    }
+  };
+  const runLib = async () => {
+    const v = q.value.trim(); if (v.length < 2) return;
+    const my = ++libSeq; libQ = v; libRes = null; draw();
+    const res = await food.search(v).catch(() => ({ remote: [] }));
+    if (my !== libSeq) return;
+    libRes = res.remote; draw();
+  };
+  const setTab = t => {
+    tab = t; editing = null;
+    if (t !== 'library') local.set('addTab', t);
+    $$('.tabs button', b).forEach(x => x.classList.toggle('on', x.dataset.t === t));
+    draw();
+  };
+  $$('.tabs button', b).forEach(x => (x.onclick = () => setTab(x.dataset.t)));
   const choose = f => (pick ? openPortion(f, { pick }) : openPortion(f, { meal }));
   (async () => {
     const [recent, pantry, recipes] = await Promise.all([recentFoods(), food.mine(), recipeFoods()]);
-    const favs = pantry.filter(p => p.fav && !recent.some(r => r.id === p.id));
-    show([{ title: 'Recent', items: recent, editable: true }, { title: 'Favorites', items: favs }, { title: 'Recipes & Creami', items: recipes }]);
+    data = { recent, pantry, recipes };
+    draw();
   })();
-  let t, seq = 0;
-  const run = async () => {
-    const v = q.value.trim(); if (v.length < 2) return;
-    const my = ++seq;
-    out.innerHTML = '<p class="muted">Searching your foods, USDA and Open Food Facts…</p>';
-    const res = await food.search(v, { recipes: await recipeFoods() });
-    if (my !== seq) return;
-    editing = null;
-    show([{ title: 'Yours', items: res.own }, { title: 'Best matches', items: res.remote }]);
-    if (food.usdaThrottled && !local.get('usdaKey')) out.insertAdjacentHTML('afterbegin', '<p class="warn small">USDA demo key is rate-limited. Add your free key in Settings for better generic results.</p>');
+  let t;
+  q.oninput = () => { editing = null; if (tab === 'library') { clearTimeout(t); t = setTimeout(draw, 650); } else draw(); };
+  q.onkeydown = e => {
+    if (e.key !== 'Enter') return;
+    clearTimeout(t);
+    if (tab !== 'library' && !list.length) setTab('library'); else draw();
+    q.blur();
   };
-  q.oninput = () => { clearTimeout(t); t = setTimeout(run, 650); };
-  q.onkeydown = e => { if (e.key === 'Enter') { clearTimeout(t); run(); } };
+  $('#qx', b).onclick = () => { q.value = ''; draw(); q.focus(); };
   $('#scanBtn', b).onclick = () => openScanner(meal, pick);
   $('#labelBtn', b).onclick = () => openLabel({ meal, pick });
   $('#newBtn', b).onclick = () => openFoodEditor(null, { meal, pick });
   if (!pick) { $('#quickBtn', b).onclick = () => openQuick(meal); $('#voiceBtn', b).onclick = () => openVoice(); }
-  setTimeout(() => q.focus(), 50);
 }
 
 function openQuick(meal) {
