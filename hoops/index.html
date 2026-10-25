@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3730a3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Polo Hoops">
+<title>Polo Hoops</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <h1><img src="icons/icon-192.png" alt="" class="logo">Polo Hoops</h1>
+  <div class="hdr-r"><span id="status" class="small muted">Loading…</span><button id="refresh" aria-label="Refresh">↻</button></div>
+</header>
+<main><p class="muted center">Loading your league…</p></main>
+<nav>
+  <button data-tab="moves"><span>★</span>Moves</button>
+  <button data-tab="roster"><span>◉</span>Roster</button>
+  <button data-tab="wire"><span>＋</span>Wire</button>
+  <button data-tab="league"><span>☰</span>League</button>
+  <button data-tab="compare"><span>⇄</span>Compare</button>
+</nav>
+<div id="sheet" hidden></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
