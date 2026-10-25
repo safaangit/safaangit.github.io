@@ -377,3 +377,20 @@ ul.list li.ad { cursor: default; padding: 11px 14px !important; display: block; 
 .prepbtn { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; padding: 13px 14px; text-align: left; font-size: 16px; color: var(--ink); }
 .prepbtn .ico { color: var(--accent); width: 22px; height: 22px; }
 .prepbtn .small { color: var(--muted); white-space: nowrap; }
+
+/* Eat out */
+.seg.mode { margin-bottom: 10px; }
+.row.eoq { display: flex; gap: 8px; margin: 0 0 10px; } .row.eoq input { flex: 1; } .row.eoq button { flex: none; white-space: nowrap; }
+h4.eoh { margin: 4px 2px 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.place .why .badge, .halalbox .badge { margin: 2px 0; }
+.idea .bc .kc, .place .bc .kc, .cuisine .bc .kc { color: var(--kc); font-weight: 400; }
+.cuisine .bc { margin-top: 2px; }
+.badge.tag-veg { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.badge.tag-fish { background: var(--p-bg); color: var(--p); }
+.badge.tag-meat { background: var(--chip); color: var(--accent); }
+.eoacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px; }
+.eoacts button { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--accent); }
+.halalbox { background: var(--tile); border-radius: 10px; padding: 10px 12px; margin: 4px 0 12px; }
+.halalbox p { margin: 8px 0 0; } .halalbox a { color: var(--accent); }
+ul.tips { margin: 0 0 12px; padding-left: 20px; } ul.tips li { margin: 0 0 6px; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line2); border-radius: 10px; padding: 10px 12px; color: inherit; text-decoration: none; font-weight: 500; background: var(--card); }

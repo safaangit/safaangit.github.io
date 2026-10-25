@@ -1,0 +1,503 @@
+{
+ "v": 1,
+ "cuisines": [
+  {
+   "id": "indian",
+   "name": "Indian / Pakistani",
+   "match": "indian|pakistani|desi|curry|tandoor|biryani|masala",
+   "tips": [
+    "Tandoori and tikka (dry, from the clay oven) are the lean picks; anything \"masala\", \"makhani\", \"korma\" or \"malai\" is cream and butter (+300\u2013500 kcal).",
+    "Skip the naan or split it: one plain naan is about 260 kcal, garlic/butter naan more.",
+    "Ask for half rice; entrees usually come with ~1.5 cups (300 kcal).",
+    "Dal tadka is the leanest veg protein; dal makhni has butter and cream."
+   ],
+   "halal": "Many Indian/Pakistani places are halal but not all; check the place. Biryani and curries are fine to ask about.",
+   "orders": [
+    {
+     "name": "Chicken tikka (dry) + half rice",
+     "how": "Ask for no butter brushed on top, half rice, raita on the side.",
+     "n": {
+      "kcal": 490,
+      "p": 58,
+      "c": 41,
+      "f": 9
+     },
+     "tag": "meat"
+    },
+    {
+     "name": "Tandoori shrimp or fish + salad",
+     "how": "Swap rice for salad if they will, lemon instead of dressing.",
+     "n": {
+      "kcal": 330,
+      "p": 49,
+      "c": 10,
+      "f": 8
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Tandoori chicken (skin off) + salad",
+     "how": "Pull the skin, no butter on top.",
+     "n": {
+      "kcal": 440,
+      "p": 57,
+      "c": 10,
+      "f": 18
+     },
+     "tag": "meat"
+    },
+    {
+     "name": "Dal tadka + half rice + raita",
+     "how": "Yellow dal, not dal makhni.",
+     "n": {
+      "kcal": 400,
+      "p": 18,
+      "c": 62,
+      "f": 9
+     },
+     "tag": "veg"
+    },
+    {
+     "name": "Chana masala + half rice",
+     "how": "Ask for less oil.",
+     "n": {
+      "kcal": 470,
+      "p": 15,
+      "c": 72,
+      "f": 15
+     },
+     "tag": "veg"
+    }
+   ]
+  },
+  {
+   "id": "mediterranean",
+   "name": "Mediterranean / Middle Eastern",
+   "match": "mediterranean|middle eastern|lebanese|turkish|greek|shawarma|gyro|kabob|kebab|falafel|pita",
+   "tips": [
+    "Plate over sandwich: you control the sides. Ask for salad instead of rice, or half and half.",
+    "Get garlic sauce (toum) and tahini on the side: toum is about 100 kcal per tablespoon.",
+    "Skip the pita that comes with dips (about 165 kcal each) or eat half.",
+    "Falafel is fried; good for veg but low protein per calorie."
+   ],
+   "halal": "Lots of shawarma/kebab spots are halal; gyro meat at Greek diners usually isn't. Check the place.",
+   "orders": [
+    {
+     "name": "Chicken kebab plate, greens + half rice",
+     "how": "Sauce on the side, hummus scoop, no pita.",
+     "n": {
+      "kcal": 515,
+      "p": 49,
+      "c": 34,
+      "f": 17
+     },
+     "tag": "meat"
+    },
+    {
+     "name": "Shrimp or salmon kebab, greens + half rice",
+     "how": "Lemon and herbs, sauce on side.",
+     "n": {
+      "kcal": 365,
+      "p": 44,
+      "c": 29,
+      "f": 7
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Lentil soup + 3 falafel + salad",
+     "how": "Dressing on the side.",
+     "n": {
+      "kcal": 400,
+      "p": 18,
+      "c": 50,
+      "f": 13
+     },
+     "tag": "veg"
+    },
+    {
+     "name": "Half roasted chicken, skin off, salad side",
+     "how": "Skip the rice and pita.",
+     "n": {
+      "kcal": 450,
+      "p": 61,
+      "c": 8,
+      "f": 18
+     },
+     "tag": "meat"
+    }
+   ]
+  },
+  {
+   "id": "halal-cart",
+   "name": "Halal cart / platter",
+   "match": "halal guys|halal cart|platter|over rice|food cart",
+   "tips": [
+    "A regular platter with full white sauce is 900\u20131,000+ kcal. Small platter + extra lettuce is the move.",
+    "White sauce is about 300 kcal per serving: use half, or swap for hot sauce (7 kcal)."
+   ],
+   "halal": "Halal carts usually are halal (it's the name), but the slaughter method varies; ask who supplies the chicken.",
+   "orders": [
+    {
+     "name": "Small chicken platter, half white sauce",
+     "how": "Extra lettuce, half the white sauce, hot sauce to taste.",
+     "n": {
+      "kcal": 620,
+      "p": 40,
+      "c": 61,
+      "f": 21
+     },
+     "tag": "meat",
+     "basis": "The Halal Guys published nutrition (small chicken platter 471 kcal) + half a white sauce"
+    },
+    {
+     "name": "Regular chicken platter, no white sauce",
+     "how": "Hot sauce and a squeeze of lemon instead.",
+     "n": {
+      "kcal": 655,
+      "p": 59,
+      "c": 79,
+      "f": 10
+     },
+     "tag": "meat",
+     "basis": "The Halal Guys published nutrition"
+    },
+    {
+     "name": "Falafel platter, small, half white sauce",
+     "how": "Mostly carbs and fat; split it if you can.",
+     "n": {
+      "kcal": 1060,
+      "p": 25,
+      "c": 126,
+      "f": 48
+     },
+     "tag": "veg",
+     "basis": "The Halal Guys published nutrition"
+    }
+   ]
+  },
+  {
+   "id": "mexican",
+   "name": "Mexican / burrito bowls",
+   "match": "mexican|burrito|taco|chipotle|qdoba|moe|tex mex",
+   "tips": [
+    "Bowl, not burrito: a burrito tortilla is about 320 kcal.",
+    "Fajita veggies and salsa are almost free; chips (540), queso and sour cream are not.",
+    "Half rice + beans keeps it filling.",
+    "Refried and pinto beans can be made with lard (pork) at small places; ask, or get black beans."
+   ],
+   "halal": "Chain meats (Chipotle, Qdoba, Moe's) aren't halal. Veg and fish orders below work anywhere.",
+   "orders": [
+    {
+     "name": "Veggie bowl + sofritas",
+     "how": "Lettuce, half rice, black beans, sofritas, fajita veg, salsa, light cheese.",
+     "n": {
+      "kcal": 545,
+      "p": 24,
+      "c": 61,
+      "f": 22
+     },
+     "tag": "veg",
+     "basis": "Chipotle's published ingredient nutrition"
+    },
+    {
+     "name": "Grilled shrimp or fish tacos (3, corn)",
+     "how": "Grilled not fried, no crema, extra cabbage and salsa.",
+     "n": {
+      "kcal": 380,
+      "p": 38,
+      "c": 36,
+      "f": 9
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Chicken bowl, no rice",
+     "how": "Chicken, black beans, fajita veg, salsa, lettuce. Only at a halal place.",
+     "n": {
+      "kcal": 360,
+      "p": 40,
+      "c": 31,
+      "f": 9
+     },
+     "tag": "meat",
+     "basis": "Chipotle's published ingredient nutrition"
+    }
+   ]
+  },
+  {
+   "id": "sushi",
+   "name": "Sushi / Japanese",
+   "match": "sushi|japanese|poke|ramen|hibachi|roll",
+   "tips": [
+    "Sashimi and naruto rolls (cucumber wrap, no rice) are the highest protein per calorie.",
+    "Anything tempura, \"crunch\" or with spicy mayo adds 100\u2013200 kcal a roll.",
+    "Eel sauce, teriyaki and many glazes are made with mirin or sake (alcohol). Ask for ponzu or plain soy, and check imitation crab labels for mirin."
+   ],
+   "halal": "Fish orders work anywhere. Ask about mirin/sake in sauces and seasoned rice vinegar.",
+   "orders": [
+    {
+     "name": "Sashimi, 10 pieces (tuna + salmon)",
+     "how": "Add a seaweed salad or miso soup if you have room.",
+     "n": {
+      "kcal": 270,
+      "p": 37,
+      "c": 0,
+      "f": 11
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Naruto roll (no rice)",
+     "how": "Cucumber-wrapped tuna/salmon/avocado.",
+     "n": {
+      "kcal": 180,
+      "p": 18,
+      "c": 6,
+      "f": 9
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Tuna roll (6 pieces)",
+     "how": "Plain, not spicy.",
+     "n": {
+      "kcal": 200,
+      "p": 12,
+      "c": 33,
+      "f": 1
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Poke bowl, half rice half greens",
+     "how": "Tuna, cucumber, edamame, ponzu; skip spicy mayo and crunch.",
+     "n": {
+      "kcal": 365,
+      "p": 36,
+      "c": 38,
+      "f": 6
+     },
+     "tag": "fish"
+    }
+   ]
+  },
+  {
+   "id": "chinese",
+   "name": "Chinese",
+   "match": "chinese|szechuan|sichuan|panda|hunan|wok|asian",
+   "tips": [
+    "Steamed with sauce on the side is the cheat code. Anything crispy, General Tso's or orange is about 1,000 kcal an order; lo mein is ~900.",
+    "Many sauces use Shaoxing cooking wine. Ask for no cooking wine, or steamed with sauce on the side."
+   ],
+   "halal": "Chicken and beef usually aren't halal unless the place says so. Shrimp and tofu orders below work anywhere.",
+   "orders": [
+    {
+     "name": "Steamed shrimp & broccoli + half rice",
+     "how": "Brown or garlic sauce on the side, use a little.",
+     "n": {
+      "kcal": 355,
+      "p": 45,
+      "c": 39,
+      "f": 2
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Steamed tofu & mixed veg + half rice",
+     "how": "Sauce on the side.",
+     "n": {
+      "kcal": 375,
+      "p": 26,
+      "c": 46,
+      "f": 11
+     },
+     "tag": "veg"
+    },
+    {
+     "name": "Hot & sour or egg drop soup",
+     "how": "Good starter that fills you up for ~100 kcal.",
+     "n": {
+      "kcal": 100,
+      "p": 5,
+      "c": 14,
+      "f": 3
+     },
+     "tag": "veg"
+    }
+   ]
+  },
+  {
+   "id": "thai",
+   "name": "Thai",
+   "match": "thai|pho|vietnamese|basil",
+   "tips": [
+    "Pad thai is ~900\u20131,000 kcal; green/red/massaman curries with coconut milk are 600\u2013800 a serving.",
+    "Clear soups (tom yum) and basil stir-fries with half rice are the lean picks. Fish sauce is fine (it's fish)."
+   ],
+   "halal": "Shrimp, fish and tofu work anywhere; chicken only at a halal place.",
+   "orders": [
+    {
+     "name": "Tom yum soup with shrimp",
+     "how": "Clear version, not coconut (tom kha).",
+     "n": {
+      "kcal": 180,
+      "p": 22,
+      "c": 12,
+      "f": 5
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Basil shrimp or tofu, less oil, half rice",
+     "how": "Ask for light oil.",
+     "n": {
+      "kcal": 455,
+      "p": 40,
+      "c": 40,
+      "f": 15
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Fresh summer rolls (2) with shrimp",
+     "how": "Peanut sauce on the side, use half.",
+     "n": {
+      "kcal": 290,
+      "p": 13,
+      "c": 41,
+      "f": 8
+     },
+     "tag": "fish"
+    }
+   ]
+  },
+  {
+   "id": "pizza",
+   "name": "Pizza / Italian",
+   "match": "pizza|italian|pasta|pizzeria",
+   "tips": [
+    "Thin crust, veggie toppings, 2 slices + side salad.",
+    "Vodka sauce, marsala and piccata use alcohol; pepperoni and sausage are usually pork.",
+    "Pasta portions are often 3+ cups; ask for a half or lunch portion."
+   ],
+   "halal": "Halal pizza places exist (halal pepperoni/chicken); otherwise stick to veg or shrimp.",
+   "orders": [
+    {
+     "name": "Thin crust veggie, 2 slices + side salad",
+     "how": "Light cheese if they offer it, dressing on side.",
+     "n": {
+      "kcal": 470,
+      "p": 19,
+      "c": 47,
+      "f": 22
+     },
+     "tag": "veg"
+    },
+    {
+     "name": "Shrimp marinara, half portion",
+     "how": "Marinara, not vodka or scampi butter.",
+     "n": {
+      "kcal": 550,
+      "p": 44,
+      "c": 54,
+      "f": 16
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Minestrone + side salad",
+     "how": "Light, filling starter or lunch.",
+     "n": {
+      "kcal": 250,
+      "p": 8,
+      "c": 35,
+      "f": 8
+     },
+     "tag": "veg"
+    }
+   ]
+  },
+  {
+   "id": "burgers",
+   "name": "Burgers / American",
+   "match": "burger|american|grill|diner|wings|fries",
+   "tips": [
+    "Lettuce wrap or open-face cuts ~200 kcal of bun.",
+    "Swap fries (~400 kcal medium) for a side salad or fruit.",
+    "Bacon is pork; \"turkey\" bacon/sausage isn't halal unless the place is."
+   ],
+   "halal": "Halal burger joints are common in college towns; otherwise grilled fish or veggie burgers.",
+   "orders": [
+    {
+     "name": "Single burger, lettuce wrap, no mayo",
+     "how": "One slice of cheese, mustard + veggies. Only at a halal place.",
+     "n": {
+      "kcal": 375,
+      "p": 26,
+      "c": 3,
+      "f": 28
+     },
+     "tag": "meat"
+    },
+    {
+     "name": "Grilled fish sandwich, no tartar",
+     "how": "Grilled, not fried.",
+     "n": {
+      "kcal": 390,
+      "p": 38,
+      "c": 38,
+      "f": 8
+     },
+     "tag": "fish"
+    },
+    {
+     "name": "Black bean burger, lettuce wrap + side salad",
+     "how": "Dressing on the side.",
+     "n": {
+      "kcal": 350,
+      "p": 13,
+      "c": 28,
+      "f": 19
+     },
+     "tag": "veg"
+    }
+   ]
+  },
+  {
+   "id": "breakfast",
+   "name": "Breakfast / diner",
+   "match": "breakfast|brunch|diner|pancake|cafe|bagel",
+   "tips": [
+    "Egg white veggie omelet + dry wheat toast + fruit is the classic.",
+    "Bacon, sausage, ham are pork; hash browns ~300 kcal.",
+    "Pancakes: one short stack is ~500 kcal before butter and syrup."
+   ],
+   "halal": "Eggs and veg work anywhere; meats only at a halal place.",
+   "orders": [
+    {
+     "name": "Egg white veggie omelet, dry toast, fruit",
+     "how": "No cheese, cooked with spray not butter if they will.",
+     "n": {
+      "kcal": 370,
+      "p": 28,
+      "c": 45,
+      "f": 7
+     },
+     "tag": "veg"
+    },
+    {
+     "name": "Greek yogurt parfait + 2 eggs",
+     "how": "Granola on the side.",
+     "n": {
+      "kcal": 420,
+      "p": 30,
+      "c": 40,
+      "f": 16
+     },
+     "tag": "veg"
+    }
+   ]
+  }
+ ]
+}

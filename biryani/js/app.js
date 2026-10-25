@@ -37,6 +37,7 @@ const ICONS = {
   alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   knee: '<path d="M12 2v8l-3 4v8M12 10l4 4v8"/><circle cx="12" cy="12" r="2.5"/>',
+  pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
 };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -963,7 +964,10 @@ async function leftToday() {
   return { kcal: g.kcal - tot.kcal, p: g.p - tot.p, c: g.c - (s.netCarbs ? tot.c - tot.fib : tot.c), f: g.f - tot.f };
 }
 
+const exModeBar = m => `<div class="seg mode" id="exMode"><button data-m="cook" class="${m === 'cook' ? 'on' : ''}">Cook at home</button><button data-m="out" class="${m === 'out' ? 'on' : ''}">Eat out</button></div>`;
 async function viewExplore() {
+  const mode = local.get('exMode', 'cook');
+  if (mode === 'out') return exModeBar(mode) + await viewEatOut();
   const chip = local.get('exChip', 'you');
   const { list, buys, deals } = await exploreData();
   let shown = list, note = '';
@@ -979,7 +983,7 @@ async function viewExplore() {
     ${x.because ? `<div class="bc">Because you eat ${esc(x.because.split(',')[0])}</div>` : ''}
     <div class="why">${x.kind === 'creami' ? '<span class="badge src-recipe">Creami</span> ' : x.kind === 'buy' ? '<span class="badge src-usda">Buy</span> ' : ''}${x.tags.includes('halal-certified') ? '<span class="badge ok">Halal certified</span> ' : ''}${x.deals.length ? '<span class="badge deal">Deal</span> ' : ''}${x.saved ? '<span class="badge ok">✓ saved</span> ' : ''}<b class="pd">${r0((x.n.p * 100) / Math.max(1, x.k))} g protein / 100 kcal</b></div></div></li>`;
   const order = Object.keys(buys), local_ = deals.filter(d => d.until).sort((a, b) => order.indexOf(a.buy) - order.indexOf(b.buy)), online = deals.filter(d => !d.until).slice(0, 4);
-  return `<div class="chips" id="exChips">${EX_CHIPS.map(([k, l]) => `<button data-c="${k}" class="${k === chip ? 'on' : ''}">${l}</button>`).join('')}</div>
+  return `${exModeBar(mode)}<div class="chips" id="exChips">${EX_CHIPS.map(([k, l]) => `<button data-c="${k}" class="${k === chip ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${note}
     ${shown.length ? `<ul class="list card ideas">${shown.map(row).join('')}</ul>` : `<p class="muted pad">${chip === 'fits' ? "None of the ideas fit what's left today." : 'Nothing here yet.'}</p>`}
     <button class="wide" id="exFits">${ico('pie')}What fits from my own foods</button>
@@ -990,6 +994,8 @@ async function viewExplore() {
       <p class="muted small">From the Giant, Weis, ALDI, Walmart and Target weekly ads near Bellefonte plus Slickdeals, checked Wed and Sat for what you buy. Halal: ideas use vegetarian foods, seafood, or halal meat; no gelatin or alcohol.</p></section>`;
 }
 bind.explore = root => {
+  $$('#exMode button', root).forEach(b => (b.onclick = () => { local.set('exMode', b.dataset.m); render(); }));
+  if (local.get('exMode', 'cook') === 'out') return bind.eatout(root);
   $$('#exChips button', root).forEach(b => (b.onclick = () => { local.set('exChip', b.dataset.c); render(); }));
   $('#exFits', root).onclick = () => openFits();
   $('#exAllDeals', root)?.addEventListener('click', async () => {
@@ -1017,6 +1023,138 @@ function openIdea(x) {
       items: x.items.map(({ foodId, name, brand, qty, unit, mult, n }) => ({ foodId, name, brand, qty, unit, mult, n })), explore: x.id });
     if (!x.saved) toast('Saved to My recipes');
     openRecipe(r);
+  };
+}
+
+// ---------- Eat out ----------
+// Cuisine playbooks (app/eatout.json) work for any place; saved restaurant guides with halal
+// detail live in data/fuel/places.json, written by Claude (.claude/skills/eat-out). Anything
+// not covered goes to Claude with your macros left and filters filled in.
+let eatoutP;
+const loadEatout = () => (eatoutP ??= fetch('eatout.json').then(r => r.json()).catch(() => { eatoutP = null; return { cuisines: [] }; }));
+const EO_CHIPS = [['halal', 'Halal places'], ['veg', 'Veg'], ['fish', 'Fish'], ['fits', 'Fits today']];
+const TAG_LABEL = { veg: 'Veg', fish: 'Fish', meat: 'Halal meat' };
+const SLAUGHTER = { hand: 'Hand-slaughtered', machine: 'Machine-slaughtered', unconfirmed: 'Slaughter unconfirmed' };
+
+function halalBadges(h) {
+  if (!h || h.status === 'unknown') return '<span class="badge">Halal unknown</span>';
+  if (h.status === 'none') return '<span class="badge warn">Not halal</span>';
+  return [`<span class="badge ok">${h.status === 'full' ? 'Fully halal' : 'Partly halal'}</span>`,
+    `<span class="badge ${h.slaughter === 'hand' ? 'ok' : ''}">${SLAUGHTER[h.slaughter] || SLAUGHTER.unconfirmed}</span>`,
+    h.alcohol === false ? '<span class="badge">No alcohol</span>' : h.alcohol ? '<span class="badge warn">Serves alcohol</span>' : '',
+    `<span class="badge">${h.cert ? 'Cert: ' + esc(h.cert) : 'No certifier listed'}</span>`].join(' ');
+}
+// Orders that pass the Veg / Fish / Fits filters. Meat only counts at a halal place.
+function eoOrders(orders, f, rem, halalPlace) {
+  const want = ['veg', 'fish'].filter(k => f.includes(k));
+  return orders.filter(o => (!want.length || want.includes(o.tag)) && (o.tag !== 'meat' || halalPlace !== false)
+    && (!f.includes('fits') || !rem || o.n.kcal <= rem.kcal + 40))
+    .sort((a, b) => b.n.p / b.n.kcal - a.n.p / a.n.kcal);
+}
+const orderRow = (o, i, halalPlace) => `<li class="food eo" data-o="${i}"><div class="grow">${row2(esc(o.name), o.n, esc(o.price || ''))}
+  ${o.how ? `<div class="bc">${esc(o.how)}</div>` : ''}<div class="why"><span class="badge tag-${o.tag}">${TAG_LABEL[o.tag]}${o.tag === 'meat' && halalPlace == null ? ' · halal place only' : ''}</span> ${o.basis ? `<span class="badge ok" title="${esc(o.basis)}">Published</span>` : '<span class="badge">Estimate</span>'} <b class="pd">${r0((o.n.p * 100) / o.n.kcal)} g protein / 100 kcal</b></div></div></li>`;
+
+async function viewEatOut() {
+  const [{ cuisines }, places] = await Promise.all([loadEatout(), db.all('places')]);
+  const f = local.get('eoF', []), q = (state.eoQ || '').trim().toLowerCase();
+  const rem = f.includes('fits') ? await leftToday() : null;
+  const hit = (...xs) => !q || xs.some(x => (x || '').toLowerCase().includes(q));
+  const ps = places.filter(p => hit(p.name, p.city, p.cuisine) && (!f.includes('halal') || ['full', 'partial'].includes(p.halal?.status)))
+    .sort((a, b) => (b.halal?.status === 'full') - (a.halal?.status === 'full') || a.name.localeCompare(b.name));
+  const cs = cuisines.filter(c => !q || hit(c.name) || new RegExp(c.match, 'i').test(q));
+  state.eo = { ps, cs, rem };
+  const best = (orders, hp) => eoOrders(orders, f, rem, hp)[0];
+  const placeRow = (p, i) => { const b = best(p.orders, ['full', 'partial'].includes(p.halal?.status)); return `<li class="food place" data-p="${i}"><div class="grow">
+    <div class="r1"><span class="name">${esc(p.name)}</span><span class="muted">${esc(p.price || '')}</span></div>
+    <div class="r2"><span class="sub">${esc([p.city, cuisines.find(c => c.id === p.cuisine)?.name || p.cuisine].filter(Boolean).join(' · '))}</span></div>
+    <div class="why">${halalBadges(p.halal)}</div>
+    ${b ? `<div class="bc">Best: ${esc(b.name)} · <b class="kc">${kcalOf(b.n)}</b> kcal · ${macroLine(b.n)}</div>` : ''}</div></li>`; };
+  const cuisineRow = (c, i) => { const b = best(c.orders); return `<li class="food cuisine" data-c="${i}"><div class="grow">
+    <div class="r1"><span class="name">${esc(c.name)}</span><span class="chev">›</span></div>
+    ${b ? `<div class="bc">${esc(b.name)} · <b class="kc">${kcalOf(b.n)}</b> kcal · ${macroLine(b.n)}</div>` : '<div class="bc muted">Nothing matches your filters.</div>'}</div></li>`; };
+  return `<div class="row eoq"><input id="eoQ" type="search" placeholder="Restaurant or cuisine" value="${esc(state.eoQ || '')}" enterkeyhint="search"><button class="primary" id="eoAsk">Ask Claude</button></div>
+    <div class="chips" id="eoChips">${EO_CHIPS.map(([k, l]) => `<button data-c="${k}" class="${f.includes(k) ? 'on' : ''}">${l}</button>`).join('')}</div>
+    ${rem ? `<p class="hint">Left today: <b>${r0(rem.kcal)}</b> kcal · ${macroLine(rem)}</p>` : ''}
+    ${ps.length ? `<h4 class="eoh">Your places</h4><ul class="list card ideas">${ps.map(placeRow).join('')}</ul>` : ''}
+    ${cs.length ? `<h4 class="eoh">Any place, by cuisine</h4><ul class="list card ideas">${cs.map(cuisineRow).join('')}</ul>` : ''}
+    ${!ps.length && !cs.length && q ? `<p class="muted pad">Nothing saved for “${esc(state.eoQ)}” yet. Ask Claude and it'll research the menu and halal status.</p>` : ''}
+    <div class="eoacts"><button id="eoPhoto">${ico('camera')}Menu photo</button><button id="eoNear">${ico('pin')}Halal near me</button></div>
+    <p class="muted small">Published = from the chain's own nutrition data. Estimate = portions guessed from the menu, usually within ~15%. Halal details come from Zabihah, HMS and the restaurant, with the date checked; always confirm in person.</p>`;
+}
+bind.eatout = root => {
+  const q = $('#eoQ', root);
+  q.oninput = () => { state.eoQ = q.value; clearTimeout(q._t); q._t = setTimeout(async () => { await render(); const n = $('#eoQ'); n.focus(); n.setSelectionRange(99, 99); }, 350); };
+  q.onkeydown = e => { if (e.key === 'Enter') q.blur(); };
+  $$('#eoChips button', root).forEach(b => (b.onclick = () => {
+    const f = new Set(local.get('eoF', [])); f.has(b.dataset.c) ? f.delete(b.dataset.c) : f.add(b.dataset.c); local.set('eoF', [...f]); render();
+  }));
+  $('#eoAsk', root).onclick = () => openAsk({ place: q.value.trim() });
+  $('#eoPhoto', root).onclick = () => openAsk({ place: q.value.trim(), photo: true });
+  $('#eoNear', root).onclick = () => openAsk({ near: true });
+  $$('li.place', root).forEach(li => (li.onclick = () => openPlace(state.eo.ps[+li.dataset.p])));
+  $$('li.cuisine', root).forEach(li => (li.onclick = () => openCuisine(state.eo.cs[+li.dataset.c])));
+};
+
+function logOrder(where, o) {
+  openPortion({ name: `${o.name} (${where})`, n: o.n, units: [{ label: 'order', mult: 1 }], source: 'recipe', srcLabel: 'Eat out' }, { meal: defaultMeal() });
+}
+function openPlace(p) {
+  const f = local.get('eoF', []), hp = ['full', 'partial'].includes(p.halal?.status);
+  const orders = eoOrders(p.orders, f.filter(k => k !== 'fits'), null, hp), h = p.halal || {};
+  const b = sheet(`<p class="sub">${esc([p.address, p.city, p.price].filter(Boolean).join(' · '))}</p>
+    <div class="halalbox"><div>${halalBadges(h)}</div>${h.summary ? `<p class="small">${esc(h.summary)}</p>` : ''}
+      ${h.source ? `<p class="small muted">Source: <a href="${esc(h.source)}" target="_blank" rel="noopener">${esc(new URL(h.source).hostname.replace('www.', ''))}</a>${h.checked ? ' · checked ' + esc(fmtDate(h.checked)) : ''}</p>` : ''}</div>
+    <h4>Best orders${p.nutrition === 'published' ? '' : ' (estimates)'}</h4>
+    <ul class="list">${orders.map((o, i) => orderRow(o, i, hp)).join('') || '<li class="empty small">Nothing matches your Veg / Fish filters here.</li>'}</ul>
+    ${p.note ? `<p class="muted small">${esc(p.note)}</p>` : ''}
+    ${p.avoid ? `<p class="small halal"><b>Skip:</b> ${esc(p.avoid)}</p>` : ''}
+    <div class="actions">${p.menu ? `<a class="btn" href="${esc(p.menu)}" target="_blank" rel="noopener">Menu</a>` : ''}<button class="primary" id="pAsk">Ask Claude about it</button></div>
+    <p class="muted small">Tap an order to log it.</p>`, { title: p.name });
+  $$('li.eo', b).forEach(li => (li.onclick = () => logOrder(p.name, orders[+li.dataset.o])));
+  $('#pAsk', b).onclick = () => openAsk({ place: `${p.name}, ${p.city}` });
+}
+function openCuisine(c) {
+  const f = local.get('eoF', []), orders = eoOrders(c.orders, f.filter(k => k !== 'fits'), null, null);
+  const b = sheet(`<ul class="tips">${c.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+    ${c.halal ? `<p class="small halal">${esc(c.halal)}</p>` : ''}
+    <h4>What to order</h4><ul class="list">${orders.map((o, i) => orderRow(o, i, null)).join('') || '<li class="empty small">Nothing matches your Veg / Fish filters.</li>'}</ul>
+    <div class="actions"><button class="primary" id="cAsk">Ask Claude about a specific place</button></div>
+    <p class="muted small">Tap an order to log it. Numbers are estimates for a typical restaurant portion.</p>`, { title: c.name });
+  $$('li.eo', b).forEach(li => (li.onclick = () => logOrder(c.name, orders[+li.dataset.o])));
+  $('#cAsk', b).onclick = () => openAsk({ place: '', cuisine: c.name });
+}
+
+// Hands the question to Claude (free on your plan) with macros left and halal rules filled in.
+async function openAsk({ place = '', cuisine = '', photo = false, near = false } = {}) {
+  const rem = await leftToday(), f = local.get('eoF', []);
+  const where = place || (cuisine ? `a ${cuisine} restaurant` : '');
+  const b = sheet(`<label>${near ? 'Area' : 'Restaurant (name + town)'}<input id="aPlace" value="${esc(near ? '' : place)}" placeholder="${near ? 'Using your location' : cuisine ? `${cuisine} place in…` : 'e.g. Penn Pide, State College'}"></label>
+    ${photo ? '<p class="hint">Open Claude copies this prompt and opens a new chat: paste it, attach your menu photo or screenshot, then send.</p>' : ''}
+    <label>Prompt<textarea id="aText" rows="9"></textarea></label>
+    <div class="actions"><button id="aCopy">Copy</button><button class="primary" id="aGo">Open Claude</button></div>
+    <p class="muted small">Opens a Claude chat, which is included in your plan. For the full research (saved to this app), send it in your project instead.</p>`, { title: near ? 'Halal near me' : photo ? 'Menu photo' : 'Ask Claude' });
+  const loc = near && navigator.geolocation ? await new Promise(res => navigator.geolocation.getCurrentPosition(p => res(`${p.coords.latitude.toFixed(3)}, ${p.coords.longitude.toFixed(3)}`), () => res(''), { timeout: 8000 })) : '';
+  const build = () => {
+    const w = $('#aPlace', b).value.trim() || (near ? '' : where);
+    const diet = [f.includes('veg') && 'vegetarian', f.includes('fish') && 'fish/seafood'].filter(Boolean);
+    return [
+      near ? `Find halal restaurants near ${w || loc || 'me'}. For each: fully vs partly halal, certifier, hand vs machine slaughter (say "unconfirmed" if no source says), alcohol served, and the source (Zabihah, HMS, HFSAA, the restaurant) with a link. Then the best macro-friendly order at each.`
+        : `What should I order at ${w || 'this restaurant'}?${photo ? ' I attached a photo of the menu.' : ''}`,
+      `Macros left today: ${r0(rem.kcal)} kcal, ${r0(rem.p)} g protein, ${r0(rem.c)} g carbs, ${r0(rem.f)} g fat. I want high protein for the calories.`,
+      'I eat halal only: no pork, no alcohol (including mirin, sake, wine in sauces). If the meat isn\'t halal, give vegetarian or fish options instead. Show the halal status with sources: fully vs partly halal, certifier, hand vs machine slaughter, alcohol served.',
+      diet.length ? `Prefer ${diet.join(' or ')} orders.` : '',
+      'Give the 3 best orders with exact customizations to ask for, estimated calories / protein / carbs / fat (say whether it\'s from published nutrition or an estimate, and the portion you assumed), the price if you can find it, and what to skip.',
+      'If you have my safaan-personal repo, follow .claude/skills/eat-out and save the guide to my app.',
+    ].filter(Boolean).join('\n\n');
+  };
+  const t = $('#aText', b); t.value = build();
+  $('#aPlace', b).oninput = () => (t.value = build());
+  $('#aCopy', b).onclick = async () => { try { await navigator.clipboard.writeText(t.value); toast('Copied'); } catch { t.select(); } };
+  $('#aGo', b).onclick = async () => {
+    try { await navigator.clipboard.writeText(t.value); } catch {}
+    // ?q= can auto-send, so for a photo just copy the prompt and let them attach first.
+    if (photo) toast('Prompt copied: paste it in Claude and attach the photo');
+    window.open('https://claude.ai/new' + (photo ? '' : '?q=' + encodeURIComponent(t.value)), '_blank', 'noopener');
   };
 }
 
