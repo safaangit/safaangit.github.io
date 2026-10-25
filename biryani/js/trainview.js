@@ -103,17 +103,26 @@ function planView(data, s, ui) {
       ${lvl ? `<span class="pips">${'<i></i>'.repeat(lvl)}</span>` : ''}
       ${st === 'done' && x.mi ? '<i class="ok"></i>' : st === 'miss' || st === 'part' ? '<i class="miss"></i>' : ''}</button>`;
   };
-  const weeksHtml = [...pastWeeks, ...plan.weeks].map(w => {
+  const wkHtml = w => {
     const actual = wkMi.get(w.start) || 0;
     const before = w.past || T.addDays(w.start, 6) < cfg.planStart;
     const right = before ? `${r1(actual)} mi` : w.start <= t ? `${r1(actual)} of ${Math.round(w.lo)}-${Math.round(w.hi)} mi` : `${Math.round(w.lo)}-${Math.round(w.hi)} mi`;
     return `<div class="wk ${before ? 'past' : ''}"><div class="wkh"><span>${mon(w.start)} – ${mon(T.addDays(w.start, 6))}</span><span class="ph">${before ? 'Done' : w.phase}</span><b>${right}</b></div>
       <div class="calrow">${w.days.map(cell).join('')}</div></div>`;
-  }).join('');
-  return hero(data, ui) + todayCardHtml + notesHtml + `<section class="card calcard"><h3>Plan to race day</h3>
-    <div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div>${weeksHtml}
-    <div class="legend">${[['easy', 'Easy'], ['medium', 'Medium'], ['quality', 'Hard (tempo, MP, intervals)'], ['long', 'Long'], ['race', 'Race']].map(([k, l]) => `<span class="k-${k}"><i></i>${l}</span>`).join('')}</div>
-    <p class="muted small">Dots = how hard the day is. Any distance in the range counts. Tap a day for the workout; past days show what Garmin logged.</p></section>
+  };
+  // Finished weeks fold away; this week and the rest of the plan stay open.
+  const all = [...pastWeeks, ...plan.weeks], done = all.filter(w => T.addDays(w.start, 6) < t), ahead = all.filter(w => T.addDays(w.start, 6) >= t);
+  const doneMi = done.reduce((a, w) => a + (wkMi.get(w.start) || 0), 0);
+  const pastHtml = done.length ? `<details class="pastwks" id="pastWks" ${local.get('calPastOpen', false) ? 'open' : ''}><summary><span>${done.length} earlier weeks</span><span class="muted">${mon(done[0].start)} – ${mon(T.addDays(done[done.length - 1].start, 6))} · ${Math.round(doneMi)} mi</span></summary>${done.map(wkHtml).join('')}</details>` : '';
+  // Target paces for each kind of day, pinned above the calendar while you scroll it.
+  const Z = k => plan.z.list.find(x => x[0] === k);
+  const chips = [['easy', 'Easy', 'easy'], ['long', 'Long', 'long'], ['quality', 'MP', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
+    .map(([k, l, z]) => `<span class="pchip k-${k}"><b>${l}</b>${T.fmtPace(Z(z)[3])}-${T.fmtPace(Z(z)[2])}</span>`).join('');
+  return hero(data, ui) + `<section class="card calcard"><h3>Plan to race day</h3>
+    <div class="calstick"><div class="pchips">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
+    ${pastHtml}${ahead.map(wkHtml).join('')}
+    <p class="muted small">Paces are per mile. Dots show how hard the day is, and any distance in the range counts. Tap a day for the full workout.</p></section>
+  ${todayCardHtml}${notesHtml}
   <section class="card"><details class="how"><summary><h3>How this plan adjusts</h3></summary><ul class="tips">
     <li><b>Ranges, not exact miles.</b> Anything in the range counts as done. Long runs flex down, not up.</li>
     <li><b>Ran short on an easy day?</b> About half of it gets added to your remaining easy days this week (max +1.5 mi a day). The rest is let go; chasing missed miles is how knees get hurt.</li>
@@ -200,6 +209,7 @@ export function bind(root, s, ui) {
   const edit = ui.$('#raceEdit', root);
   if (edit) edit.onclick = () => openRace(s, ui);
   ui.$$('.cal[data-d]', root).forEach(c => (c.onclick = () => openDay(s, c.dataset.d, ui)));
+  const pw = ui.$('#pastWks', root); if (pw) pw.ontoggle = () => local.set('calPastOpen', pw.open);
   if (picked) bindCharts(root, (id, i, c) => {
     const P = picked, box = c.closest('.card').querySelector('.tipbox');
     if (id === 'wk' || id === 'pace') {
