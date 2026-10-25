@@ -17,6 +17,24 @@ const nowTime = () => new Date().toTimeString().slice(0, 5);
 const fmtDate = d => d === today() ? 'Today' : d === addDays(today(), -1) ? 'Yesterday' : new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 const DT_ORDER = [null, 'rest', 'run', 'long'];
 
+// Line icons (24px grid, stroke = currentColor) so the UI doesn't lean on emoji.
+const ICONS = {
+  today: '<path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H19"/>',
+  trends: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
+  add: '<path d="M12 5v14M5 12h14"/>',
+  foods: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  prev: '<path d="m15 18-6-6 6-6"/>', next: '<path d="m9 18 6-6-6-6"/>',
+  cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"/>',
+  plusc: '<circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>',
+  scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M11 8v8M14 8v8M17 8v8"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+  pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+};
+const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
+
 const state = { date: today(), tab: local.get('tab', 'today'), s: null, sel: null };
 
 // ---------- shell ----------
@@ -29,16 +47,18 @@ async function render() {
   if (state.tab === 'recipes') state.tab = 'foods';
   const views = { today: viewToday, trends: viewTrends, foods: viewFoods, settings: viewSettings };
   main.innerHTML = await views[state.tab]();
+  document.body.classList.toggle('today', state.tab === 'today');
+  $('#datenav').innerHTML = state.tab === 'today' ? `<button id="prev" aria-label="Previous day">${ico('prev')}</button><button id="dateLbl">${ico('cal')}${fmtDate(state.date)}</button><button id="next" aria-label="Next day">${ico('next')}</button>` : '';
   bind[state.tab]?.(main);
   syncBadge();
 }
 function syncBadge(msg) {
   const el = $('#sync');
-  if (!sync.configured()) { el.textContent = 'local only'; el.className = 'muted'; return; }
+  if (!sync.configured()) { el.textContent = 'local only'; el.className = ''; return; }
   if (msg) { el.textContent = msg; return; }
   const t = local.get('lastSync', 0);
-  el.textContent = t ? 'synced ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not synced';
-  el.className = 'muted';
+  el.textContent = t ? '✓ ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not synced';
+  el.className = '';
 }
 let syncTimer;
 function scheduleSync(ms = 6000) { clearTimeout(syncTimer); syncTimer = setTimeout(runSync, ms); }
@@ -131,11 +151,15 @@ async function recipeFoods() {
 
 function macroLine(n, s = state.s) {
   const c = s.netCarbs ? Math.max(0, (n.c || 0) - (n.fib || 0)) : n.c;
-  return `<span class="macros"><span class="mc c"><b>${r0(c)}</b>${s.netCarbs ? 'net C' : 'C'}</span><span class="mc p"><b>${r0(n.p)}</b>P</span><span class="mc f"><b>${r0(n.f)}</b>F</span></span>`;
+  return `<span class="macros">${s.netCarbs ? 'NC' : 'C'}: <b class="c">${r1(c)}</b>P: <b class="p">${r1(n.p)}</b>F: <b class="f">${r1(n.f)}</b></span>`;
 }
 const kcalOf = n => r0(N.countedKcal(n, state.s.caloriesFromMacros));
 // "serving (1 pita (57g))" reads better as "1 pita (57g)" in tight rows.
 const unitText = l => (/^serving \((.*)\)$/.exec(l || '')?.[1] || l || '').replace(/\d+\.\d{2,}/g, m => String(Math.round(m * 10) / 10));
+// Macros-style two-line row: name + kcal, then brand/serving + C P F.
+const row2 = (nameHtml, n, subHtml) => `<div class="r1"><span class="name">${nameHtml}</span><span class="kc">${kcalOf(n)}</span></div><div class="r2"><span class="sub">${subHtml}</span>${macroLine(n)}</div>`;
+// "58 g", "1 package", "2 × 1 pita (57g)" — skip the "1 ×" Macros never shows.
+const qtyText = (q, unit) => { const u = unitText(unit); return /^\d/.test(u) ? (r1(q) === 1 ? u : `${r1(q)} × ${u}`) : `${r1(q)} ${u}`; };
 const kcalCol = n => `<div class="kcol"><div class="kc">${kcalOf(n)}</div><div class="kl">kcal</div></div>`;
 function checkBadge(n) {
   const c = N.check(n);
@@ -144,9 +168,11 @@ function checkBadge(n) {
 }
 function foodRow(f, i, selState = null) {
   const p = food.preview(f);
-  return `<li class="food ${selState || ''}" data-i="${i}">${selState != null ? '<span class="box"></span>' : ''}<div class="grow"><div class="name">${f.fav ? '★ ' : ''}${esc(f.name)}</div>
-  <div class="sub">${f.brand ? esc(f.brand) + ' · ' : ''}<span class="badge src-${f.source}">${esc(f.srcLabel || f.source)}</span> ${checkBadge(f.n)}</div>
-  <div class="qty">per ${esc(unitText(p.unit.label))}</div>${macroLine(p.n)}</div>${kcalCol(p.n)}</li>`;
+  // Your own foods need no source tag; a verified one gets a check like Macros does.
+  const badge = f.source === 'mine' ? '' : `<span class="badge src-${f.source}">${esc(f.srcLabel || f.source)}</span> `;
+  const tick = f.source === 'mine' && f.verified ? ' <span class="badge ok">✓</span>' : '';
+  return `<li class="food ${selState || ''}" data-i="${i}">${selState != null ? '<span class="box"></span>' : ''}<div class="grow">${row2(`${f.fav ? '★ ' : ''}${esc(f.name)}${tick}`, p.n,
+    `${badge}${checkBadge(f.n)}${[f.brand, unitText(p.unit.label)].filter(Boolean).map(esc).join(', ')}`)}</div></li>`;
 }
 
 // ---------- Today ----------
@@ -157,52 +183,53 @@ async function viewToday() {
   const tot = N.entryTotals(entries, s.caloriesFromMacros);
   const carbs = s.netCarbs ? tot.c - tot.fib : tot.c;
   const left = goals.kcal - tot.kcal;
-  const pct = Math.min(1, tot.kcal / Math.max(1, goals.kcal));
   const showLeft = local.get('kcalView', 'eaten') === 'left';
-  const ring = `<button class="ringbtn" id="ringBtn" aria-label="Toggle eaten / remaining"><svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="fill ${left < 0 ? 'over' : ''}" stroke-dasharray="${(pct * 326.7).toFixed(1)} 326.7" transform="rotate(-90 60 60)"/>
-    <text x="60" y="58" text-anchor="middle" class="big">${showLeft ? r0(Math.abs(left)) : r0(tot.kcal)}</text><text x="60" y="76" text-anchor="middle" class="small">${showLeft ? (left < 0 ? 'kcal over' : 'kcal left') : 'kcal eaten'}</text><text x="60" y="92" text-anchor="middle" class="tiny">tap to switch</text></svg></button>`;
-  const bar = (k, label, have, goal) => {
-    const w = Math.min(100, (have / Math.max(1, goal)) * 100);
-    return `<div class="mbar ${k}"><div class="lbl"><span>${label}</span><span>${r0(have)} / ${r0(goal)} g</span></div><div class="track"><div style="width:${w}%" class="${have > goal * 1.08 ? 'over' : ''}"></div></div><div class="rem">${r0(goal - have)} g left</div></div>`;
-  };
+  const fill = (have, goal) => `<div class="track"><div style="width:${Math.min(100, (have / Math.max(1, goal)) * 100)}%" class="${have > goal * 1.08 ? 'over' : ''}"></div></div>`;
+  const col = (k, label, have, goal) => `<div class="mcol ${k}"><div class="lbl">${label}</div>${fill(have, goal)}<div class="num">${r0(have)} / ${r0(goal)} g</div><div class="rem">${have > goal ? r0(have - goal) + ' g over' : r0(goal - have) + ' g left'}</div></div>`;
+  const kbar = `<button class="kbar ${left < 0 ? 'over' : ''}" id="kcalBtn" aria-label="Toggle eaten / remaining">${fill(tot.kcal, goals.kcal)}
+    <div class="num">${showLeft ? `<b>${r0(Math.abs(left))}</b> kcal ${left < 0 ? 'over' : 'left'}` : `<b>${r0(tot.kcal)}</b> / ${r0(goals.kcal)} kcal`}</div></button>`;
   const dtLabel = s.dayTypes[goals.type]?.label || goals.type;
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
 
   const single = s.meals.length === 1, sel = state.sel;
   const byMeal = s.meals.map((m, mi) => {
     const list = entries.filter(e => single || (e.meal ?? 0) === mi);
-    const t = N.entryTotals(list, s.caloriesFromMacros);
-    return `<section class="card meal"><header><h3>${esc(m)}</h3><span class="hkcal">${list.length ? r0(t.kcal) + ' kcal' : ''}</span>
-      ${list.length && !sel ? '<button class="link selBtn">Select</button>' : ''}</header>
-      ${sel ? '' : `<div class="bigacts">${mi === 0 ? '<button class="primary voiceBtn">🎤 Say it</button>' : ''}<button class="addBig" data-meal="${mi}">＋ Add food</button></div>`}
+    const t = N.entryTotals(list, s.caloriesFromMacros), tc = s.netCarbs ? t.c - t.fib : t.c;
+    // Stripe under the title shows this meal's calorie split, like Macros.
+    const kc = { c: tc * 4, p: t.p * 4, f: t.f * 9 }, ks = kc.c + kc.p + kc.f;
+    const stripe = `<div class="mstripe">${ks ? ['c', 'p', 'f'].map(k => `<div class="${k}" style="flex:${kc[k] / ks}"></div>`).join('') : '<div class="e"></div>'}</div>`;
+    // With one running list the meal total is the day total, so show it against the goal.
+    const mt = (k, v, goal, label) => `<div class="${k}"><b>${r0(v)}${single ? ' / ' + r0(goal) : ''}</b><span>${label}</span></div>`;
+    return `<section class="card meal"><header><h3>${esc(single && /^food$/i.test(m) ? (date === today() ? 'Today meals' : 'Meals') : m)}</h3>
+      ${list.length && !sel ? '<button class="link selBtn">Select</button>' : ''}</header>${stripe}
     <ul class="entries ${sel ? 'selecting' : ''}">${list.map(e => {
       const n = N.scale(e.n, e.qty * e.mult);
-      return `<li data-id="${e.id}" class="${sel?.has(e.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow"><div class="name">${esc(e.name)}</div><div class="qty">${r1(e.qty)} × ${esc(unitText(e.unit))}</div>${macroLine(n)}</div>${kcalCol(n)}</li>`;
-    }).join('') || (single ? '<li class="empty muted small">Nothing logged yet. Tap Say it and list everything, e.g. "chicken 8.5 oz, milk 240 grams, 2 eggs".</li>' : '')}</ul></section>`;
+      return `<li data-id="${e.id}" class="${sel?.has(e.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow">${row2(esc(e.name), n, esc([e.brand, qtyText(e.qty, e.unit)].filter(Boolean).join(', ')))}</div></li>`;
+    }).join('') || (single ? '<li class="empty small">Nothing logged yet. Tap Say it and list everything, e.g. "chicken 8.5 oz, milk 240 grams, 2 eggs".</li>' : '')}</ul>
+    ${list.length ? `<div class="mtot">${mt('c', tc, goals.c, s.netCarbs ? 'Net carbs' : 'Carbs')}${mt('p', t.p, goals.p, 'Protein')}${mt('f', t.f, goals.f, 'Fat')}${mt('k', t.kcal, goals.kcal, 'Calories')}</div>` : ''}
+    ${sel ? '' : `<div class="bigacts">${mi === 0 ? `<button class="voiceBtn">${ico('mic')}Say it</button>` : ''}<button class="addBig" data-meal="${mi}">${ico('plusc')}Add food</button></div>`}</section>`;
   }).join('');
   const selBar = sel ? `<div class="selbar"><span>${sel.size} selected</span><button id="selAll">All</button>
     <button id="selCopy">Copy to…</button>
     <button id="selDel" class="danger">Delete</button><button id="selDone" class="primary">Done</button></div>` : '';
 
   const acts = g.activities || [];
+  const burned = acts.reduce((t, a) => t + (a.kcal || 0), 0);
   const garmin = `<section class="card">
-    <header><h3>Activity</h3>${gday ? '' : `<span class="muted">${sync.configured() ? 'no Garmin data yet' : 'connect Garmin in Settings'}</span>`}<button class="add" id="addEx" aria-label="Add exercise">＋</button></header>
+    <header><h3>Exercise</h3><span class="hkcal">${r0(burned)} kcal</span><button class="add" id="addEx" aria-label="Add exercise">${ico('plusc')}</button></header>
     ${gday ? `<div class="stats">
-      ${stat('Steps', gday.steps?.toLocaleString(), '', 'steps', '👟')}${stat('Burned', gday.activeKcal && r0(gday.activeKcal), '', 'burn', '🔥')}${stat('Sleep', gday.sleepSec ? r1(gday.sleepSec / 3600) + ' h' : null, gday.sleepScore ? 'score ' + gday.sleepScore : '', 'sleep', '😴')}
-      ${stat('HRV', gday.hrv, gday.hrvStatus?.toLowerCase(), 'hrv', '💓')}${stat('Rest HR', gday.rhr, '', 'heart', '❤️')}${stat('Readiness', gday.readiness, '', 'ready', '⚡')}</div>` : ''}
-    <ul class="entries acts">${acts.map(a => `<li class="act ${actKind(a)}" ${a.manual ? `data-ex="${a.id}"` : ''}><span class="aicon">${ACT_ICON[actKind(a)]}</span><div class="grow"><div class="name">${esc(a.name)}</div><div class="qty">${[
+      ${stat('Steps', gday.steps?.toLocaleString(), '', 'steps')}${stat('Active kcal', gday.activeKcal && r0(gday.activeKcal), '', 'burn')}${stat('Sleep', gday.sleepSec ? r1(gday.sleepSec / 3600) + ' h' : null, gday.sleepScore ? 'score ' + gday.sleepScore : '', 'sleep')}
+      ${stat('HRV', gday.hrv, gday.hrvStatus?.toLowerCase(), 'hrv')}${stat('Rest HR', gday.rhr, '', 'heart')}${stat('Readiness', gday.readiness, '', 'ready')}</div>` : `<p class="muted small">${sync.configured() ? 'No Garmin data for this day yet.' : 'Connect Garmin in Settings.'}</p>`}
+    ${acts.length ? `<ul class="entries acts">${acts.map(a => `<li class="act ${actKind(a)}" ${a.manual ? `data-ex="${a.id}"` : ''}><span class="aicon">${ACT_ICON[actKind(a)]}</span><div class="grow"><div class="name">${esc(a.name)}</div><div class="qty">${[
       a.distance ? r1(a.distance / 1609.34) + ' mi' : '', a.duration ? Math.round(a.duration / 60) + ' min' : a.min ? a.min + ' min' : '',
-      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div></div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul></section>`;
+      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div></div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul>` : ''}</section>`;
 
   return `
-  <div class="datebar"><button id="prev" aria-label="Previous day">‹</button><button id="dateLbl">${fmtDate(date)}</button><button id="next" aria-label="Next day">›</button></div>
   <section class="card summary">
-    ${ring}
-    <div class="grow">
-      <button class="chip" id="dayType" title="Tap to change">${esc(dtLabel)} day${goals.auto ? ' · auto' : ''}</button>
-      <div class="goalline">Goal <b>${r0(goals.kcal)}</b> kcal${goals.eatBack ? ` (+${goals.eatBack} exercise)` : ''} · <b>${r0(left)}</b> left</div>
-      ${bar('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${bar('p', 'Protein', tot.p, goals.p)}${bar('f', 'Fat', tot.f, goals.f)}
-    </div>
+    <div class="mcols">${col('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${col('p', 'Protein', tot.p, goals.p)}${col('f', 'Fat', tot.f, goals.f)}</div>
+    ${kbar}
+    <div class="sumfoot"><button class="chip" id="dayType" title="Tap to change">${ico('pie')}${esc(dtLabel)} day${goals.auto ? ' · auto' : ''}</button>
+      <div class="goalline">Goal <b>${r0(goals.kcal)}</b>${goals.eatBack ? ` (+${goals.eatBack} exercise)` : ''}</div></div>
   </section>
   ${byMeal}
   ${selBar}
@@ -216,9 +243,9 @@ function pace(sec, m) { const p = sec / (m / 1609.34); return `${Math.floor(p / 
 
 const bind = {};
 bind.today = root => {
-  $('#prev', root).onclick = () => { state.date = addDays(state.date, -1); state.sel = null; render(); };
-  $('#next', root).onclick = () => { state.date = addDays(state.date, 1); state.sel = null; render(); };
-  $('#dateLbl', root).onclick = () => { state.date = today(); render(); };
+  $('#prev').onclick = () => { state.date = addDays(state.date, -1); state.sel = null; render(); };
+  $('#next').onclick = () => { state.date = addDays(state.date, 1); state.sel = null; render(); };
+  $('#dateLbl').onclick = () => { state.date = today(); render(); };
   $('#dayType', root).onclick = async () => {
     const cur = (await db.get('days', state.date))?.dayType ?? null;
     const next = DT_ORDER[(DT_ORDER.indexOf(cur) + 1) % DT_ORDER.length];
@@ -226,7 +253,7 @@ bind.today = root => {
     render();
   };
   $$('.meal .addBig[data-meal]', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
-  $('#ringBtn', root).onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); };
+  $('#kcalBtn', root).onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); };
   $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
   $$('.selBtn', root).forEach(b => (b.onclick = () => { state.sel = new Set(); render(); }));
   $$('.meal li[data-id]', root).forEach(li => (li.onclick = async () => {
@@ -297,9 +324,9 @@ function openExercise(id) {
 function openAdd(meal, { pick } = {}) {
   const b = sheet(`
     <div class="searchbar"><input id="q" type="search" placeholder="Search foods, brands, recipes" autocomplete="off" enterkeyhint="search"></div>
-    <div class="tools">
-      ${pick ? '' : '<button id="voiceBtn">🎤 Say it</button>'}<button id="scanBtn">▥ Scan</button><button id="labelBtn">📷 Label</button>
-      ${pick ? '' : '<button id="quickBtn">⚡ Quick add</button>'}<button id="newBtn">＋ New food</button>
+    <div class="tools quick">
+      ${pick ? '' : `<button id="voiceBtn">${ico('mic')}Say it</button>`}<button id="scanBtn">${ico('scan')}Scan</button><button id="labelBtn">${ico('camera')}Label</button>
+      ${pick ? '' : `<button id="quickBtn">${ico('zap')}Quick</button>`}<button id="newBtn">${ico('add')}New</button>
     </div>
     <div id="results"><p class="muted">Loading recents…</p></div>`, { title: pick ? 'Pick ingredient' : state.s.meals.length > 1 ? `Add to ${state.s.meals[meal] || 'diary'}` : 'Add food' });
   const q = $('#q', b), out = $('#results', b);
@@ -943,6 +970,7 @@ async function openRecommend() {
 }
 
 // ---------- boot ----------
+$$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ico(b.dataset.tab)));
 $$('nav button').forEach(b => (b.onclick = () => { if (b.dataset.tab === 'add') return openAdd(defaultMeal()); state.tab = b.dataset.tab; state.sel = state.fsel = null; render(); }));
 function defaultMeal() {
   const h = new Date().getHours(), n = state.s?.meals.length || 1;
