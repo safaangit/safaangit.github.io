@@ -211,7 +211,7 @@ label.lc { color: var(--c) !important; font-weight: 500; } label.lp { color: var
 .chart .ax { font-size: 10.5px; fill: var(--muted); } .chart .grid { stroke: var(--line); stroke-width: .6; }
 .chart .bar { fill: var(--kc); opacity: .9; } .chart .bar.over { fill: var(--warn); }
 .chart .bar.p { fill: var(--p); } .chart .bar.steps { fill: var(--steps); } .chart .bar.burn { fill: var(--burn); }
-.chart .goal { fill: none; stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .6; }
+.chart .goal { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; opacity: .55; }
 .chart .trend { fill: none; stroke: var(--accent); stroke-width: 2; } .chart .dot { fill: var(--muted); }
 .split { display: flex; height: 28px; border-radius: 8px; overflow: hidden; font-size: 12px; font-weight: 700; color: #fff; }
 .split div { display: flex; align-items: center; justify-content: center; min-width: 30px; }
@@ -259,8 +259,8 @@ li.picked { background: color-mix(in srgb, var(--accent) 10%, var(--card)) !impo
 .daypick small { font-size: 12px; opacity: .85; }
 
 /* ---- training ---- */
-header.top #gear { border: 0; background: none; color: inherit; padding: 6px; display: flex; border-radius: 50%; }
-header.top #gear .ico { width: 24px; height: 24px; }
+header.top .hbtn { border: 0; background: none; color: inherit; padding: 6px; display: flex; border-radius: 50%; }
+header.top .hbtn .ico { width: 24px; height: 24px; }
 .k-easy { --k: var(--p); } .k-medium { --k: var(--sleep); } .k-quality { --k: var(--c); } .k-long { --k: var(--accent); }
 .k-race { --k: var(--f); } .k-rest, .k-recovery, .k-past { --k: var(--line2); }
 .k-mp { --k: var(--f); } .k-tempo { --k: var(--c); } .k-interval { --k: var(--heart); }
@@ -394,3 +394,35 @@ h4.eoh { margin: 4px 2px 8px; font-size: 13px; text-transform: uppercase; letter
 .halalbox p { margin: 8px 0 0; } .halalbox a { color: var(--accent); }
 ul.tips { margin: 0 0 12px; padding-left: 20px; } ul.tips li { margin: 0 0 6px; }
 a.btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line2); border-radius: 10px; padding: 10px 12px; color: inherit; text-decoration: none; font-weight: 500; background: var(--card); }
+
+/* ---- trends (Garmin-style: one metric, tap a bar) ---- */
+header.top .hbtn.on { background: rgba(255,255,255,.18); }
+.pnav { display: flex; align-items: center; justify-content: space-between; margin: -4px 0 6px; }
+.pnav b { font-size: 16px; font-weight: 700; }
+.pnav button { border: 0; background: var(--tile); color: var(--ink); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; }
+.pnav button:disabled { opacity: .3; }
+.mtabs { display: flex; overflow-x: auto; margin: 0 -12px 10px; padding: 0 6px; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.mtabs button { flex: 1 0 auto; border: 0; background: none; color: var(--muted); font-size: 15px; padding: 10px 10px 9px; border-bottom: 3px solid transparent; border-radius: 0; }
+.mtabs button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
+.tipbox { display: flex; align-items: center; gap: 8px; min-height: 46px; background: var(--tile); border-radius: 10px; padding: 7px 10px; margin: 0 0 6px; font-size: 15px; }
+.tipbox .tl { font-size: 12.5px; color: var(--muted); }
+.tipbox b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.tipbox .link { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
+.tipbox .link .ico { width: 18px; height: 18px; }
+.wkruns { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.wkruns button { border: 0; background: var(--card); color: var(--ink); border-radius: 8px; padding: 4px 8px; font-size: 13px; }
+.chart .hit { fill: transparent; cursor: pointer; }
+.chart .mark { stroke: var(--ink); stroke-width: 1; opacity: 0; }
+.chart.picked .mark { opacity: .5; }
+.chart.picked .bar:not(.on) { opacity: .45; } .chart .bar.on { opacity: 1; }
+.chart .dot.on { r: 4.5; fill: var(--accent); }
+.chart .bar.sleep { fill: var(--sleep); }
+.tsums { margin-top: 6px; }
+.tsum { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.tsum b { font-variant-numeric: tabular-nums; font-weight: 500; text-align: right; }
+.daylist { padding-bottom: 4px; } .daylist ul.entries { margin: 0 -14px; }
+.daylist li .ico { width: 18px; height: 18px; color: var(--muted); }
+.daylist .name { font-size: 15.5px; }
+.dot2 { width: 8px; height: 8px; border-radius: 50%; background: var(--line2); flex: none; }
+.dot2.ok { background: var(--ok); } .dot2.over { background: var(--warn); } .dot2.under { background: var(--f); }
+.daylist .more { display: block; width: 100%; padding: 12px 0 8px; text-align: center; }

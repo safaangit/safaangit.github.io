@@ -4,7 +4,7 @@ import * as db from './db.js';
 import { today, monthOf, local } from './db.js';
 import * as sync from './sync.js';
 import * as T from './training.js';
-import { bars, line } from './charts.js';
+import { bars, line, bindCharts } from './charts.js';
 
 const KIND = { easy: 'Easy', medium: 'Medium', quality: 'Workout', long: 'Long', race: 'Race', rest: 'Rest', recovery: 'Recover' };
 const r1 = v => Math.round(v * 10) / 10;
@@ -43,6 +43,7 @@ export async function todayCard(s, date, ui) {
 }
 
 // ---------- Training tab ----------
+let picked = null; // what the Trends charts were drawn from, for taps
 export async function view(s, ui) {
   const sub = local.get('trainTab', 'plan');
   const data = await load(s);
@@ -113,16 +114,16 @@ function trends({ runs, gdays, plan, cfg }, ui) {
   const steps7 = days.slice(-7).map(d => g(d).steps).filter(Boolean), rhr7 = days.slice(-7).map(d => g(d).rhr).filter(Boolean);
   const stat = (k, v, sub, cls) => `<div class="stat ${cls}"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="k">${sub}</div>` : ''}</div>`;
   const recent = runs.filter(r => r.mi >= 1).slice(-10).reverse();
+  picked = { weeks, days, inWeek, miles, paceW, longW, g };
   return `<section class="card"><div class="stats">
     ${stat('This week', r1(miles[11]) + ' mi', planned[11] && weeks[11] >= T.weekStart(cfg.planStart) ? 'plan ' + r1(planned[11]) : 'per week', 'run')}${stat('4-wk avg', r1(avg(last4)) + ' mi', 'per week', 'run')}
     ${stat('Longest', r1(Math.max(...longW.slice(-4))) + ' mi', 'last 4 wks', 'burn')}${stat('Avg pace', mi28 ? T.fmtPace(r28.reduce((a, r) => a + r.sec, 0) / mi28) : '–', 'last 28 days', 'p')}
     ${stat('Steps', steps7.length ? Math.round(avg(steps7)).toLocaleString() : '–', '7-day avg', 'steps')}${stat('Rest HR', rhr7.length ? Math.round(avg(rhr7)) : '–', '7-day avg', 'heart')}
   </div></section>
-  <section class="card"><h3>Weekly miles</h3>${bars(weeks, miles, null, { title: 'Weekly miles', cls: 'run' })}</section>
-  <section class="card"><h3>Long run each week</h3>${bars(weeks, longW, null, { title: 'Long run', cls: 'burn' })}</section>
-  <section class="card"><h3>Average pace (min/mi)</h3>${line(weeks, paceW, { title: 'Pace', fmt: v => T.fmtPace(v * 60) })}</section>
-  <section class="card"><h3>Steps (30 days)</h3>${bars(days, days.map(d => g(d).steps || 0), null, { title: 'Steps', cls: 'steps' })}</section>
-  <section class="card"><h3>Resting heart rate</h3>${line(days, days.map(d => g(d).rhr || NaN), { title: 'Resting HR' })}<p class="muted small">A few bpm above your normal for 2-3 days usually means back off.</p></section>
+  <section class="card"><h3>Weekly miles</h3><div class="tipbox"><span class="muted">Tap a week to see it</span></div>${bars(weeks, miles, null, { title: 'Weekly miles', cls: 'run', id: 'wk' })}</section>
+  <section class="card"><h3>Average pace (min/mi)</h3><div class="tipbox"><span class="muted">Tap a week to see it</span></div>${line(weeks, paceW, { title: 'Pace', fmt: v => T.fmtPace(v * 60), id: 'pace' })}</section>
+  <section class="card"><h3>Steps</h3><div class="tipbox"><span class="muted">Tap a day to see it</span></div>${bars(days, days.map(d => g(d).steps || 0), null, { title: 'Steps', cls: 'steps', id: 'steps' })}</section>
+  <section class="card"><h3>Resting heart rate</h3><div class="tipbox"><span class="muted">Tap a day to see it</span></div>${line(days, days.map(d => g(d).rhr || NaN), { title: 'Resting HR', id: 'rhr' })}<p class="muted small">A few bpm above your normal for 2-3 days usually means back off.</p></section>
   <section class="card"><h3>Recent runs</h3><ul class="entries runs">${recent.map(r => `<li><div class="grow"><div class="r1"><span class="name">${ui.esc(r.name || 'Run')}</span><span class="kc">${r1(r.mi)} mi</span></div>
     <div class="r2"><span class="sub">${wkday(r.date)} ${mon(r.date)}${r.tread ? ' · treadmill' : ''}</span><span class="macros">${r.sec ? T.fmtPace(r.sec / r.mi) + '/mi' : ''}${r.hr ? ` · ${r.hr} bpm` : ''}</span></div></div></li>`).join('') || '<li class="empty small">No runs synced yet.</li>'}</ul></section>`;
 }
@@ -156,6 +157,20 @@ export function bind(root, s, ui) {
   const edit = ui.$('#raceEdit', root);
   if (edit) edit.onclick = () => openRace(s, ui);
   ui.$$('.cal[data-d]', root).forEach(c => (c.onclick = () => openDay(s, c.dataset.d, ui)));
+  if (picked) bindCharts(root, (id, i, c) => {
+    const P = picked, box = c.closest('.card').querySelector('.tipbox');
+    if (id === 'wk' || id === 'pace') {
+      const w = P.weeks[i], rs = P.inWeek(w).filter(r => r.mi >= 1);
+      box.innerHTML = `<div class="grow"><div class="tl">${mon(w)} – ${mon(T.addDays(w, 6))}</div><div><b>${r1(P.miles[i])} mi</b> <span class="muted">· ${rs.length} runs${P.longW[i] ? ` · long ${r1(P.longW[i])}` : ''}${Number.isFinite(P.paceW[i]) ? ` · ${T.fmtPace(P.paceW[i] * 60)}/mi avg` : ''}</span></div>
+        <div class="wkruns">${rs.map(r => `<button data-d="${r.date}">${wkday(r.date)} ${r1(r.mi)}</button>`).join('')}</div></div>`;
+      ui.$$('.wkruns button', box).forEach(b => (b.onclick = () => openDay(s, b.dataset.d, ui)));
+    } else {
+      const d = P.days[i], gd = P.g(d);
+      box.innerHTML = `<div class="grow"><div class="tl">${wkday(d)} ${mon(d)}</div><div>${id === 'steps' ? `<b>${(gd.steps || 0).toLocaleString()}</b> steps` : gd.rhr ? `<b>${gd.rhr}</b> bpm resting` : '<span class="muted">No data</span>'}</div></div>
+        <button class="link">Open day ${ui.ico('next')}</button>`;
+      box.querySelector('button').onclick = () => ui.goDay(d);
+    }
+  });
 }
 
 async function openDay(s, date, ui) {
