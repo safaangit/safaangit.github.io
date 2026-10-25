@@ -114,6 +114,14 @@ export async function garminMonth(ym, { fresh = false } = {}) {
   return d;
 }
 export async function garminDay(date, opts) { return (await garminMonth(date.slice(0, 7), opts)).days?.[date]; }
+// data/garmin/gear.json = { gear: [{ uuid, name, type, status, maxM, distance m, activities }] }, cached like a month.
+export async function garminGear() {
+  let d = await kv.get('g:gear');
+  if (configured() && (!d || Date.now() - (d.fetched || 0) > 30 * 60e3)) {
+    try { const r = await raw('data/garmin/gear.json'); if (r) { d = { ...r, fetched: Date.now() }; await kv.set('g:gear', d); } } catch {}
+  }
+  return d || { gear: [] };
+}
 export async function garminMeta() { try { return configured() ? await raw('data/garmin/meta.json') : null; } catch { return null; } }
 
 // ---- Halal places ----
