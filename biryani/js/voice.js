@@ -9,38 +9,50 @@ const UNIT = [
   [/^(cup|cups)$/, 'cup'], [/^(tbsp|tablespoon|tablespoons)$/, 'tbsp'], [/^(tsp|teaspoon|teaspoons)$/, 'tsp'],
   [/^(serving|servings|portion|portions)$/, 'serving'], [/^(slice|slices)$/, 'slice'], [/^(scoop|scoops)$/, 'scoop'],
   [/^(piece|pieces|pc|pcs)$/, 'piece'], [/^(pint|pints)$/, 'pint'], [/^(bar|bars)$/, 'bar'], [/^(can|cans)$/, 'can'],
+  [/^(packet|packets|pack|packs|package|packages|pouch|pouches)$/, 'packet'], [/^(container|containers|cartons?)$/, 'container'],
+  [/^(bowl|bowls)$/, 'bowl'], [/^(bottle|bottles)$/, 'bottle'], [/^(handful|handfuls)$/, 'handful'],
 ];
 const unitOf = w => UNIT.find(([re]) => re.test(w))?.[1];
 const numOf = w => (/^\d+(\.\d+)?$/.test(w) ? +w : /^\d+\/\d+$/.test(w) ? w.split('/')[0] / w.split('/')[1] : NUMS[w]);
+const FILLER = /^(of|um|uh|like|about|around|plus|also|then|i|had|ate|and)$/;
 
-// Splits a transcript into { text, qty, unit } items.
+// Splits a transcript into { text, qty, unit } items. Works with or without commas:
+// "22 grams eggs 2 packets ketchup 1 pound chicken" and "chicken 8 oz rice 150 g" both split
+// at each amount, pairing it with the words before it (name first) or after it (amount first).
 export function parseItems(raw) {
-  return raw
+  const chunks = raw
     .toLowerCase()
     .replace(/(\d),(\d)/g, '$1.$2')           // "8,5" -> 8.5
     .replace(/(\d)\s*point\s*(\d)/g, '$1.$2') // "8 point 5"
     .replace(/(\d)(g|oz|ml|lbs?|kg)\b/g, '$1 $2')
     .replace(/\b(\d+(?:\.\d+)?|one|two|three|four|five|six)\s+and\s+a\s+half\b/g, (_, n) => String(numOf(n) + 0.5))
-    .split(/\s*(?:,|;|\n|\.(?!\d)|\band then\b|\bthen\b|\balso\b|\band\b(?=\s+(?:\d|a |an |one|two|three|half)))\s*/)
-    .map(seg => seg.replace(/[–—-]/g, ' ').replace(/\b(of|with|about|around|like|i had|i ate|plus)\b/g, ' ').trim())
-    .filter(Boolean)
-    .map(seg => {
-      const words = seg.split(/\s+/);
-      let qty, unit;
-      const name = [];
-      for (let i = 0; i < words.length; i++) {
-        const w = words[i], n = numOf(w);
-        if (n != null && qty == null && (w !== 'a' && w !== 'an' || unitOf(words[i + 1] || ''))) {
-          qty = n;
-          const u = unitOf(words[i + 1] || '');
-          if (u) { unit = u; i++; }
-          continue;
-        }
-        if (!unit && qty != null && unitOf(w)) { unit = unitOf(w); continue; }
-        name.push(w);
+    .replace(/[–—-]/g, ' ')
+    .split(/\s*(?:,|;|\n|\.(?!\d))\s*/);
+  const items = [];
+  for (const chunk of chunks) {
+    const words = chunk.split(/\s+/).filter(Boolean);
+    let open = null; // item still waiting for its name (amount came first) or its amount (name came first)
+    const close = () => { if (open) { if (open.name.length) items.push(open); open = null; } };
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i], n = numOf(w), nextUnit = unitOf(words[i + 1] || '');
+      if (n != null && (!['a', 'an'].includes(w) || nextUnit)) {
+        const q = { qty: n, unit: nextUnit };
+        if (nextUnit) i++;
+        if (open && open.name.length && open.qty == null) { Object.assign(open, q); close(); }
+        else { close(); open = { name: [], ...q }; }
+        continue;
       }
-      return { text: name.join(' ').replace(/^(a|an|some|the)\s+/, '').trim(), qty: qty ?? 1, unit };
-    })
+      if (/^(then|also|plus|and)$/.test(w) && open && open.qty != null && open.name.length) { close(); continue; } // "creami then a banana"
+      if (FILLER.test(w) && !(open && open.name.length && words[i + 1] && numOf(words[i + 1]) == null)) continue;
+      if (open && open.qty != null && open.name.length && !open.namedAfter) close();
+      if (!open) open = { name: [], qty: null };
+      if (open.qty != null) open.namedAfter = true;
+      open.name.push(w);
+    }
+    close();
+  }
+  return items
+    .map(it => ({ text: it.name.join(' ').replace(/^(a|an|some|the)\s+/, '').replace(/\s+(and|of)$/, '').trim(), qty: it.qty ?? 1, unit: it.unit }))
     .filter(it => it.text);
 }
 
@@ -80,21 +92,34 @@ export function bestLocal(text, candidates) {
 
 // Web Speech API (Chrome on Android uses Google's free recognizer; no key needed).
 export const speechSupported = () => !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+// Android Chrome resends earlier text inside later results, so each result is folded into the
+// previous one when one contains the other. Recognition auto-restarts after pauses until stop().
+const norm = t => t.toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+function fold(list, t) {
+  const last = list[list.length - 1];
+  if (last && norm(t).startsWith(norm(last))) list[list.length - 1] = t;
+  else if (!last || !norm(last).startsWith(norm(t))) list.push(t);
+}
 export function listen({ onText, onEnd }) {
   const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new R();
-  rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true;
-  let final = '';
-  rec.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) final += e.results[i][0].transcript + ', ';
-      else interim += e.results[i][0].transcript;
-    }
-    onText(final + interim);
+  let committed = [], session = [], stopped = false, rec;
+  const text = (interim = '') => { const all = [...committed, ...session]; if (interim) fold(all, interim); return all.join(', '); };
+  const start = () => {
+    rec = new R();
+    rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true;
+    rec.onresult = e => {
+      session = []; let interim = '';
+      for (const r of e.results) { const t = r[0].transcript.trim(); if (!t) continue; if (r.isFinal) fold(session, t); else interim = t; }
+      onText(text(interim));
+    };
+    rec.onerror = e => { if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(e.error)) { stopped = true; onEnd?.(text(), e.error); } };
+    rec.onend = () => {
+      session.forEach(t => fold(committed, t)); session = [];
+      if (stopped) return onEnd?.(text());
+      try { start(); } catch { onEnd?.(text()); }
+    };
+    rec.start();
   };
-  rec.onend = () => onEnd?.(final);
-  rec.onerror = e => onEnd?.(final, e.error);
-  rec.start();
-  return rec;
+  start();
+  return { stop() { stopped = true; try { rec.stop(); } catch { onEnd?.(text()); } } };
 }

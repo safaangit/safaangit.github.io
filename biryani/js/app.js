@@ -181,7 +181,7 @@ async function viewToday() {
     }).join('') || (single ? '<li class="empty muted small">Nothing logged yet. Tap Say it and list everything, e.g. "chicken 8.5 oz, milk 240 grams, 2 eggs".</li>' : '')}</ul></section>`;
   }).join('');
   const selBar = sel ? `<div class="selbar"><span>${sel.size} selected</span><button id="selAll">All</button>
-    ${state.date !== today() ? '<button id="selCopy">Copy to today</button>' : '<button id="selDup">Duplicate</button>'}
+    <button id="selCopy">Copy to…</button>
     <button id="selDel" class="danger">Delete</button><button id="selDone" class="primary">Done</button></div>` : '';
 
   const acts = g.activities || [];
@@ -249,8 +249,16 @@ bind.today = root => {
       for (const { id, u, ...e } of list) await db.put(logName(date), { ...e, date, time: nowTime() });
       state.sel = null; toast(`Copied ${list.length} to ${fmtDate(date)}`); render();
     };
-    $('#selCopy', root)?.addEventListener('click', () => copyTo(today()));
-    $('#selDup', root)?.addEventListener('click', () => copyTo(state.date));
+    $('#selCopy', root).onclick = () => {
+      if (!state.sel.size) return toast('Select entries first');
+      const t = today(), opts = [[addDays(t, -1), 'Yesterday'], [t, 'Today'], [addDays(t, 1), 'Tomorrow']];
+      const b = sheet(`<p class="hint">Copy ${state.sel.size} entr${state.sel.size === 1 ? 'y' : 'ies'} to:</p>
+        <div class="daypick">${opts.map(([d, l]) => `<button data-d="${d}" class="${d === state.date ? '' : 'primary'}">${l}<small>${fmtDate(d) === l ? new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : fmtDate(d)}</small></button>`).join('')}</div>
+        <label>Or pick a date<input type="date" id="cdate" value="${addDays(state.date, 1)}"></label>
+        <div class="actions"><button class="primary" id="cgo">Copy to that date</button></div>`, { title: 'Copy entries' });
+      $$('.daypick button', b).forEach(x => (x.onclick = () => { closeSheet(); copyTo(x.dataset.d); }));
+      $('#cgo', b).onclick = () => { const d = $('#cdate', b).value; if (d) { closeSheet(); copyTo(d); } };
+    };
   }
   $('#addEx', root).onclick = () => openExercise();
   $$('li[data-ex]', root).forEach(li => (li.onclick = () => openExercise(li.dataset.ex)));
@@ -381,7 +389,7 @@ function openPortion(f, { meal = 0, entry, pick } = {}) {
     const b = sheet(`
       <div class="pname">${esc(f.name)}</div><div class="sub">${f.brand ? esc(f.brand) + ' · ' : ''}<span class="badge src-${f.source}">${esc(f.srcLabel || '')}</span> ${checkBadge(f.n)}</div>
       ${!N.check(f.n).ok && !N.check(f.n).missingKcal ? `<p class="warn small">Listed calories don't match the macros. ${state.s.caloriesFromMacros ? 'The app is counting calories from macros, so your totals stay consistent.' : 'Consider turning on "calories from macros" in Settings.'}</p>` : ''}
-      <div class="qty"><input id="qty" type="number" inputmode="decimal" step="any" value="${q0}"><select id="unit">${units.map((u, i) => `<option value="${i}" ${i === ui ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select></div>
+      <div class="qtyrow"><input id="qty" type="number" inputmode="decimal" step="any" value="${q0}"><select id="unit">${units.map((u, i) => `<option value="${i}" ${i === ui ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select></div>
       <div id="live" class="live"></div>
       ${pick || state.s.meals.length < 2 ? '' : `<label>Meal<select id="meal">${state.s.meals.map((m, i) => `<option value="${i}" ${i === (entry?.meal ?? meal) ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`}
       ${remote && !pick ? `<label class="check"><input type="checkbox" id="save"> Save to my foods (for staples; it shows in recents either way once you eat it again)</label>` : ''}
@@ -469,10 +477,13 @@ async function voiceCandidates() {
   for (const f of [...mine, ...recipes, ...recent]) { const k = f.id || f._key || f.name; if (!seen.has(k)) { seen.add(k); out.push(f); } }
   return out;
 }
-async function matchRows(text) {
-  const items = voice.parseItems(text), cands = await voiceCandidates();
+async function matchRows(items, old = new Map()) {
+  const cands = await voiceCandidates();
   return Promise.all(items.map(async it => {
-    const row = { said: [it.qty !== 1 || it.unit ? `${it.qty}${it.unit ? ' ' + it.unit : ''}` : '', it.text].filter(Boolean).join(' '), qty: it.qty, unit: it.unit, text: it.text };
+    const said = [it.qty !== 1 || it.unit ? `${it.qty}${it.unit ? ' ' + it.unit : ''}` : '', it.text].filter(Boolean).join(' ');
+    const prev = old.get(it.text);
+    if (prev?.food) return { ...prev, said, amount: prev.qty === it.qty && prev.unit === it.unit ? prev.amount : voice.resolveAmount(prev.food, it.qty, it.unit), qty: it.qty, unit: it.unit };
+    const row = { said, qty: it.qty, unit: it.unit, text: it.text };
     const local = voice.bestLocal(it.text, cands);
     if (local) { row.food = local.food; row.src = 'yours'; }
     else {
@@ -483,37 +494,42 @@ async function matchRows(text) {
     return row;
   }));
 }
-function openVoice() {
+function openVoice({ autostart = true } = {}) {
   const b = sheet(`
-    ${voice.speechSupported() ? '<button id="mic" class="bigbtn mic">🎤 Tap and talk</button>' : '<p class="muted small">This browser has no voice input here. Type it, or use your keyboard\'s mic button.</p>'}
-    <textarea id="vt" rows="3" placeholder="chicken 8.5 oz, milk 240 grams, 2 eggs, 1 josephs pita">${esc(vstate.text)}</textarea>
-    <div class="actions"><button id="parse">Match items</button></div>
+    ${voice.speechSupported() ? '<button id="mic" class="micbtn">🎤 Start talking</button>' : ''}
+    <p class="hint" id="vhint">Say your whole list in one go, e.g. <b>"22 grams eggs, 2 packets ketchup, 1 pound chicken"</b>. Tap <b>Done</b> when you finish.</p>
+    <textarea id="vt" rows="2" placeholder="…or type the list here">${esc(vstate.text)}</textarea>
+    <div class="vtools"><button id="vclear">✕ Clear</button>${voice.speechSupported() ? '<button id="vredo">🎤 Start over</button>' : ''}</div>
     <ul class="list" id="vrows"></ul>
     <div id="vlog"></div>`, { title: 'Say what you ate' });
-  const ta = $('#vt', b);
+  const ta = $('#vt', b), mic = $('#mic', b);
+  let rec = null, matchSeq = 0, typingT;
+  const total = () => vstate.rows.filter(r => r.food).reduce((t, r) => t + N.countedKcal(N.scale(r.food.n, r.amount.qty * r.amount.mult), state.s.caloriesFromMacros), 0);
   const draw = () => {
     const rows = vstate.rows;
     $('#vrows', b).innerHTML = rows.map((r, i) => {
       const units = r.food?.units?.length ? r.food.units : [{ label: 'serving', mult: 1 }];
       const n = r.food ? N.scale(r.food.n, r.amount.qty * r.amount.mult) : null;
-      return `<li class="vrow" data-i="${i}"><div class="grow">
-        <div class="name">${r.food ? esc(r.food.name) : 'No match'} <span class="badge ${r.src === 'yours' ? 'ok' : 'warn'}">${r.src === 'yours' ? 'yours' : r.src === 'guess' ? 'best guess, check it' : 'pick one'}</span></div>
-        <div class="qty">heard "${esc(r.said)}"${n ? ` · <b>${kcalOf(n)} kcal</b>` : ''}</div>${n ? macroLine(n) : ''}
-        ${r.food ? `<div class="vamt"><input class="vq" type="number" step="any" inputmode="decimal" value="${r.amount.qty}"><select class="vu">${units.map(u => `<option ${u.label === r.amount.unit ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select></div>` : ''}
-      </div><div class="vbtns"><button class="chg">Change</button><button class="rm" aria-label="Remove">✕</button></div></li>`;
+      return `<li class="vrow ${r.src}" data-i="${i}"><div class="grow">
+        <div class="vhead"><div class="name">${r.food ? esc(r.food.name) : `No match for "${esc(r.text)}"`}</div><button class="rm" aria-label="Remove">✕</button></div>
+        <div class="qty">${r.src === 'yours' ? '✓ your food' : r.src === 'guess' ? '⚠ best guess, check it' : 'tap Pick to choose'} · heard "${esc(r.said)}"</div>
+        ${r.food ? `<div class="vamt"><input class="vq" type="number" step="any" inputmode="decimal" value="${r.amount.qty}"><select class="vu">${units.map(u => `<option ${u.label === r.amount.unit ? 'selected' : ''}>${esc(unitText(u.label))}</option>`).join('')}</select></div>
+        <div class="vfoot">${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span></div>` : ''}
+        <button class="chg">${r.food ? 'Wrong food? Pick another' : 'Pick food'}</button>
+      </div></li>`;
     }).join('');
     const ok = rows.filter(r => r.food).length;
-    $('#vlog', b).innerHTML = rows.length ? `<div class="actions"><button class="primary" id="logAll" ${ok ? '' : 'disabled'}>Log ${ok} item${ok === 1 ? '' : 's'}</button></div>` : '';
+    $('#vlog', b).innerHTML = rows.length ? `<div class="vlogbar"><button class="primary" id="logAll" ${ok ? '' : 'disabled'}>Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal</button></div>` : '';
     $$('.vrow', b).forEach(li => {
       const r = rows[+li.dataset.i];
       $('.rm', li).onclick = () => { rows.splice(+li.dataset.i, 1); draw(); };
-      $('.chg', li).onclick = () => openAdd(0, { pick: (base, full) => {
+      $('.chg', li).onclick = () => { rec?.stop(); openAdd(0, { pick: (base, full) => {
         r.food = full; r.src = 'yours'; r.amount = { qty: base.qty, unit: base.unit, mult: base.mult };
-        openVoice();
-      } });
+        openVoice({ autostart: false });
+      } }); };
       const q = $('.vq', li), u = $('.vu', li);
-      if (q) q.onchange = () => { r.amount.qty = +q.value || 0; draw(); };
-      if (u) u.onchange = () => { const unit = r.food.units.find(x => x.label === u.value); r.amount = { ...r.amount, unit: unit.label, mult: unit.mult }; draw(); };
+      if (q) q.oninput = () => { r.amount.qty = +q.value || 0; const n = N.scale(r.food.n, r.amount.qty * r.amount.mult); $('.vfoot', li).innerHTML = `${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span>`; $('#logAll', b).textContent = `Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal`; };
+      if (u) u.onchange = () => { const unit = r.food.units[u.selectedIndex]; r.amount = { ...r.amount, unit: unit.label, mult: unit.mult }; draw(); };
     });
     const la = $('#logAll', b);
     if (la) la.onclick = async () => {
@@ -529,34 +545,38 @@ function openVoice() {
       closeSheet(); render(); toast(`Logged ${list.length} item${list.length === 1 ? '' : 's'}`);
     };
   };
-  const parse = async () => {
-    vstate.text = ta.value;
-    if (!ta.value.trim()) return;
-    $('#vrows', b).innerHTML = '<li class="muted small">Matching…</li>';
-    vstate.rows = await matchRows(ta.value);
-    draw();
+  // Re-match only items whose words changed, so edits and picks survive.
+  const match = async () => {
+    const my = ++matchSeq, items = voice.parseItems(vstate.text);
+    if (!items.length) { vstate.rows = []; return draw(); }
+    const old = new Map(vstate.rows.map(r => [r.text, r]));
+    $('#vlog', b).innerHTML = '<p class="muted small">Finding foods…</p>';
+    const rows = await matchRows(items, old);
+    if (my !== matchSeq) return;
+    vstate.rows = rows; draw();
   };
-  ta.oninput = () => (vstate.text = ta.value);
-  $('#parse', b).onclick = parse;
-  const mic = $('#mic', b);
-  let rec;
-  if (mic) mic.onclick = () => {
-    if (rec) return rec.stop();
-    const before = ta.value ? ta.value.replace(/[,\s]*$/, ', ') : '';
-    mic.textContent = '● Listening… tap to stop'; mic.classList.add('on');
+  const clear = () => { rec?.stop(); rec = null; vstate = { text: '', rows: [] }; ta.value = ''; draw(); setMic(false); };
+  const setMic = on => {
+    if (!mic) return;
+    mic.textContent = on ? '■ Done' : '🎤 Start talking'; mic.classList.toggle('on', on);
+    $('#vhint', b).hidden = !on && vstate.rows.length > 0;
+  };
+  const startListening = () => {
+    const before = ta.value.trim() ? ta.value.trim().replace(/[,\s]*$/, ', ') : '';
+    setMic(true);
     rec = voice.listen({
       onText: t => { ta.value = before + t; vstate.text = ta.value; },
-      onEnd: (_, err) => {
-        rec = null; mic.textContent = '🎤 Tap and talk'; mic.classList.remove('on');
-        if (err && err !== 'no-speech' && err !== 'aborted') toast('Mic error: ' + err);
-        parse();
-      },
+      onEnd: (_, err) => { rec = null; setMic(false); if (err) toast('Mic blocked: allow microphone access for this site'); match(); },
     });
   };
+  if (mic) mic.onclick = () => (rec ? rec.stop() : startListening());
+  $('#vclear', b).onclick = clear;
+  $('#vredo', b)?.addEventListener('click', () => { clear(); startListening(); });
+  ta.oninput = () => { vstate.text = ta.value; clearTimeout(typingT); typingT = setTimeout(match, 900); };
+  $('.sheet-wrap')._cleanup = () => rec?.stop();
   draw();
-  if (!vstate.rows.length && mic && !vstate.text) mic.click();
+  if (autostart && mic && !vstate.text) startListening();
 }
-
 // ---------- Barcode ----------
 function openScanner(meal, pick) {
   const b = sheet(`<div class="scanner"><video playsinline muted></video><div class="reticle"></div></div>

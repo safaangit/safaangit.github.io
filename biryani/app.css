@@ -106,8 +106,8 @@ fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px
 legend { font-weight: 600; font-size: 14px; padding: 0 4px; }
 
 .pname { font-size: 18px; font-weight: 600; }
-.qty { display: grid; grid-template-columns: 110px 1fr; gap: 8px; margin: 12px 0; }
-.qty input { font-size: 20px; text-align: center; }
+.qtyrow { display: grid; grid-template-columns: 110px 1fr; gap: 8px; margin: 12px 0; }
+.qtyrow input { font-size: 20px; text-align: center; }
 .live { background: var(--bg); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
 .live .kcal { font-size: 20px; font-weight: 700; }
 #items li { cursor: default; } #items input { width: 70px; text-align: center; } #items .rm { border: 0; background: none; color: var(--muted); }
@@ -276,3 +276,26 @@ input.ic { border-color: var(--c); } input.ip { border-color: var(--p); } input.
 .more details[open] { padding-bottom: 12px; }
 .seg button.on { background: var(--accent); color: var(--accent-ink); }
 .split div { min-width: 30px; font-size: 12px; }
+
+/* ---- voice sheet v2 ---- */
+.micbtn { width: 100%; padding: 22px 12px; font-size: 20px; font-weight: 800; border-radius: 16px; border: 2px solid var(--accent); background: var(--chip); color: var(--accent); }
+.micbtn.on { background: var(--warn); border-color: var(--warn); color: #fff; animation: pulse 1.2s infinite; }
+.vtools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 4px; }
+.vtools button { padding: 11px; font-size: 15px; }
+#vt { margin-top: 10px; }
+.vrow { display: block !important; border-left: 5px solid var(--line2) !important; }
+.vrow.yours { border-left-color: var(--ok) !important; } .vrow.guess { border-left-color: var(--c) !important; } .vrow.none { border-left-color: var(--warn) !important; }
+.vhead { display: flex; align-items: flex-start; gap: 8px; }
+.vhead .name { flex: 1; }
+.vhead .rm { border: 0; background: none; font-size: 20px; padding: 0 4px; color: var(--muted); }
+.vrow.guess .qty { color: var(--c); font-weight: 600; } .vrow.none .qty { color: var(--warn); font-weight: 600; }
+.vamt { grid-template-columns: 100px 1fr !important; margin-top: 8px !important; }
+.vfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.vfoot .macros { margin-top: 8px; }
+.vk { font-size: 18px; font-weight: 800; white-space: nowrap; margin-top: 8px; }
+.vrow .chg { width: 100%; margin-top: 10px; padding: 9px; font-size: 14px; }
+.vlogbar { position: sticky; bottom: 0; padding: 10px 0 4px; background: var(--card); }
+.vlogbar button { width: 100%; padding: 15px; font-size: 17px; font-weight: 800; border-radius: 14px; }
+.daypick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 14px; }
+.daypick button { padding: 12px 6px; font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.daypick small { font-size: 12px; font-weight: 600; opacity: .85; }
