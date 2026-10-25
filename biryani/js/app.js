@@ -906,6 +906,7 @@ async function viewSettings() {
       <div class="grid3"><label class="lc">Carbs ${d.mode === '%' ? '%' : 'g'}<input class="ic" name="c" type="number" step="any" inputmode="decimal" value="${d.c}"></label>
       <label class="lp">Protein ${d.mode === '%' ? '%' : 'g'}<input class="ip" name="p" type="number" step="any" inputmode="decimal" value="${d.p}"></label>
       <label class="lf">Fat ${d.mode === '%' ? '%' : 'g'}<input class="if" name="f" type="number" step="any" inputmode="decimal" value="${d.f}"></label></div>
+      ${macroSplit(g)}
       <p class="small ${Math.abs(mk - d.kcal) > 30 ? 'warn' : 'muted'}">Macros add up to ${mk} kcal${Math.abs(mk - d.kcal) > 30 ? ` (calorie goal is ${d.kcal})` : ''}.</p></fieldset>`;
   };
   return `
@@ -945,6 +946,21 @@ async function viewSettings() {
   </form></details>
   <details><summary>Export data</summary><div class="actions"><button id="export">Export everything (JSON)</button></div></details>
   </section>`;
+}
+// Grams + kcal per macro next to a donut of the calorie split, like Macros' goal screen.
+function macroSplit(g) {
+  const k = { c: g.c * 4, p: g.p * 4, f: g.f * 9 }, t = k.c + k.p + k.f || 1;
+  let a0 = -Math.PI / 2;
+  const arc = x => {
+    const frac = k[x] / t; if (frac <= 0) return '';
+    const a1 = a0 + frac * 2 * Math.PI, R = 40, r = 18, big = frac > 0.5 ? 1 : 0, P = (rad, a) => `${50 + rad * Math.cos(a)} ${50 + rad * Math.sin(a)}`;
+    const mid = (a0 + a1) / 2, d = frac >= 0.999 ? `M ${P(R, 0)} A ${R} ${R} 0 1 1 ${P(R, Math.PI)} A ${R} ${R} 0 1 1 ${P(R, 0)} Z` :
+      `M ${P(R, a0)} A ${R} ${R} 0 ${big} 1 ${P(R, a1)} L ${P(r, a1)} A ${r} ${r} 0 ${big} 0 ${P(r, a0)} Z`;
+    const out = `<path d="${d}" class="${x}"/>${frac >= 0.08 ? `<text x="${50 + 29 * Math.cos(mid)}" y="${50 + 29 * Math.sin(mid) + 4}" text-anchor="middle">${Math.round(frac * 100)}</text>` : ''}`;
+    a0 = a1; return out;
+  };
+  const col = (x, l) => `<div class="${x}"><div>${l}</div><b>${r0(g[x])} g</b><span>${r0(k[x])} kcal</span></div>`;
+  return `<div class="msplit"><div class="mcols3">${col('c', 'Carbs')}${col('p', 'Protein')}${col('f', 'Fat')}</div><svg viewBox="0 0 100 100" class="donut" role="img" aria-label="Calorie split">${['c', 'p', 'f'].map(arc).join('')}</svg></div>`;
 }
 bind.settings = root => {
   const s = state.s;
