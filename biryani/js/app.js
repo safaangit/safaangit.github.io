@@ -8,6 +8,7 @@ import * as sync from './sync.js';
 import { goalsFor, recommend, measuredTdee, autoDayType } from './goals.js';
 import { bars, line, ema } from './charts.js';
 import * as voice from './voice.js';
+import * as train from './trainview.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -31,6 +32,11 @@ const ICONS = {
   scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M11 8v8M14 8v8M17 8v8"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
   zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+  training: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  knee: '<path d="M12 2v8l-3 4v8M12 10l4 4v8"/><circle cx="12" cy="12" r="2.5"/>',
   pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
 };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -45,11 +51,13 @@ async function render() {
   $$('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
   const main = $('main');
   if (state.tab === 'recipes') state.tab = 'foods';
-  const views = { today: viewToday, trends: viewTrends, foods: viewFoods, settings: viewSettings };
+  const views = { today: viewToday, training: () => train.view(state.s, ui), trends: viewTrends, foods: viewFoods, settings: viewSettings };
   main.innerHTML = await views[state.tab]();
   document.body.classList.toggle('today', state.tab === 'today');
   $('#datenav').innerHTML = state.tab === 'today' ? `<button id="prev" aria-label="Previous day">${ico('prev')}</button><button id="dateLbl">${ico('cal')}${fmtDate(state.date)}</button><button id="next" aria-label="Next day">${ico('next')}</button>` : '';
+  if (state.tab === 'training') train.bind(main, state.s, ui);
   bind[state.tab]?.(main);
+  $('#gear').classList.toggle('on', state.tab === 'settings');
   syncBadge();
 }
 function syncBadge(msg) {
@@ -237,6 +245,7 @@ async function viewToday() {
   </section>
   ${byMeal}
   ${selBar}
+  ${await train.todayCard(s, date, ui).catch(() => '')}
   ${garmin}
   <section class="card row"><h3>Weight</h3><input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="lb" value="${w ?? ''}"><span class="muted small">${!weights.find(x => x.date === date) && gday?.weightLb ? 'from Garmin' : ''}</span></section>`;
 }
@@ -296,6 +305,7 @@ bind.today = root => {
       $('#cgo', b).onclick = () => { const d = $('#cdate', b).value; if (d) { closeSheet(); copyTo(d); } };
     };
   }
+  const tc = $('#trainCard', root); if (tc) tc.onclick = () => { state.tab = 'training'; render(); };
   $('#addEx', root).onclick = () => openExercise();
   $$('li[data-ex]', root).forEach(li => (li.onclick = () => openExercise(li.dataset.ex)));
   $('#weight', root).onchange = async e => {
@@ -1097,7 +1107,11 @@ async function openRecommend() {
 }
 
 // ---------- boot ----------
+// Helpers the Training tab module borrows.
+const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render };
 $$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ico(b.dataset.tab)));
+$('#gear').innerHTML = ico('settings');
+$('#gear').onclick = () => { state.tab = 'settings'; state.sel = state.fsel = null; render(); };
 $$('nav button').forEach(b => (b.onclick = () => { if (b.dataset.tab === 'add') return openAdd(defaultMeal()); state.tab = b.dataset.tab; state.sel = state.fsel = null; render(); }));
 function defaultMeal() {
   const h = new Date().getHours(), n = state.s?.meals.length || 1;

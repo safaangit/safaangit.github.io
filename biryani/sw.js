@@ -1,7 +1,7 @@
 // Network-first for the app shell so updates show up on the next open; the cache is only an offline fallback.
-const CACHE = 'biryani-v1';
+const CACHE = 'biryani-v2';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
-  'js/app.js', 'js/db.js', 'js/nutrition.js', 'js/food.js', 'js/scan.js', 'js/sync.js', 'js/goals.js', 'js/charts.js', 'js/voice.js'];
+  'js/app.js', 'js/db.js', 'js/nutrition.js', 'js/food.js', 'js/scan.js', 'js/sync.js', 'js/goals.js', 'js/charts.js', 'js/voice.js', 'js/training.js', 'js/trainview.js'];
 const LIBS = /cdn\.jsdelivr\.net\/npm\/(@zxing|tesseract)/;
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));

@@ -258,6 +258,60 @@ li.picked { background: color-mix(in srgb, var(--accent) 10%, var(--card)) !impo
 .daypick button { padding: 12px 6px; font-size: 16px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .daypick small { font-size: 12px; opacity: .85; }
 
+/* ---- training ---- */
+header.top #gear { border: 0; background: none; color: inherit; padding: 6px; display: flex; border-radius: 50%; }
+header.top #gear .ico { width: 24px; height: 24px; }
+.k-easy { --k: var(--p); } .k-medium { --k: var(--sleep); } .k-quality { --k: var(--c); } .k-long { --k: var(--accent); }
+.k-race { --k: var(--f); } .k-rest, .k-recovery, .k-past { --k: var(--line2); }
+.k-mp { --k: var(--f); } .k-tempo { --k: var(--c); } .k-interval { --k: var(--heart); }
+.kst { width: 4px; align-self: stretch; border-radius: 4px; background: var(--k); flex: none; }
+.hero { display: flex; align-items: center; gap: 14px; }
+.hero .cdown { text-align: center; min-width: 74px; color: var(--accent); }
+.hero .cdown b { display: block; font-size: 40px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hero .cdown span { font-size: 12px; color: var(--muted); }
+.hero .rn { font-size: 17px; font-weight: 700; }
+.hero .goal { font-size: 15px; margin-top: 4px; } .hero .goal b { color: var(--kc); }
+button.icon { border: 0; background: none; color: var(--muted); padding: 6px; display: flex; align-self: flex-start; }
+button.icon .ico { width: 22px; height: 22px; }
+.wo { display: flex; gap: 10px; padding: 2px 0; }
+.wo .name { font-weight: 500; }
+.wo .pace { color: var(--k); font-weight: 700; font-size: 14.5px; white-space: nowrap; }
+.wo .sub { margin-top: 3px; line-height: 1.35; }
+.nexth { margin: 12px 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.notes { padding: 4px 14px; }
+.note { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; font-size: 14.5px; line-height: 1.35; }
+.note + .note { border-top: 1px solid var(--line); }
+.note .ico { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+.note.warn .ico { color: var(--warn); } .note.knee .ico { color: var(--accent); } .note.fuel .ico { color: var(--f); } .note.info .ico { color: var(--p); }
+.calcard { padding: 12px 10px; } .calcard h3 { padding: 0 4px; }
+.calrow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.calrow.dow span { text-align: center; font-size: 12px; color: var(--muted); font-weight: 500; }
+.wk { margin-top: 10px; }
+.wkh { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--muted); padding: 0 4px 5px; }
+.wkh .ph { flex: 1; color: var(--accent); font-weight: 500; } .wkh b { color: var(--ink); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.wk.past .wkh .ph { color: var(--muted); }
+.cal { position: relative; border: 0; border-radius: 9px; background: var(--tile); padding: 5px 2px 6px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; border-top: 3px solid var(--k); color: var(--ink); }
+.cal .dn { font-size: 11px; color: var(--muted); }
+.cal .mi { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cal .kl { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; max-width: 100%; }
+.cal.k-rest .mi, .cal.k-recovery .mi { color: var(--muted); font-weight: 400; }
+.cal.k-race { background: color-mix(in srgb, var(--f) 22%, var(--tile)); }
+.cal.now { outline: 2px solid var(--accent); outline-offset: -1px; }
+.wk.past .cal { opacity: .75; }
+.cal i { position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; }
+.cal i.ok { background: var(--ok); } .cal i.miss { background: var(--warn); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 12px 4px 4px; font-size: 12.5px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; background: var(--k); margin-right: 5px; vertical-align: 3px; }
+.trainday { cursor: pointer; }
+.trainday .cd { font-size: 14px; color: var(--accent); font-weight: 500; }
+.trainday > header .ico { width: 20px; height: 20px; color: var(--muted); }
+.tdrow { display: flex; align-items: center; gap: 10px; }
+.tdrow .tick .ico { width: 22px; height: 22px; color: var(--ok); stroke-width: 2.6; }
+ul.entries.runs { margin: 0 -14px; } ul.entries.runs li { cursor: default; }
+.tbl.zones td { text-align: left; vertical-align: top; } .tbl.zones td:last-child { text-align: right; white-space: nowrap; font-weight: 700; color: var(--k); font-variant-numeric: tabular-nums; }
+.tips { margin: 0; padding-left: 18px; font-size: 14.5px; line-height: 1.45; } .tips li + li { margin-top: 6px; }
+.chart .bar.run, .chart .bar.run.over { fill: var(--run); }
+.tbl.splits td:first-child { text-align: left; }
 /* ---- full-screen pages (Add food) ---- */
 .sheet-wrap.full { background: var(--bg); align-items: stretch; }
 .sheet-wrap.full .sheet { max-height: none; height: 100%; border-radius: 0; background: var(--bg); animation: none; }
