@@ -9,6 +9,12 @@ import { bars, line, bindCharts } from './charts.js';
 const KIND = { easy: 'Easy', medium: 'Medium', quality: 'Workout', long: 'Long', race: 'Race', rest: 'Rest', recovery: 'Recover' };
 const r1 = v => Math.round(v * 10) / 10;
 const paceRange = p => p ? `${T.fmtPace(p[1])}-${T.fmtPace(p[0])}/mi` : '';
+const miRange = x => !x.mi ? '' : x.kind === 'race' || x.lo === x.hi ? `${x.mi} mi` : `${x.lo}-${x.hi} mi`;
+// Short calendar label and 1-3 intensity pips, so hard days stand out at a glance.
+const SHORT = { Tempo: 'Tempo', Intervals: 'Intervals', 'Marathon pace': 'MP', Sharpener: 'MP', Recovery: 'Recover', Shakeout: 'Shakeout', 'Medium long': 'Medium' };
+const calLabel = x => x.kind === 'quality' ? SHORT[x.title.replace(/ \(moved\)$/, '')] || 'Workout' : x.kind === 'long' ? 'Long' : SHORT[x.title] || KIND[x.kind];
+const LEVEL = { recovery: 0, rest: 0, easy: 1, medium: 2, long: 2, quality: 3, race: 3 };
+const shoeName = (gear, ids) => (ids || []).map(id => gear.find(g => g.uuid === id)?.name).filter(Boolean).join(', ');
 const mon = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 const wkday = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short' });
 
@@ -24,7 +30,9 @@ async function load(s, ref = today()) {
   const autoGoal = !cfg.goalSec;
   if (autoGoal) cfg.goalSec = pred ? T.suggestGoal(pred.sec) : 4 * 3600;
   const plan = T.buildPlan(cfg, runs, ref);
-  return { cfg, gdays, runs, pred, autoGoal, plan };
+  const adapted = T.adapt(plan, runs, gdays, cfg, ref);
+  const gear = ((await sync.garminGear().catch(() => null))?.gear || []).filter(g => /shoe/i.test(g.type || ''));
+  return { cfg, gdays, runs, pred, autoGoal, plan, adapted, gear };
 }
 
 // ---------- Today card ----------
@@ -37,8 +45,8 @@ export async function todayCard(s, date, ui) {
   const done = T.milesOn(runs, date), st = T.status(d, done);
   const short = cfg.raceName.replace(/ (Marathon|Half Marathon)$/, '');
   return `<section class="card trainday k-${d.kind}" id="trainCard"><header><h3>Training</h3><span class="cd">${toRace === 0 ? 'Race day!' : toRace > 0 ? `${toRace} days to ${ui.esc(short)}` : ''}</span>${ui.ico('next')}</header>
-    <div class="tdrow"><span class="kst"></span><div class="grow"><div class="name">${d.mi ? `${d.mi} mi · ` : ''}${ui.esc(d.title)}</div>
-    <div class="sub">${d.pace ? paceRange(d.pace) : ui.esc(d.detail)}</div></div>
+    <div class="tdrow"><span class="kst"></span><div class="grow"><div class="name">${d.mi ? `${miRange(d)} · ` : ''}${ui.esc(d.title)}</div>
+    <div class="sub">${d.pace ? paceRange(d.pace) : ui.esc(d.detail)}${d.adj ? ` · <span class="adjt">adjusted</span>` : ''}</div></div>
     ${done ? `<div class="kcol"><div class="kc">${r1(done)}</div><div class="kl">mi done</div></div>` : ''}${st === 'done' && d.mi ? `<span class="tick">${ui.ico('check')}</span>` : ''}</div></section>`;
 }
 
@@ -63,9 +71,16 @@ function hero({ cfg, autoGoal, plan }, ui) {
 function planView(data, s, ui) {
   const { plan, runs, cfg } = data, t = today();
   const nudges = T.notes({ ...data, s });
+  for (const g of data.gear.filter(g => !/retired/i.test(g.status || ''))) {
+    const { mi, max, pct } = shoeInfo(g), used = data.runs.filter(r => r.date > T.addDays(t, -21) && r.gear?.includes(g.uuid)).length;
+    if (pct >= 0.85 && used) nudges.push(['warn', `${g.name} is at ${Math.round(mi)} of ${Math.round(max)} mi. Start the next pair now so it has 30+ mi on it before race day.`]);
+  }
+  const fz = data.adapted.fatigue;
+  if (fz.signals.length === 1) nudges.unshift(['warn', `Watch it: ${fz.signals[0]}. One more sign of fatigue and the next workout turns easy.`]);
+  if (!fz.signals.length && fz.strong >= 2) nudges.push(['info', `Your last ${fz.strong} rated runs felt strong. Training is landing well.`]);
   const d = T.planFor(plan, t);
   const next = d && d.kind === 'rest' ? plan.weeks.flatMap(w => w.days).find(x => x.date > t && x.mi > 0) : null;
-  const workout = x => `<div class="wo k-${x.kind}"><span class="kst"></span><div class="grow"><div class="name">${x.mi ? x.mi + ' mi · ' : ''}${ui.esc(x.title)}${x.pace ? ` <span class="pace">${paceRange(x.pace)}</span>` : ''}</div><div class="sub">${ui.esc(x.detail)}</div></div></div>`;
+  const workout = x => `<div class="wo k-${x.kind}"><span class="kst"></span><div class="grow"><div class="name">${x.mi ? miRange(x) + ' · ' : ''}${ui.esc(x.title)}${x.pace ? ` <span class="pace">${paceRange(x.pace)}</span>` : ''}</div><div class="sub">${ui.esc(x.detail)}</div>${x.adj ? `<div class="adjn">${ui.ico('refresh')}${ui.esc(x.adj)}</div>` : ''}</div></div>`;
   const todayCardHtml = d ? `<section class="card"><header><h3>Today</h3>${T.milesOn(runs, t) ? `<span class="hkcal">${r1(T.milesOn(runs, t))} mi done</span>` : ''}</header>${workout(d)}
     ${next ? `<h4 class="nexth">Next: ${wkday(next.date)}</h4>${workout(next)}` : ''}</section>` : '';
   const NOTE_ICO = { warn: 'alert', knee: 'knee', fuel: 'pie', info: 'info' };
@@ -79,26 +94,38 @@ function planView(data, s, ui) {
   const cell = x => {
     if (x.date < cfg.planStart && x.kind !== 'past') x = { ...x, kind: 'past' };
     const act = T.milesOn(runs, x.date), st = x.kind === 'past' ? '' : T.status(x, act);
-    const showMi = x.kind === 'past' || x.date < t ? act : x.mi;
+    const past = x.kind === 'past' || x.date < t;
     const kind = x.kind === 'past' ? (act >= 13 ? 'long' : act > 0 ? 'easy' : 'rest') : x.kind;
-    return `<button class="cal k-${kind} ${x.date === t ? 'now' : ''} ${st}" data-d="${x.date}"><span class="dn">${+x.date.slice(8)}</span>
-      <span class="mi">${showMi ? r1(showMi) : '–'}</span><span class="kl">${x.kind === 'past' ? (act ? 'run' : '') : KIND[x.kind]}</span>
+    const miTxt = past ? (act ? r1(act) : '–') : !x.mi ? '–' : x.kind === 'race' || x.lo === x.hi ? r1(x.mi) : `${x.lo}-${x.hi}`;
+    const lvl = x.kind === 'past' ? 0 : LEVEL[x.kind] || 0;
+    return `<button class="cal k-${kind} ${x.date === t ? 'now' : ''} ${st} ${x.adj && !past ? 'adj' : ''} ${miTxt.length > 4 ? 'rng' : ''}" data-d="${x.date}"><span class="dn">${+x.date.slice(8)}</span>
+      <span class="mi">${miTxt}</span><span class="kl">${x.kind === 'past' ? (act ? 'run' : '') : calLabel(x)}</span>
+      ${lvl ? `<span class="pips">${'<i></i>'.repeat(lvl)}</span>` : ''}
       ${st === 'done' && x.mi ? '<i class="ok"></i>' : st === 'miss' || st === 'part' ? '<i class="miss"></i>' : ''}</button>`;
   };
   const weeksHtml = [...pastWeeks, ...plan.weeks].map(w => {
     const actual = wkMi.get(w.start) || 0;
     const before = w.past || T.addDays(w.start, 6) < cfg.planStart;
-    const right = before ? `${r1(actual)} mi` : w.start <= t ? `${r1(actual)} / ${r1(w.mi)} mi` : `${r1(w.mi)} mi`;
+    const right = before ? `${r1(actual)} mi` : w.start <= t ? `${r1(actual)} of ${Math.round(w.lo)}-${Math.round(w.hi)} mi` : `${Math.round(w.lo)}-${Math.round(w.hi)} mi`;
     return `<div class="wk ${before ? 'past' : ''}"><div class="wkh"><span>${mon(w.start)} – ${mon(T.addDays(w.start, 6))}</span><span class="ph">${before ? 'Done' : w.phase}</span><b>${right}</b></div>
       <div class="calrow">${w.days.map(cell).join('')}</div></div>`;
   }).join('');
   return hero(data, ui) + todayCardHtml + notesHtml + `<section class="card calcard"><h3>Plan to race day</h3>
     <div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div>${weeksHtml}
-    <div class="legend">${['easy', 'medium', 'quality', 'long', 'race'].map(k => `<span class="k-${k}"><i></i>${KIND[k]}</span>`).join('')}</div>
-    <p class="muted small">Tap a day for the workout. Past days show what Garmin logged. The plan rebuilds from your recent weeks each time you open it.</p></section>`;
+    <div class="legend">${[['easy', 'Easy'], ['medium', 'Medium'], ['quality', 'Hard (tempo, MP, intervals)'], ['long', 'Long'], ['race', 'Race']].map(([k, l]) => `<span class="k-${k}"><i></i>${l}</span>`).join('')}</div>
+    <p class="muted small">Dots = how hard the day is. Any distance in the range counts. Tap a day for the workout; past days show what Garmin logged.</p></section>
+  <section class="card"><details class="how"><summary><h3>How this plan adjusts</h3></summary><ul class="tips">
+    <li><b>Ranges, not exact miles.</b> Anything in the range counts as done. Long runs flex down, not up.</li>
+    <li><b>Ran short on an easy day?</b> About half of it gets added to your remaining easy days this week (max +1.5 mi a day). The rest is let go; chasing missed miles is how knees get hurt.</li>
+    <li><b>Ran extra?</b> It comes off your later easy days that week.</li>
+    <li><b>Missed the long run?</b> It moves to the next day or two (never in race week). If you ran it on another day, that counts.</li>
+    <li><b>Missed a workout?</b> It moves to today if today is easy and not the day before the long run, otherwise it's dropped so hard days don't stack.</li>
+    <li><b>Tired?</b> If two signals line up (resting HR up, recent runs rated weak, or easy runs rated hard effort in Garmin), the next workout turns into an easy run.</li>
+    <li><b>Week to week</b>, mileage is rebuilt from what you actually ran the last 4-6 weeks. Lock your goal time with the gear so paces don't drift.</li>
+  </ul></details></section>`;
 }
 
-function trends({ runs, gdays, plan, cfg }, ui) {
+function trends({ runs, gdays, plan, cfg, gear }, ui) {
   const t = today(), first = T.weekStart(T.addDays(t, -7 * 11));
   const weeks = Array.from({ length: 12 }, (_, i) => T.addDays(first, 7 * i));
   const wk = T.weekly(runs);
@@ -120,12 +147,28 @@ function trends({ runs, gdays, plan, cfg }, ui) {
     ${stat('Longest', r1(Math.max(...longW.slice(-4))) + ' mi', 'last 4 wks', 'burn')}${stat('Avg pace', mi28 ? T.fmtPace(r28.reduce((a, r) => a + r.sec, 0) / mi28) : '–', 'last 28 days', 'p')}
     ${stat('Steps', steps7.length ? Math.round(avg(steps7)).toLocaleString() : '–', '7-day avg', 'steps')}${stat('Rest HR', rhr7.length ? Math.round(avg(rhr7)) : '–', '7-day avg', 'heart')}
   </div></section>
+  ${shoes(gear, ui)}
   <section class="card"><h3>Weekly miles</h3><div class="tipbox"><span class="muted">Tap a week to see it</span></div>${bars(weeks, miles, null, { title: 'Weekly miles', cls: 'run', id: 'wk' })}</section>
   <section class="card"><h3>Average pace (min/mi)</h3><div class="tipbox"><span class="muted">Tap a week to see it</span></div>${line(weeks, paceW, { title: 'Pace', fmt: v => T.fmtPace(v * 60), id: 'pace' })}</section>
   <section class="card"><h3>Steps</h3><div class="tipbox"><span class="muted">Tap a day to see it</span></div>${bars(days, days.map(d => g(d).steps || 0), null, { title: 'Steps', cls: 'steps', id: 'steps' })}</section>
   <section class="card"><h3>Resting heart rate</h3><div class="tipbox"><span class="muted">Tap a day to see it</span></div>${line(days, days.map(d => g(d).rhr || NaN), { title: 'Resting HR', id: 'rhr' })}<p class="muted small">A few bpm above your normal for 2-3 days usually means back off.</p></section>
   <section class="card"><h3>Recent runs</h3><ul class="entries runs">${recent.map(r => `<li><div class="grow"><div class="r1"><span class="name">${ui.esc(r.name || 'Run')}</span><span class="kc">${r1(r.mi)} mi</span></div>
-    <div class="r2"><span class="sub">${wkday(r.date)} ${mon(r.date)}${r.tread ? ' · treadmill' : ''}</span><span class="macros">${r.sec ? T.fmtPace(r.sec / r.mi) + '/mi' : ''}${r.hr ? ` · ${r.hr} bpm` : ''}</span></div></div></li>`).join('') || '<li class="empty small">No runs synced yet.</li>'}</ul></section>`;
+    <div class="r2"><span class="sub">${wkday(r.date)} ${mon(r.date)}${r.tread ? ' · treadmill' : ''}</span><span class="macros">${r.sec ? T.fmtPace(r.sec / r.mi) + '/mi' : ''}${r.hr ? ` · ${r.hr} bpm` : ''}</span></div>
+    ${T.feelText(r) || r.gear?.length ? `<div class="r3">${[T.feelText(r), shoeName(gear, r.gear)].filter(Boolean).map(ui.esc).join(' · ')}</div>` : ''}</div></li>`).join('') || '<li class="empty small">No runs synced yet.</li>'}</ul>
+    ${runs.some(r => r.feel != null || r.rpe) ? '' : '<p class="muted small">Rate "How did you feel" and effort in Garmin after runs; they show here and the plan uses them to spot fatigue.</p>'}</section>`;
+}
+
+// Running shoes from Garmin gear: miles vs the shoe's max (Garmin's setting, else 400 mi).
+export const shoeInfo = g => { const mi = (g.distance || 0) / 1609.34, max = g.maxM ? g.maxM / 1609.34 : 400; return { mi, max, pct: mi / max }; };
+function shoes(gear, ui) {
+  const active = gear.filter(g => !/retired/i.test(g.status || ''));
+  if (!active.length) return `<section class="card"><h3>Shoes</h3><p class="muted small">Add your shoes under Gear in Garmin Connect. Mileage shows here after the next sync, with a heads-up when a pair is wearing out.</p></section>`;
+  return `<section class="card"><h3>Shoes</h3><ul class="shoes">${active.sort((a, b) => (b.distance || 0) - (a.distance || 0)).map(g => {
+    const { mi, max, pct } = shoeInfo(g);
+    return `<li class="${pct >= 1 ? 'over' : pct >= 0.85 ? 'warn' : ''}"><div class="r1"><span class="name">${ui.esc(g.name || 'Shoe')}</span><b>${Math.round(mi)} <span class="muted">/ ${Math.round(max)} mi</span></b></div>
+      <div class="track"><div style="width:${Math.min(100, pct * 100)}%"></div></div>
+      <div class="sub">${pct >= 1 ? 'Past its mileage. Replace it.' : pct >= 0.85 ? `About ${Math.round(max - mi)} mi left. Get the next pair now.` : `${g.activities || 0} activities${g.since ? ' since ' + mon(g.since) : ''}`}</div></li>`;
+  }).join('')}</ul></section>`;
 }
 
 function race({ cfg, plan, pred, autoGoal }, s, ui) {
@@ -174,12 +217,13 @@ export function bind(root, s, ui) {
 }
 
 async function openDay(s, date, ui) {
-  const { plan, runs } = await load(s);
+  const { plan, runs, gear } = await load(s);
   const d = T.planFor(plan, date), done = runs.filter(r => r.date === date);
-  const b = ui.sheet(`${d ? `<div class="wo k-${d.kind}"><span class="kst"></span><div class="grow"><div class="name">${d.mi ? d.mi + ' mi · ' : ''}${ui.esc(d.title)}</div>
-      ${d.pace ? `<div class="pace">${paceRange(d.pace)}</div>` : ''}<div class="sub">${ui.esc(d.detail)}</div></div></div>` : '<p class="muted">Before the plan started.</p>'}
+  const b = ui.sheet(`${d ? `<div class="wo k-${d.kind}"><span class="kst"></span><div class="grow"><div class="name">${d.mi ? miRange(d) + ' · ' : ''}${ui.esc(d.title)}</div>
+      ${d.pace ? `<div class="pace">${paceRange(d.pace)}</div>` : ''}<div class="sub">${ui.esc(d.detail)}</div>${d.adj ? `<div class="adjn">${ui.ico('refresh')}${ui.esc(d.adj)}</div>` : ''}</div></div>` : '<p class="muted">Before the plan started.</p>'}
     <h4>Garmin</h4>${done.length ? `<ul class="entries runs">${done.map(r => `<li><div class="grow"><div class="r1"><span class="name">${ui.esc(r.name || 'Run')}</span><span class="kc">${r1(r.mi)} mi</span></div>
-      <div class="r2"><span class="sub">${r.tread ? 'treadmill' : 'outdoor'}</span><span class="macros">${r.sec ? T.fmtPace(r.sec / r.mi) + '/mi' : ''}${r.hr ? ` · ${r.hr} bpm` : ''}</span></div></div></li>`).join('')}</ul>` : `<p class="muted small">${date > today() ? 'Not yet.' : 'No run logged.'}</p>`}`,
+      <div class="r2"><span class="sub">${r.tread ? 'treadmill' : 'outdoor'}</span><span class="macros">${r.sec ? T.fmtPace(r.sec / r.mi) + '/mi' : ''}${r.hr ? ` · ${r.hr} bpm` : ''}</span></div>
+      ${T.feelText(r) || r.gear?.length ? `<div class="r3">${[T.feelText(r), shoeName(gear, r.gear)].filter(Boolean).map(ui.esc).join(' · ')}</div>` : ''}</div></li>`).join('')}</ul>` : `<p class="muted small">${date > today() ? 'Not yet.' : 'No run logged.'}</p>`}`,
     { title: new Date(date + 'T12:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) });
   return b;
 }

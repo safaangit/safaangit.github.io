@@ -34,6 +34,7 @@ const ICONS = {
   zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   training: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/>',
   alert: '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   knee: '<path d="M12 2v8l-3 4v8M12 10l4 4v8"/><circle cx="12" cy="12" r="2.5"/>',

@@ -462,3 +462,27 @@ header.top .hbtn.on { background: rgba(255,255,255,.18); }
 .dot2 { width: 8px; height: 8px; border-radius: 50%; background: var(--line2); flex: none; }
 .dot2.ok { background: var(--ok); } .dot2.over { background: var(--warn); } .dot2.under { background: var(--f); }
 .daylist .more { display: block; width: 100%; padding: 12px 0 8px; text-align: center; }
+
+/* ---- training: intensity, ranges, adjustments, shoes ---- */
+.cal { background: color-mix(in srgb, var(--k) 16%, var(--tile)); }
+.cal.k-rest, .cal.k-recovery, .cal.k-past { background: var(--tile); }
+.cal.k-quality, .cal.k-race { background: color-mix(in srgb, var(--k) 30%, var(--tile)); }
+.cal.k-quality .kl, .cal.k-long .kl, .cal.k-race .kl { color: var(--k); font-weight: 700; }
+.cal.rng .mi { font-size: 13.5px; letter-spacing: -.02em; }
+.cal .pips { display: flex; gap: 2px; height: 4px; margin-top: 1px; }
+.cal .pips i { position: static; width: 4px; height: 4px; border-radius: 50%; background: var(--k); }
+.cal.adj { box-shadow: inset 0 0 0 1.5px var(--k); }
+.cal.adj::after { content: '↻'; position: absolute; top: 2px; left: 4px; font-size: 10px; color: var(--k); }
+.adjn { display: flex; gap: 6px; align-items: flex-start; margin-top: 6px; font-size: 13.5px; color: var(--accent); line-height: 1.35; }
+.adjn .ico { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+.adjt { color: var(--accent); }
+.r3 { font-size: 13px; color: var(--muted); margin-top: 2px; }
+ul.shoes { list-style: none; margin: 0; padding: 0; }
+ul.shoes li { padding: 8px 0; color: var(--steps); } ul.shoes li + li { border-top: 1px solid var(--line); }
+ul.shoes li.warn { color: var(--f); } ul.shoes li.over { color: var(--warn); }
+ul.shoes .name { color: var(--ink); } ul.shoes b { color: var(--ink); font-weight: 500; white-space: nowrap; }
+ul.shoes .track { height: 7px; }
+details.how summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+details.how summary::-webkit-details-marker { display: none; }
+details.how summary h3 { margin: 0; } details.how summary::after { content: '›'; font-size: 22px; color: var(--muted); transform: rotate(90deg); }
+details.how[open] summary::after { transform: rotate(-90deg); } details.how[open] summary { margin-bottom: 8px; }

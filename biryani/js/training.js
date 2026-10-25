@@ -22,9 +22,12 @@ export const config = s => ({ ...DEFAULTS, ...(s.training || {}) });
 export function runsFrom(gdays) {
   return Object.entries(gdays).flatMap(([date, d]) => (d.activities || [])
     .filter(a => RUN.test(a.type || '') && a.distance > 0)
-    .map(a => ({ date, name: a.name, mi: a.distance / M, sec: a.duration, hr: a.avgHR, tread: /treadmill/.test(a.type) })))
+    .map(a => ({ date, id: a.id, name: a.name, mi: a.distance / M, sec: a.duration, hr: a.avgHR, tread: /treadmill/.test(a.type), feel: a.feel, rpe: a.rpe, gear: a.gear })))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
+// Garmin's post-run ratings: feel 0 very weak .. 100 very strong, rpe 10..100 (effort 1-10).
+export const FEEL = { 0: 'Very weak', 25: 'Weak', 50: 'Normal', 75: 'Strong', 100: 'Very strong' };
+export const feelText = r => [r.feel != null ? 'felt ' + (FEEL[r.feel] || r.feel).toLowerCase() : '', r.rpe ? `effort ${Math.round(r.rpe / 10)}/10` : ''].filter(Boolean).join(' · ');
 export const milesOn = (runs, date) => runs.filter(r => r.date === date).reduce((t, r) => t + r.mi, 0);
 
 // Marathon prediction: Riegel (t × (26.2 / d)^1.06) on runs of 5+ mi from the last 8 weeks,
@@ -95,7 +98,7 @@ export function buildPlan(cfg, runs, ref = today()) {
   }
 
   const P = k => { const x = zone(z, k); return [x[2], x[3]]; };
-  const day = (date, kind, mi, title, detail, pace) => ({ date, kind, mi: kind === 'race' ? mi : half(mi), title, detail, pace });
+  const day = (date, kind, mi, title, detail, pace) => ({ date, kind, mi: kind === 'race' ? mi : half(mi), title, detail, pace, ...range(kind, kind === 'race' ? mi : half(mi)) });
   const quality = (w, mi) => {
     const t = w === 2 || (w > 3 && w % 3 === 1) ? 'tempo' : w > 3 && w % 3 === 0 ? 'interval' : 'mp';
     if (t === 'tempo') return ['Tempo', `2 mi easy, ${w === 2 ? '3 × 1.5 mi' : `${Math.max(3, Math.round(mi * 0.45))} mi`} @ tempo (3 min jog between), rest easy.`, P('tempo')];
@@ -136,6 +139,90 @@ export function buildPlan(cfg, runs, ref = today()) {
   return { weeks, z, peak, longPeak };
 }
 
+// Any distance in the range counts as done. Easy days flex the most; long runs flex down, not up.
+export function range(kind, mi) {
+  if (!mi || kind === 'race') return { lo: mi, hi: mi };
+  const R = Math.round;
+  if (kind === 'long') return { lo: R(Math.max(mi - 2, mi * 0.85)), hi: R(mi) };
+  if (kind === 'quality') return { lo: R(Math.max(3, mi - 1)), hi: R(mi + 1) };
+  return { lo: R(Math.max(2, mi - 1)), hi: R(mi + (kind === 'medium' ? 1.5 : 1)) };
+}
+const sumBy = (a, k) => a.reduce((t, d) => t + (d[k] || 0), 0);
+
+// Adjusts this week (and the first days of next) to what you actually ran, after buildPlan.
+// Rules, kept conservative for the knee:
+// - A missed long run moves to the next day or two if that isn't race week; otherwise it's dropped.
+// - A missed workout moves to today if today is an easy day and it isn't the day before the long run;
+//   otherwise it's dropped (no stacking hard days).
+// - Easy-day shortfalls are only half made up, at most +1.5 mi a day; extra miles come off later easy days.
+// - Two fatigue signals together (resting HR up, last runs felt weak / easy runs felt hard) turn the
+//   next workout into an easy run.
+export function adapt(plan, runs, gdays, cfg, ref = today()) {
+  const all = plan.weeks.flatMap(w => w.days), at = d => all.find(x => x.date === d);
+  const act = d => milesOn(runs, d), wkOf = d => plan.weeks.find(w => w.days.some(x => x.date === d));
+  const toRace = d => daysBetween(d, cfg.raceDate), changes = [];
+  const set = (d, patch, why) => { Object.assign(d, patch, range(patch.kind || d.kind, patch.mi ?? d.mi), { adj: why }); changes.push([d.date, why]); };
+  const yesterday = addDays(ref, -1), twoAgo = addDays(ref, -2);
+  for (const missed of [twoAgo, yesterday].map(at).filter(Boolean)) {
+    if (missed.date < cfg.planStart || missed.adj || act(missed.date) >= missed.lo * 0.75) continue;
+    const later = Array.from({ length: daysBetween(missed.date, ref) }, (_, k) => addDays(missed.date, k + 1));
+    if (later.some(d => act(d) >= missed.lo * 0.9 && act(d) >= 4)) { missed.adj = 'Done on a different day.'; continue; }
+    if (missed.kind === 'long') {
+      const slot = [ref, addDays(ref, 1)].map(at).find(x => x && x.kind !== 'race' && x.kind !== 'long' && toRace(x.date) > 6);
+      if (slot && !act(slot.date)) {
+        set(slot, { kind: 'long', mi: missed.mi, title: 'Long run (moved)', detail: missed.detail, pace: missed.pace }, `Moved from ${new Date(missed.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'long' })} since it didn't happen.`);
+        const after = at(addDays(slot.date, 1));
+        if (after && after.kind === 'quality') set(after, { kind: 'easy', mi: Math.max(3, after.mi - 2), title: 'Recovery', detail: 'Easy the day after the long run.', pace: plan.z.list.find(z => z[0] === 'recovery').slice(2, 4) }, 'Workout dropped: it would land the day after the moved long run.');
+      }
+      missed.adj = slot ? 'Missed; moved forward.' : 'Missed. Skip it rather than cram it in.';
+    } else if (missed.kind === 'quality') {
+      const t = at(ref), beforeLong = at(addDays(ref, 1))?.kind === 'long';
+      if (t && (t.kind === 'easy' || t.kind === 'medium') && !beforeLong && !act(ref) && toRace(ref) > 2) {
+        set(t, { kind: 'quality', mi: missed.mi, title: missed.title + ' (moved)', detail: missed.detail, pace: missed.pace }, 'Moved from yesterday.');
+        missed.adj = 'Missed; moved to today.';
+      } else missed.adj = 'Missed. Dropped so hard days don\'t stack.';
+    }
+  }
+  // Rebalance easy days in the current week.
+  const wk = wkOf(ref);
+  if (wk && wk.w >= 1) {
+    const done = wk.days.filter(d => d.date < ref && d.date >= cfg.planStart && (d.kind === 'easy' || d.kind === 'medium'));
+    const left = wk.days.filter(d => d.date >= ref && !act(d.date) && (d.kind === 'easy' || d.kind === 'medium') && !d.adj);
+    let delta = done.reduce((t, d) => t + act(d.date) - d.mi, 0);
+    if (left.length && Math.abs(delta) >= 1.5) {
+      const share = delta < 0 ? Math.min(1.5, (-delta / 2) / left.length) : -Math.min(2, delta / left.length);
+      for (const d of left) {
+        const mi = Math.max(3, half(d.mi + share));
+        if (mi !== d.mi) set(d, { mi }, delta < 0 ? `+${r1(mi - d.mi)} mi: picking up about half of what earlier easy days missed.` : `${r1(mi - d.mi)} mi: you already ran extra this week.`);
+      }
+    }
+  }
+  // Fatigue: resting HR up and recent runs felt bad -> next workout becomes easy.
+  const f = fatigue(runs, gdays, ref);
+  if (f.signals.length >= 2) {
+    const q = all.find(d => d.date >= ref && d.date <= addDays(ref, 3) && d.kind === 'quality' && !act(d.date) && toRace(d.date) > 0);
+    if (q) set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail: 'Easy miles instead of the workout. Bring it back next week if you feel better.', pace: plan.z.list.find(z => z[0] === 'easy').slice(2, 4) }, 'Swapped for easy: ' + f.signals.join(' and ') + '.');
+  }
+  for (const w of plan.weeks) Object.assign(w, { mi: sumBy(w.days.filter(d => d.kind !== 'race'), 'mi'), lo: sumBy(w.days.filter(d => d.kind !== 'race'), 'lo'), hi: sumBy(w.days.filter(d => d.kind !== 'race'), 'hi') });
+  return { changes, fatigue: f };
+}
+const r1 = v => Math.round(v * 10) / 10;
+
+// Signals from resting HR and your post-run ratings over the last few days.
+export function fatigue(runs, gdays, ref = today()) {
+  const signals = [], rated = runs.filter(r => r.date > addDays(ref, -5) && r.date <= ref && (r.feel != null || r.rpe));
+  const v = (from, to) => Object.entries(gdays).filter(([d]) => d >= from && d <= to).map(([, g]) => g.rhr).filter(x => x > 0);
+  const avg = a => a.reduce((t, x) => t + x, 0) / (a.length || 1);
+  const r3 = v(addDays(ref, -2), ref), r28 = v(addDays(ref, -31), addDays(ref, -4));
+  if (r3.length >= 2 && r28.length >= 10 && avg(r3) - avg(r28) >= 4) signals.push(`resting HR up ${Math.round(avg(r3) - avg(r28))} bpm`);
+  const weak = rated.filter(r => r.feel != null && r.feel <= 25).length;
+  const hardEasy = rated.filter(r => r.rpe >= 70 && r.mi < 10 && r.hr && r.hr < 150).length;
+  if (weak >= 2) signals.push(`${weak} recent runs felt weak`);
+  else if (hardEasy >= 2) signals.push('easy runs feeling hard');
+  const strong = rated.filter(r => r.feel >= 75).length;
+  return { signals, strong, rated: rated.length };
+}
+
 export function planFor(plan, date) {
   for (const w of plan.weeks) for (const d of w.days) if (d.date === date) return d;
   return null;
@@ -145,7 +232,7 @@ export function planFor(plan, date) {
 export function status(d, actual, ref = today()) {
   if (d.date > ref) return '';
   if (d.kind === 'rest' || d.kind === 'recovery') return actual > 0 ? 'extra' : 'done';
-  if (actual >= d.mi * 0.75) return 'done';
+  if (actual >= (d.lo ?? d.mi) * 0.95) return 'done';
   if (d.date === ref) return 'due';
   return actual > 0 ? 'part' : 'miss';
 }
