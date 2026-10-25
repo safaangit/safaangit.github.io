@@ -1,0 +1,1063 @@
+{
+ "v": 1,
+ "ideas": [
+  {
+   "id": "lavash-burrito",
+   "name": "Bean & cheese lavash burrito",
+   "kind": "recipe",
+   "tags": [
+    "high-protein",
+    "josephs",
+    "under-400"
+   ],
+   "like": "refried|smokey|bean|burrito|santa fe|rice & beans",
+   "why": "Your refried beans + fat free cheese combo, wrapped in a 120 kcal Joseph's lavash instead of eating it from the bowl.",
+   "items": [
+    {
+     "name": "Joseph's Flax Oat Bran Lavash",
+     "brand": "Joseph's",
+     "qty": 1,
+     "unit": "1 lavash (64 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 120,
+      "p": 12,
+      "c": 16,
+      "f": 3,
+      "fib": 4
+     }
+    },
+    {
+     "foodId": "73eba626sl598",
+     "name": "Fat Free Refried Beans",
+     "brand": "Old El Paso",
+     "qty": 100,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 68,
+      "p": 4,
+      "c": 12.9,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626szt64",
+     "name": "Smokey Spice",
+     "brand": "Aldi",
+     "qty": 80,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 118,
+      "p": 5.4,
+      "c": 23.1,
+      "f": 0.4
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 40,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    },
+    {
+     "name": "Salsa",
+     "qty": 1,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 10,
+      "p": 0,
+      "c": 2,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Warm the beans and Smokey Spice together.",
+    "Spread on the lavash, top with cheese and salsa, roll it up.",
+    "Toast seam-side down in a dry pan 2 min a side so it holds."
+   ],
+   "buys": [
+    "josephs",
+    "mexican"
+   ]
+  },
+  {
+   "id": "ziti-konjac",
+   "name": "Konjac baked ziti",
+   "kind": "recipe",
+   "tags": [
+    "swap",
+    "konjac",
+    "under-300",
+    "high-protein"
+   ],
+   "like": "ziti|ravioli|pasta|michelina|cheese ziti",
+   "why": "Swap for Michelina's ziti (280 kcal, 11 g protein): same red-sauce cheesy bowl, about 2\u00d7 the protein for fewer calories.",
+   "items": [
+    {
+     "name": "Konjac Fettuccine",
+     "brand": "Miracle Noodle",
+     "qty": 2,
+     "unit": "3 oz (85 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 5,
+      "p": 0,
+      "c": 3,
+      "f": 0,
+      "fib": 2
+     }
+    },
+    {
+     "name": "Traditional Italian Sauce",
+     "brand": "Prego",
+     "qty": 1,
+     "unit": "1/2 cup (125 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 70,
+      "p": 2,
+      "c": 11,
+      "f": 1.5,
+      "fib": 3
+     }
+    },
+    {
+     "foodId": "73eba626oy51j",
+     "name": "Fat Free Cottage Cheese",
+     "brand": "Giant",
+     "qty": 100,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 64,
+      "p": 10.6,
+      "c": 5.3,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 40,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Rinse the konjac well, then dry-fry 3\u20134 min in a hot pan until it squeaks (this kills the rubbery texture).",
+    "Stir in sauce and cottage cheese (stands in for ricotta).",
+    "Top with the cheese and broil or microwave until melted."
+   ],
+   "buys": [
+    "cottage",
+    "konjac",
+    "mexican"
+   ]
+  },
+  {
+   "id": "sushi-bowl",
+   "name": "California roll bowl",
+   "kind": "recipe",
+   "tags": [
+    "swap",
+    "under-300",
+    "seafood"
+   ],
+   "like": "california|sushi|roll|crab|lobster|tempura",
+   "why": "You eat California rolls a lot. Same flavors at home: fewer calories than a 15-piece tray, more protein from the tuna.",
+   "items": [
+    {
+     "foodId": "73eba626gs8gb",
+     "name": "Imitation crab",
+     "brand": "Transocean",
+     "qty": 100,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 90,
+      "p": 7.1,
+      "c": 15.3,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626mc0y1",
+     "name": "Tuna in Water",
+     "brand": "StarKist",
+     "qty": 57,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 100.5,
+      "p": 22.9,
+      "c": 0,
+      "f": 0.9
+     }
+    },
+    {
+     "foodId": "73eba626f1tgz",
+     "name": "White Rice, cooked",
+     "brand": "Minute Rice",
+     "qty": 0.5,
+     "unit": "1 cup cooked",
+     "mult": 1,
+     "n": {
+      "kcal": 199,
+      "p": 4,
+      "c": 40,
+      "f": 2.5
+     }
+    },
+    {
+     "name": "Cucumber",
+     "qty": 75,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 15,
+      "p": 0.7,
+      "c": 3.6,
+      "f": 0.1,
+      "fib": 0.5
+     }
+    },
+    {
+     "name": "Light mayo",
+     "brand": "Hellmann's",
+     "qty": 1,
+     "unit": "1 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 35,
+      "p": 0,
+      "c": 1,
+      "f": 3.5
+     }
+    },
+    {
+     "name": "Sriracha",
+     "qty": 1,
+     "unit": "1 tsp",
+     "mult": 1,
+     "n": {
+      "kcal": 5,
+      "p": 0,
+      "c": 1,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Rice in the bowl, then chopped crab, tuna and diced cucumber.",
+    "Mix mayo + sriracha and drizzle over.",
+    "Crumble a nori sheet on top if you have one."
+   ],
+   "halal": "Some imitation crab adds mirin or wine; check the label (Transocean Crab Supreme is the one you already log).",
+   "buys": [
+    "seafood"
+   ]
+  },
+  {
+   "id": "premier-creami",
+   "name": "Premier Protein Creami",
+   "kind": "creami",
+   "tags": [
+    "creami",
+    "high-protein",
+    "under-200"
+   ],
+   "like": "creami|premier|protein shake|oreo|yasso|ice cream",
+   "why": "The classic: one shake makes a pint. 30 g protein for 180 kcal; add your 2 Oreo Thins on Mix-in if you want the cookies back.",
+   "items": [
+    {
+     "foodId": "73eba626p0xss",
+     "name": "High Protein Shake, Chocolate",
+     "brand": "Premier Protein",
+     "qty": 1,
+     "unit": "11 oz bottle",
+     "mult": 1,
+     "n": {
+      "kcal": 160,
+      "p": 30,
+      "c": 5,
+      "f": 3
+     }
+    },
+    {
+     "name": "Sugar Free Instant Pudding mix",
+     "brand": "Jell-O",
+     "qty": 1,
+     "unit": "1/4 box (dry)",
+     "mult": 1,
+     "n": {
+      "kcal": 20,
+      "p": 0,
+      "c": 5,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Whisk the pudding mix into the shake, pour into the pint, freeze 24 h.",
+    "Spin on Lite Ice Cream, add a splash of milk and Re-spin if crumbly."
+   ],
+   "halal": "Jell-O sugar free instant pudding has no gelatin (checked the ingredient list); the Jell-O gelatin desserts do, so grab the pudding box.",
+   "buys": [
+    "premier",
+    "pudding"
+   ]
+  },
+  {
+   "id": "oikos-creami",
+   "name": "Vanilla Oikos cheesecake Creami",
+   "kind": "creami",
+   "tags": [
+    "creami",
+    "high-protein",
+    "under-200"
+   ],
+   "like": "creami|yogurt|oikos|yasso|greek",
+   "why": "Two Oikos cups spin into a frozen-yogurt pint that tastes like cheesecake..",
+   "items": [
+    {
+     "name": "Triple Zero Vanilla Greek Yogurt",
+     "brand": "Oikos",
+     "qty": 2,
+     "unit": "1 cup (150 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 80,
+      "p": 15,
+      "c": 6,
+      "f": 0
+     }
+    },
+    {
+     "name": "Sugar Free Instant Pudding mix",
+     "brand": "Jell-O",
+     "qty": 1,
+     "unit": "1/4 box (dry)",
+     "mult": 1,
+     "n": {
+      "kcal": 20,
+      "p": 0,
+      "c": 5,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Stir pudding mix into both yogurts, pack into the pint, freeze 24 h.",
+    "Spin on Lite Ice Cream; Re-spin once."
+   ],
+   "buys": [
+    "oikos",
+    "pudding"
+   ]
+  },
+  {
+   "id": "pita-pizza",
+   "name": "Plant chicken pita pizza",
+   "kind": "recipe",
+   "tags": [
+    "josephs",
+    "high-protein",
+    "under-300"
+   ],
+   "like": "pizza|garlic knot|plant chicken|daring|bread",
+   "why": "Pizza night for under 250 kcal using the Daring pieces you already buy.",
+   "items": [
+    {
+     "name": "Joseph's Low Carb Pita",
+     "brand": "Joseph's",
+     "qty": 1,
+     "unit": "1 pita",
+     "mult": 1,
+     "n": {
+      "kcal": 60,
+      "p": 6,
+      "c": 9,
+      "f": 1.5,
+      "fib": 2
+     }
+    },
+    {
+     "name": "Traditional Italian Sauce",
+     "brand": "Prego",
+     "qty": 0.5,
+     "unit": "1/2 cup (125 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 70,
+      "p": 2,
+      "c": 11,
+      "f": 1.5,
+      "fib": 3
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 40,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626de1ni",
+     "name": "Original Plant Chicken Pieces",
+     "brand": "Daring",
+     "qty": 71,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 109.9,
+      "p": 19.7,
+      "c": 1.4,
+      "f": 2.8
+     }
+    }
+   ],
+   "steps": [
+    "Pita on a tray, sauce, cheese, chopped plant chicken.",
+    "Air fry 375\u00b0F 5\u20136 min or bake 425\u00b0F 8 min until crisp."
+   ],
+   "buys": [
+    "daring",
+    "josephs",
+    "mexican"
+   ]
+  },
+  {
+   "id": "konjac-stirfry",
+   "name": "Chicken konjac stir-fry",
+   "kind": "recipe",
+   "tags": [
+    "konjac",
+    "high-protein",
+    "under-300"
+   ],
+   "like": "chicken|stir fry|dumpling|noodle|veggie pasta",
+   "why": "Big plate, 40 g protein, under 300 kcal. Replaces the Birds Eye veggie pasta bag (386 kcal).",
+   "items": [
+    {
+     "name": "Konjac Fettuccine",
+     "brand": "Miracle Noodle",
+     "qty": 2,
+     "unit": "3 oz (85 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 5,
+      "p": 0,
+      "c": 3,
+      "f": 0,
+      "fib": 2
+     }
+    },
+    {
+     "foodId": "73eba6262awk8",
+     "name": "Stir Fry Vegetables",
+     "qty": 220,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 39.1,
+      "p": 2.2,
+      "c": 7.6,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626lgnpi",
+     "name": "Chicken Breast, skinless (halal)",
+     "qty": 113,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 155.2,
+      "p": 30.9,
+      "c": 0,
+      "f": 3.5
+     }
+    },
+    {
+     "name": "Soy sauce (alcohol-free, e.g. La Choy)",
+     "qty": 1,
+     "unit": "1 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 10,
+      "p": 1,
+      "c": 1,
+      "f": 0,
+      "na": 1000
+     }
+    }
+   ],
+   "steps": [
+    "Dry-fry the rinsed konjac until squeaky, push aside.",
+    "Cook the veggies, add sliced cooked chicken and soy sauce, toss everything."
+   ],
+   "halal": "Use halal chicken. Brewed soy sauce like Kikkoman contains alcohol from fermentation; La Choy and halal-certified brands don't.",
+   "buys": [
+    "konjac"
+   ]
+  },
+  {
+   "id": "eggwhite-wrap",
+   "name": "Egg white & cheese lavash wrap",
+   "kind": "recipe",
+   "tags": [
+    "josephs",
+    "high-protein",
+    "under-300"
+   ],
+   "like": "egg|breakfast|bread|uncrustables",
+   "why": "Good noon fast-breaker: 43 g protein for about 270 kcal.",
+   "items": [
+    {
+     "name": "Joseph's Flax Oat Bran Lavash",
+     "brand": "Joseph's",
+     "qty": 1,
+     "unit": "1 lavash (64 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 120,
+      "p": 12,
+      "c": 16,
+      "f": 3,
+      "fib": 4
+     }
+    },
+    {
+     "foodId": "73eba626v9k1c",
+     "name": "Liquid Egg Whites",
+     "brand": "Parkhurst",
+     "qty": 200,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 47.4,
+      "p": 10.8,
+      "c": 0.7,
+      "f": 0.1
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 30,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    },
+    {
+     "name": "Salsa",
+     "qty": 1,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 10,
+      "p": 0,
+      "c": 2,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Scramble the egg whites, add cheese at the end.",
+    "Fill the lavash, add salsa, roll and toast."
+   ],
+   "buys": [
+    "eggw",
+    "josephs",
+    "mexican"
+   ]
+  },
+  {
+   "id": "yogurt-bowl",
+   "name": "Protein yogurt bowl",
+   "kind": "recipe",
+   "tags": [
+    "high-protein",
+    "under-200"
+   ],
+   "like": "yogurt|greek|oikos|granola",
+   "why": "Your Great Value Greek yogurt with half a scoop of whey stirred in. Pudding-thick and doubles the protein.",
+   "items": [
+    {
+     "foodId": "73eba6263r9bs",
+     "name": "Greek Strawberry Yogurt",
+     "brand": "Great Value",
+     "qty": 150,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 53.3,
+      "p": 8.7,
+      "c": 4.7,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626yu3tl",
+     "name": "Impact Whey, Salted Caramel",
+     "brand": "Myprotein",
+     "qty": 12.5,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 440,
+      "p": 80,
+      "c": 12,
+      "f": 8
+     }
+    }
+   ],
+   "steps": [
+    "Stir the whey into the yogurt until smooth. Top with berries if you have room."
+   ],
+   "buys": [
+    "yogurt"
+   ]
+  },
+  {
+   "id": "saffron-butter-chicken",
+   "name": "Saffron Road Butter Chicken Cavatappi",
+   "kind": "buy",
+   "tags": [
+    "frozen",
+    "halal-certified",
+    "high-protein"
+   ],
+   "like": "ziti|ravioli|michelina|smart ones|frozen|pasta",
+   "why": "Certified halal (IFANCA) frozen pasta with 28 g protein. Higher calorie than your Michelina's, but covers a real meal.",
+   "items": [
+    {
+     "name": "Crossroads Butter Chicken Cavatappi",
+     "brand": "Saffron Road",
+     "qty": 1,
+     "unit": "1 package (9.5 oz)",
+     "mult": 1,
+     "n": {
+      "kcal": 460,
+      "p": 28,
+      "c": 50,
+      "f": 17,
+      "fib": 3,
+      "na": 680
+     }
+    }
+   ],
+   "steps": [
+    "Microwave per box."
+   ],
+   "src": "https://giantfoodstores.com/groceries/product/saffron-road-crossroads-28g-protein-butter-chicken-cavatappi-frozen-meal-9-5-oz-box/411164",
+   "buys": [
+    "saffron"
+   ]
+  },
+  {
+   "id": "pb-syrup",
+   "name": "PB2 + sugar free syrup drizzle",
+   "kind": "hack",
+   "tags": [
+    "hacks",
+    "under-100"
+   ],
+   "like": "creami|yogurt|pancake|syrup|peanut",
+   "why": "Peanut butter drizzle for 70 kcal instead of ~190 for 2 tbsp of real PB. Goes on a Creami pint, yogurt bowl, or protein pancakes.",
+   "items": [
+    {
+     "name": "PB2 Original Powdered Peanut Butter",
+     "brand": "PB2",
+     "qty": 1,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 60,
+      "p": 6,
+      "c": 5,
+      "f": 1.5,
+      "fib": 1,
+      "na": 90
+     }
+    },
+    {
+     "foodId": "73eba626hgum0",
+     "name": "Sugar Free Syrup",
+     "qty": 25,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 40,
+      "p": 0,
+      "c": 10,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Stir PB2 with the syrup, then add water a teaspoon at a time until it drizzles.",
+    "Thicker = less water; it firms up on frozen Creami like a magic shell."
+   ],
+   "buys": [
+    "pb2"
+   ]
+  },
+  {
+   "id": "oikos-pb",
+   "name": "Peanut butter mousse Oikos",
+   "kind": "hack",
+   "tags": [
+    "hacks",
+    "high-protein",
+    "under-200"
+   ],
+   "like": "yogurt|oikos|greek|yasso",
+   "why": "Stir PB2 into a vanilla Oikos: tastes like peanut butter mousse, 21 g protein for 140 kcal.",
+   "items": [
+    {
+     "name": "Triple Zero Vanilla Greek Yogurt",
+     "brand": "Oikos",
+     "qty": 1,
+     "unit": "1 cup (150 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 80,
+      "p": 15,
+      "c": 6,
+      "f": 0
+     }
+    },
+    {
+     "name": "PB2 Original Powdered Peanut Butter",
+     "brand": "PB2",
+     "qty": 1,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 60,
+      "p": 6,
+      "c": 5,
+      "f": 1.5,
+      "fib": 1,
+      "na": 90
+     }
+    }
+   ],
+   "steps": [
+    "Stir the powder straight into the cup. Add 3\u20134 chocolate morsels if you have room."
+   ],
+   "buys": [
+    "oikos",
+    "pb2"
+   ]
+  },
+  {
+   "id": "cottage-queso",
+   "name": "Cottage cheese queso",
+   "kind": "hack",
+   "tags": [
+    "hacks",
+    "high-protein",
+    "under-200"
+   ],
+   "like": "queso|salsa con queso|cottage|nacho|refried",
+   "why": "Fat free cottage cheese + your fat free cheese + salsa: about half the calories of jarred queso, zero fat, and 22 g protein per batch.",
+   "items": [
+    {
+     "foodId": "73eba626oy51j",
+     "name": "Fat Free Cottage Cheese",
+     "brand": "Giant",
+     "qty": 120,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 64,
+      "p": 10.6,
+      "c": 5.3,
+      "f": 0
+     }
+    },
+    {
+     "foodId": "73eba626rruk8",
+     "name": "Fat Free Shredded Cheese",
+     "brand": "Kraft",
+     "qty": 28,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 157.1,
+      "p": 32.1,
+      "c": 7.1,
+      "f": 0
+     }
+    },
+    {
+     "name": "Salsa",
+     "qty": 1,
+     "unit": "2 tbsp",
+     "mult": 1,
+     "n": {
+      "kcal": 10,
+      "p": 0,
+      "c": 2,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Blend or mash the cottage cheese smooth, stir in the cheese and salsa.",
+    "Microwave 45 s, stir, 30 s more. Dip, or pour over a burrito bowl."
+   ],
+   "buys": [
+    "cottage",
+    "mexican"
+   ]
+  },
+  {
+   "id": "pudding-mousse",
+   "name": "Greek yogurt pudding mousse",
+   "kind": "hack",
+   "tags": [
+    "hacks",
+    "under-200"
+   ],
+   "like": "yogurt|greek|pudding|dessert",
+   "why": "Whisk a quarter box of sugar free pudding into Greek yogurt and it turns into thick mousse. A sweet fix for 100 kcal.",
+   "items": [
+    {
+     "foodId": "73eba6263r9bs",
+     "name": "Greek Strawberry Yogurt",
+     "brand": "Great Value",
+     "qty": 150,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 53.3,
+      "p": 8.7,
+      "c": 4.7,
+      "f": 0
+     }
+    },
+    {
+     "name": "Sugar Free Instant Pudding mix",
+     "brand": "Jell-O",
+     "qty": 1,
+     "unit": "1/4 box (dry)",
+     "mult": 1,
+     "n": {
+      "kcal": 20,
+      "p": 0,
+      "c": 5,
+      "f": 0
+     }
+    }
+   ],
+   "steps": [
+    "Whisk hard for 30 s, chill 5 min. Chocolate pudding + strawberry yogurt is the move."
+   ],
+   "buys": [
+    "pudding",
+    "yogurt"
+   ]
+  },
+  {
+   "id": "half-konjac-pasta",
+   "name": "Half-and-half konjac pasta",
+   "kind": "hack",
+   "tags": [
+    "hacks",
+    "konjac",
+    "swap",
+    "under-200"
+   ],
+   "like": "pasta|ziti|ravioli|noodle",
+   "why": "Can't do full konjac? Mix it 50/50 with regular pasta. Same big bowl, about half the calories, and the real pasta hides the texture.",
+   "items": [
+    {
+     "foodId": "73eba626c8rb5",
+     "name": "Pasta, boiled",
+     "qty": 70,
+     "unit": "g",
+     "mult": 0.01,
+     "n": {
+      "kcal": 133.6,
+      "p": 4.21,
+      "c": 28.43,
+      "f": 0.36
+     }
+    },
+    {
+     "name": "Konjac Fettuccine",
+     "brand": "Miracle Noodle",
+     "qty": 1,
+     "unit": "3 oz (85 g)",
+     "mult": 1,
+     "n": {
+      "kcal": 5,
+      "p": 0,
+      "c": 3,
+      "f": 0,
+      "fib": 2
+     }
+    }
+   ],
+   "steps": [
+    "Rinse konjac, dry-fry in a hot pan with no oil 3\u20134 min until it squeaks: this is the secret to no rubbery texture.",
+    "Toss with the cooked pasta and your sauce."
+   ],
+   "buys": [
+    "konjac"
+   ]
+  }
+ ],
+ "buys": {
+  "josephs": {
+   "name": "Joseph's lavash / pita",
+   "q": [
+    "joseph's lavash",
+    "joseph's pita",
+    "josephs bread"
+   ]
+  },
+  "konjac": {
+   "name": "Konjac noodles",
+   "q": [
+    "miracle noodle",
+    "shirataki",
+    "konjac noodles",
+    "it's skinny pasta"
+   ]
+  },
+  "premier": {
+   "name": "Premier Protein shakes",
+   "q": [
+    "premier protein shake",
+    "premier protein"
+   ]
+  },
+  "pudding": {
+   "name": "Jell-O sugar free pudding",
+   "q": [
+    "jell-o sugar free pudding",
+    "sugar free pudding"
+   ]
+  },
+  "oikos": {
+   "name": "Oikos Triple Zero",
+   "q": [
+    "oikos triple zero",
+    "oikos pro"
+   ]
+  },
+  "daring": {
+   "name": "Daring plant chicken",
+   "q": [
+    "daring plant chicken",
+    "daring foods"
+   ]
+  },
+  "saffron": {
+   "name": "Saffron Road meals",
+   "q": [
+    "saffron road"
+   ]
+  },
+  "fairlife": {
+   "name": "Fairlife shakes / milk",
+   "q": [
+    "fairlife",
+    "core power"
+   ]
+  },
+  "yasso": {
+   "name": "Yasso bars",
+   "q": [
+    "yasso"
+   ]
+  },
+  "pb2": {
+   "name": "PB2 / powdered peanut butter",
+   "q": [
+    "pb2",
+    "powdered peanut butter"
+   ]
+  },
+  "yogurt": {
+   "name": "Greek yogurt",
+   "q": [
+    "oikos",
+    "light fit greek",
+    "greek yogurt"
+   ]
+  },
+  "cottage": {
+   "name": "Cottage cheese",
+   "q": [
+    "cottage cheese"
+   ]
+  },
+  "eggw": {
+   "name": "Egg whites",
+   "q": [
+    "egg whites"
+   ]
+  },
+  "seafood": {
+   "name": "Shrimp, crab & tuna",
+   "q": [
+    "shrimp",
+    "imitation crab",
+    "starkist"
+   ]
+  },
+  "frozen": {
+   "name": "Frozen meals you eat",
+   "q": [
+    "michelina",
+    "smart ones",
+    "birds eye veggie"
+   ]
+  },
+  "mexican": {
+   "name": "Refried beans & cheese",
+   "q": [
+    "refried beans",
+    "kraft shredded"
+   ]
+  }
+ }
+}
