@@ -10,7 +10,8 @@ function yScale(vals, pad = 0.08, floor) {
   lo = floor ?? lo - span * pad; hi += span * pad;
   return { y: val => PAD.t + (H - PAD.t - PAD.b) * (1 - (val - lo) / (hi - lo)), lo, hi };
 }
-const axis = (s, fmt = Math.round) => [s.hi, (s.hi + s.lo) / 2, s.lo]
+const short = v => (Math.abs(v) >= 10000 ? Math.round(v / 1000) + 'k' : Math.round(v));
+const axis = (s, fmt = short) => [s.hi, (s.hi + s.lo) / 2, s.lo]
   .map(v => `<text x="${PAD.l - 4}" y="${s.y(v) + 3}" class="ax" text-anchor="end">${fmt(v)}</text><line x1="${PAD.l}" x2="${W - PAD.r}" y1="${s.y(v)}" y2="${s.y(v)}" class="grid"/>`).join('');
 const labels = dates => {
   const n = dates.length, idx = [0, Math.floor(n / 2), n - 1].filter((v, i, a) => a.indexOf(v) === i);
@@ -19,11 +20,11 @@ const labels = dates => {
 };
 
 // Bars with an optional per-day goal step line.
-export function bars(dates, vals, goals, { title = '' } = {}) {
+export function bars(dates, vals, goals, { title = '', cls = '' } = {}) {
   const n = dates.length, s = yScale([0, ...vals, ...(goals || [])], 0.05, 0);
   const bw = Math.max(2, ((W - PAD.l - PAD.r) / n) * 0.7);
   const b = vals.map((v, i) => v > 0
-    ? `<rect x="${x(i, n) - bw / 2}" y="${s.y(v)}" width="${bw}" height="${Math.max(0, s.y(0) - s.y(v))}" rx="1.5" class="${goals && v > goals[i] * 1.05 ? 'bar over' : 'bar'}"><title>${dates[i]}: ${Math.round(v)}</title></rect>` : '').join('');
+    ? `<rect x="${x(i, n) - bw / 2}" y="${s.y(v)}" width="${bw}" height="${Math.max(0, s.y(0) - s.y(v))}" rx="1.5" class="bar ${cls} ${goals && v > goals[i] * 1.05 ? 'over' : ''}"><title>${dates[i]}: ${Math.round(v)}</title></rect>` : '').join('');
   const g = goals ? `<polyline class="goal" points="${goals.map((v, i) => `${x(i, n)},${s.y(v)}`).join(' ')}"/>` : '';
   return svg(title, axis(s) + b + g + labels(dates));
 }

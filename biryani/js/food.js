@@ -32,8 +32,8 @@ function fromOFF(p) {
   const sq = +p.serving_quantity;
   const brand = Array.isArray(p.brands) ? p.brands[0] : (p.brands || '').split(',')[0];
   return {
-    name: p.product_name || 'Unnamed product', brand: brand?.trim(), barcode: p.code,
-    n: clean(n), units: gramUnits(sq > 0 ? [{ label: `serving (${p.serving_size || sq + ' g'})`, mult: sq / 100 }] : []),
+    name: shortName(p.product_name || 'Unnamed product'), brand: brand?.trim(), barcode: p.code,
+    n: clean(n), units: gramUnits(sq > 0 ? [{ label: `serving (${p.serving_size || Math.round(sq * 10) / 10 + ' g'})`, mult: sq / 100 }] : []),
     source: 'off', srcLabel: 'Open Food Facts', srcId: p.code,
   };
 }
@@ -81,7 +81,7 @@ function fromUSDA(x) {
     extra.push({ label: `${m.disseminationText} (${Math.round(m.gramWeight)} g)`, mult: m.gramWeight / 100 });
   const generic = x.dataType !== 'Branded';
   return {
-    name: titleCase(x.description), brand: x.brandName || x.brandOwner, barcode: x.gtinUpc,
+    name: shortName(titleCase(x.description)), brand: x.brandName || x.brandOwner, barcode: x.gtinUpc,
     n: clean(n), units: gramUnits(extra.slice(0, 6)),
     source: generic ? 'usda' : 'usda-b', srcLabel: generic ? `USDA ${x.dataType}` : 'USDA Branded', srcId: x.fdcId,
   };
@@ -160,6 +160,13 @@ export function preview(f) {
   return { unit: u, n: scale(f.n, u.mult) };
 }
 
+// Branded database names can be a whole ingredient list; keep the first clause.
+export function shortName(s = '') {
+  let n = s.trim();
+  if (n.length > 40 && n.includes(',')) n = n.split(',')[0].trim();
+  if (n.length > 48) n = n.slice(0, 46).replace(/\s+\S*$/, '') + '…';
+  return n;
+}
 function clean(n) {
   return Object.fromEntries(Object.entries(n).filter(([, v]) => v != null && !Number.isNaN(+v)).map(([k, v]) => [k, +v]));
 }

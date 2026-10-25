@@ -209,3 +209,70 @@ fieldset { border: 1.5px solid var(--line); background: var(--tile); }
 .selbar { border: 1.5px solid var(--line2); }
 label.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: none; margin-top: 2px; }
 .pname + .sub { margin-bottom: 10px; }
+
+/* ---- round 3: emphasis, color coding, readable chips ---- */
+:root { --steps: #15803d; --burn: #c2410c; --sleep: #4338ca; --hrv: #0f766e; --heart: #be123c; --ready: #7e22ce; --run: #c2410c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --steps: #4ade80; --burn: #fb923c; --sleep: #a5b4fc; --hrv: #5eead4; --heart: #fb7185; --ready: #d8b4fe; --run: #fb923c; } }
+:root[data-theme="dark"] { --steps: #4ade80; --burn: #fb923c; --sleep: #a5b4fc; --hrv: #5eead4; --heart: #fb7185; --ready: #d8b4fe; --run: #fb923c; }
+
+/* macro chips: number in full-contrast ink, color carried by border + letter */
+.mc { background: var(--card) !important; border-width: 2px; color: var(--ink) !important; padding: 3px 10px 3px 8px; position: relative; }
+.mc::before { content: ""; width: 8px; height: 8px; border-radius: 50%; align-self: center; margin-right: 3px; }
+.mc b { color: var(--ink); font-size: 17px; }
+.mc.c { border-color: var(--c); } .mc.c::before { background: var(--c); } .mc.c { --l: var(--c); }
+.mc.p { border-color: var(--p); } .mc.p::before { background: var(--p); }
+.mc.f { border-color: var(--f); } .mc.f::before { background: var(--f); }
+.mc.c { color: var(--c) !important; } .mc.p { color: var(--p) !important; } .mc.f { color: var(--f) !important; }
+.mc b { color: var(--ink) !important; }
+
+/* long names: two lines max */
+ul.entries .name, ul.list .name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* calorie ring as a toggle */
+.ringbtn { border: 0 !important; background: none; padding: 0; flex: none; }
+.ring .tiny { font-size: 8.5px; fill: var(--muted); font-weight: 600; }
+.goalline { font-size: 14px; color: var(--muted); margin: 2px 0 2px; } .goalline b { color: var(--ink); }
+
+/* big log buttons */
+.card > header .hkcal { font-weight: 700; color: var(--muted); }
+.bigacts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 4px; }
+.bigacts button { padding: 14px 10px; font-size: 17px; font-weight: 800; border-radius: 14px; }
+.bigacts .addBig { border: 2px solid var(--accent); color: var(--accent); background: var(--chip); }
+.bigacts button:only-child { grid-column: 1 / -1; }
+
+/* activity: color-coded tiles and rows */
+.stat { border-top: 4px solid var(--line2) !important; }
+.stat .k { font-weight: 700; }
+.stat .v { font-size: 22px; font-weight: 800; }
+.stat.steps { border-top-color: var(--steps) !important; } .stat.steps .v { color: var(--steps); }
+.stat.burn { border-top-color: var(--burn) !important; } .stat.burn .v { color: var(--burn); }
+.stat.sleep { border-top-color: var(--sleep) !important; } .stat.sleep .v { color: var(--sleep); }
+.stat.hrv { border-top-color: var(--hrv) !important; } .stat.hrv .v { color: var(--hrv); }
+.stat.heart { border-top-color: var(--heart) !important; } .stat.heart .v { color: var(--heart); }
+.stat.ready { border-top-color: var(--ready) !important; } .stat.ready .v { color: var(--ready); }
+.stat.run { border-top-color: var(--run) !important; } .stat.run .v { color: var(--run); }
+.stat.c { border-top-color: var(--c) !important; } .stat.c .v { color: var(--c); }
+.stat.p { border-top-color: var(--p) !important; } .stat.p .v { color: var(--p); }
+.stat.f { border-top-color: var(--f) !important; } .stat.f .v { color: var(--f); }
+.stat.kc-t { border-top-color: var(--accent) !important; } .stat.kc-t .v { color: var(--accent); }
+li.act { border-left: 5px solid var(--line2) !important; align-items: center; }
+li.act.run { border-left-color: var(--run) !important; } li.act.strength { border-left-color: var(--ready) !important; }
+li.act.ride { border-left-color: var(--hrv) !important; } li.act.walk { border-left-color: var(--steps) !important; } li.act.swim { border-left-color: var(--sleep) !important; }
+.aicon { font-size: 24px; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--card); border: 1.5px solid var(--line); flex: none; }
+.kcol.burn .kc { color: var(--burn); }
+
+/* charts in their metric color */
+.chart .bar.p { fill: var(--p); } .chart .bar.steps { fill: var(--steps); } .chart .bar.burn { fill: var(--burn); }
+
+/* settings */
+.hint { font-size: 14px; color: var(--muted); margin: 0 0 10px; }
+button.wide { width: 100%; padding: 13px; font-size: 16px; margin-bottom: 12px; }
+fieldset legend { font-size: 15px; font-weight: 800; padding: 2px 10px; border-radius: 99px; border: 1.5px solid var(--line2); background: var(--card); }
+fieldset.dt-rest { border-left: 5px solid var(--sleep); } fieldset.dt-run { border-left: 5px solid var(--run); } fieldset.dt-long { border-left: 5px solid var(--heart); }
+label.lc { color: var(--c); font-weight: 700; } label.lp { color: var(--p); font-weight: 700; } label.lf { color: var(--f); font-weight: 700; }
+input.ic { border-color: var(--c); } input.ip { border-color: var(--p); } input.if { border-color: var(--f); }
+.more details { border: 1.5px solid var(--line); border-radius: 12px; padding: 0 12px; margin-top: 10px; background: var(--tile); }
+.more summary { padding: 13px 0; font-weight: 700; font-size: 16px; color: var(--ink); cursor: pointer; }
+.more details[open] { padding-bottom: 12px; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.split div { min-width: 30px; font-size: 12px; }

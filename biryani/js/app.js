@@ -135,7 +135,7 @@ function macroLine(n, s = state.s) {
 }
 const kcalOf = n => r0(N.countedKcal(n, state.s.caloriesFromMacros));
 // "serving (1 pita (57g))" reads better as "1 pita (57g)" in tight rows.
-const unitText = l => (/^serving \((.*)\)$/.exec(l || '')?.[1] || l);
+const unitText = l => (/^serving \((.*)\)$/.exec(l || '')?.[1] || l || '').replace(/\d+\.\d{2,}/g, m => String(Math.round(m * 10) / 10));
 const kcalCol = n => `<div class="kcol"><div class="kc">${kcalOf(n)}</div><div class="kl">kcal</div></div>`;
 function checkBadge(n) {
   const c = N.check(n);
@@ -158,8 +158,9 @@ async function viewToday() {
   const carbs = s.netCarbs ? tot.c - tot.fib : tot.c;
   const left = goals.kcal - tot.kcal;
   const pct = Math.min(1, tot.kcal / Math.max(1, goals.kcal));
-  const ring = `<svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="fill ${left < 0 ? 'over' : ''}" stroke-dasharray="${(pct * 326.7).toFixed(1)} 326.7" transform="rotate(-90 60 60)"/>
-    <text x="60" y="58" text-anchor="middle" class="big">${r0(Math.abs(left))}</text><text x="60" y="76" text-anchor="middle" class="small">${left < 0 ? 'kcal over' : 'kcal left'}</text></svg>`;
+  const showLeft = local.get('kcalView', 'eaten') === 'left';
+  const ring = `<button class="ringbtn" id="ringBtn" aria-label="Toggle eaten / remaining"><svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="fill ${left < 0 ? 'over' : ''}" stroke-dasharray="${(pct * 326.7).toFixed(1)} 326.7" transform="rotate(-90 60 60)"/>
+    <text x="60" y="58" text-anchor="middle" class="big">${showLeft ? r0(Math.abs(left)) : r0(tot.kcal)}</text><text x="60" y="76" text-anchor="middle" class="small">${showLeft ? (left < 0 ? 'kcal over' : 'kcal left') : 'kcal eaten'}</text><text x="60" y="92" text-anchor="middle" class="tiny">tap to switch</text></svg></button>`;
   const bar = (k, label, have, goal) => {
     const w = Math.min(100, (have / Math.max(1, goal)) * 100);
     return `<div class="mbar ${k}"><div class="lbl"><span>${label}</span><span>${r0(have)} / ${r0(goal)} g</span></div><div class="track"><div style="width:${w}%" class="${have > goal * 1.08 ? 'over' : ''}"></div></div><div class="rem">${r0(goal - have)} g left</div></div>`;
@@ -171,13 +172,13 @@ async function viewToday() {
   const byMeal = s.meals.map((m, mi) => {
     const list = entries.filter(e => single || (e.meal ?? 0) === mi);
     const t = N.entryTotals(list, s.caloriesFromMacros);
-    return `<section class="card meal"><header><h3>${esc(m)}</h3><span class="muted">${list.length ? r0(t.kcal) + ' kcal' : ''}</span>
-      ${list.length && !sel ? '<button class="link selBtn">Select</button>' : ''}
-      ${mi === 0 && !sel ? '<button class="add voiceBtn" aria-label="Log by voice">🎤</button>' : ''}${sel ? '' : `<button class="add" data-meal="${mi}" aria-label="Add to ${esc(m)}">＋</button>`}</header>
+    return `<section class="card meal"><header><h3>${esc(m)}</h3><span class="hkcal">${list.length ? r0(t.kcal) + ' kcal' : ''}</span>
+      ${list.length && !sel ? '<button class="link selBtn">Select</button>' : ''}</header>
+      ${sel ? '' : `<div class="bigacts">${mi === 0 ? '<button class="primary voiceBtn">🎤 Say it</button>' : ''}<button class="addBig" data-meal="${mi}">＋ Add food</button></div>`}
     <ul class="entries ${sel ? 'selecting' : ''}">${list.map(e => {
       const n = N.scale(e.n, e.qty * e.mult);
-      return `<li data-id="${e.id}" class="${sel?.has(e.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow"><div class="name">${esc(e.name)}</div><div class="qty">${r1(e.qty)} × ${esc(unitText(e.unit))}${e.time ? ' · ' + e.time : ''}</div>${macroLine(n)}</div>${kcalCol(n)}</li>`;
-    }).join('') || (single ? '<li class="empty muted small">Tap 🎤 and say everything you ate, e.g. "chicken 8.5 oz, milk 240 grams, 2 eggs".</li>' : '')}</ul></section>`;
+      return `<li data-id="${e.id}" class="${sel?.has(e.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow"><div class="name">${esc(e.name)}</div><div class="qty">${r1(e.qty)} × ${esc(unitText(e.unit))}</div>${macroLine(n)}</div>${kcalCol(n)}</li>`;
+    }).join('') || (single ? '<li class="empty muted small">Nothing logged yet. Tap Say it and list everything, e.g. "chicken 8.5 oz, milk 240 grams, 2 eggs".</li>' : '')}</ul></section>`;
   }).join('');
   const selBar = sel ? `<div class="selbar"><span>${sel.size} selected</span><button id="selAll">All</button>
     ${state.date !== today() ? '<button id="selCopy">Copy to today</button>' : '<button id="selDup">Duplicate</button>'}
@@ -187,11 +188,11 @@ async function viewToday() {
   const garmin = `<section class="card">
     <header><h3>Activity</h3>${gday ? '' : `<span class="muted">${sync.configured() ? 'no Garmin data yet' : 'connect Garmin in Settings'}</span>`}<button class="add" id="addEx" aria-label="Add exercise">＋</button></header>
     ${gday ? `<div class="stats">
-      ${stat('Steps', gday.steps?.toLocaleString())}${stat('Active kcal', gday.activeKcal)}${stat('Sleep', gday.sleepSec ? r1(gday.sleepSec / 3600) + ' h' : null, gday.sleepScore ? 'score ' + gday.sleepScore : '')}
-      ${stat('HRV', gday.hrv, gday.hrvStatus?.toLowerCase())}${stat('RHR', gday.rhr)}${stat('Readiness', gday.readiness)}</div>` : ''}
-    <ul class="entries">${acts.map(a => `<li ${a.manual ? `data-ex="${a.id}"` : ''}><div class="grow"><div class="name">${esc(a.name)}</div><div class="sub">${[
+      ${stat('Steps', gday.steps?.toLocaleString(), '', 'steps', '👟')}${stat('Burned', gday.activeKcal && r0(gday.activeKcal), '', 'burn', '🔥')}${stat('Sleep', gday.sleepSec ? r1(gday.sleepSec / 3600) + ' h' : null, gday.sleepScore ? 'score ' + gday.sleepScore : '', 'sleep', '😴')}
+      ${stat('HRV', gday.hrv, gday.hrvStatus?.toLowerCase(), 'hrv', '💓')}${stat('Rest HR', gday.rhr, '', 'heart', '❤️')}${stat('Readiness', gday.readiness, '', 'ready', '⚡')}</div>` : ''}
+    <ul class="entries acts">${acts.map(a => `<li class="act ${actKind(a)}" ${a.manual ? `data-ex="${a.id}"` : ''}><span class="aicon">${ACT_ICON[actKind(a)]}</span><div class="grow"><div class="name">${esc(a.name)}</div><div class="qty">${[
       a.distance ? r1(a.distance / 1609.34) + ' mi' : '', a.duration ? Math.round(a.duration / 60) + ' min' : a.min ? a.min + ' min' : '',
-      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div></div><div class="right">${r0(a.kcal)} kcal</div></li>`).join('')}</ul></section>`;
+      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div></div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul></section>`;
 
   return `
   <div class="datebar"><button id="prev" aria-label="Previous day">‹</button><button id="dateLbl">${fmtDate(date)}</button><button id="next" aria-label="Next day">›</button></div>
@@ -199,7 +200,7 @@ async function viewToday() {
     ${ring}
     <div class="grow">
       <button class="chip" id="dayType" title="Tap to change">${esc(dtLabel)} day${goals.auto ? ' · auto' : ''}</button>
-      <div class="muted small">${r0(tot.kcal)} eaten · goal ${r0(goals.kcal)}${goals.eatBack ? ` (+${goals.eatBack} exercise)` : ''}</div>
+      <div class="goalline">Goal <b>${r0(goals.kcal)}</b> kcal${goals.eatBack ? ` (+${goals.eatBack} exercise)` : ''} · <b>${r0(left)}</b> left</div>
       ${bar('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${bar('p', 'Protein', tot.p, goals.p)}${bar('f', 'Fat', tot.f, goals.f)}
     </div>
   </section>
@@ -208,7 +209,9 @@ async function viewToday() {
   ${garmin}
   <section class="card row"><h3>Weight</h3><input id="weight" type="number" inputmode="decimal" step="0.1" placeholder="lb" value="${w ?? ''}"><span class="muted small">${!weights.find(x => x.date === date) && gday?.weightLb ? 'from Garmin' : ''}</span></section>`;
 }
-const stat = (k, v, sub = '') => v == null || v === '' ? '' : `<div class="stat"><div class="v">${esc(v)}</div><div class="k">${k}${sub ? ' · ' + esc(sub) : ''}</div></div>`;
+const stat = (k, v, sub = '', cls = '', icon = '') => v == null || v === '' ? '' : `<div class="stat ${cls}"><div class="k">${icon ? icon + ' ' : ''}${k}</div><div class="v">${esc(v)}</div>${sub ? `<div class="k">${esc(sub)}</div>` : ''}</div>`;
+const ACT_ICON = { run: '🏃', strength: '🏋️', ride: '🚴', walk: '🚶', swim: '🏊', other: '⚡' };
+const actKind = a => { const t = a.type || ''; return /run|track/.test(t) ? 'run' : /strength|weight/.test(t) ? 'strength' : /cycl|bik|ride/.test(t) ? 'ride' : /walk|hik/.test(t) ? 'walk' : /swim/.test(t) ? 'swim' : 'other'; };
 function pace(sec, m) { const p = sec / (m / 1609.34); return `${Math.floor(p / 60)}:${String(Math.round(p % 60)).padStart(2, '0')}/mi`; }
 
 const bind = {};
@@ -222,7 +225,8 @@ bind.today = root => {
     await db.put('days', { id: state.date, dayType: next });
     render();
   };
-  $$('.meal .add[data-meal]', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
+  $$('.meal .addBig[data-meal]', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
+  $('#ringBtn', root).onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); };
   $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
   $$('.selBtn', root).forEach(b => (b.onclick = () => { state.sel = new Set(); render(); }));
   $$('.meal li[data-id]', root).forEach(li => (li.onclick = async () => {
@@ -770,27 +774,27 @@ async function viewTrends() {
   const w = rows.map(r => r.weight ?? NaN), wt = ema(w);
   const wFirst = wt.find(Number.isFinite), wLast = [...wt].reverse().find(Number.isFinite);
   const runs = rows.filter(r => r.type !== 'rest').length;
-  const card = (k, v, sub = '') => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div>${sub ? `<div class="k">${sub}</div>` : ''}</div>`;
+  const card = (k, v, sub = '', cls = '') => `<div class="stat ${cls}"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="k">${sub}</div>` : ''}</div>`;
   const steps = rows.map(r => r.gd?.steps || 0);
   return `<div class="seg" id="range">${[7, 30, 90, 180].map(n => `<button data-n="${n}" class="${n === range ? 'on' : ''}">${n}d</button>`).join('')}</div>
   <section class="card"><div class="stats">
-    ${card('Avg kcal', r0(avg('kcal')), 'goal ' + r0(avgGoal('kcal')))}${card('Avg carbs', r0(avg('c')) + ' g', 'goal ' + r0(avgGoal('c')))}
-    ${card('Avg protein', r0(avg('p')) + ' g', 'goal ' + r0(avgGoal('p')))}${card('Avg fat', r0(avg('f')) + ' g', 'goal ' + r0(avgGoal('f')))}
-    ${card('On target', logged.length ? Math.round((hit / logged.length) * 100) + '%' : '–', `${logged.length}/${range} days logged`)}
-    ${card('Weight trend', wFirst != null ? (wLast - wFirst >= 0 ? '+' : '') + r1(wLast - wFirst) + ' lb' : '–', wLast != null ? 'now ' + r1(wLast) : '')}
-    ${card('Measured TDEE', tdee ? r0(tdee) : '–', tdee ? 'from logs + weight' : 'needs 14+ days')}${card('Run days', runs, 'of ' + range)}
+    ${card('Avg kcal', r0(avg('kcal')), 'goal ' + r0(avgGoal('kcal')), 'kc-t')}${card('Avg carbs', r0(avg('c')) + ' g', 'goal ' + r0(avgGoal('c')), 'c')}
+    ${card('Avg protein', r0(avg('p')) + ' g', 'goal ' + r0(avgGoal('p')), 'p')}${card('Avg fat', r0(avg('f')) + ' g', 'goal ' + r0(avgGoal('f')), 'f')}
+    ${card('On target', logged.length ? Math.round((hit / logged.length) * 100) + '%' : '–', `${logged.length}/${range} days logged`, 'steps')}
+    ${card('Weight trend', wFirst != null ? (wLast - wFirst >= 0 ? '+' : '') + r1(wLast - wFirst) + ' lb' : '–', wLast != null ? 'now ' + r1(wLast) : '', 'sleep')}
+    ${card('Measured TDEE', tdee ? r0(tdee) : '–', tdee ? 'from logs + weight' : 'needs 14+ days', 'burn')}${card('Run days', runs, 'of ' + range, 'run')}
   </div></section>
-  <section class="card"><h3>Calories vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.kcal), rows.map(r => r.goal.kcal), { title: 'Calories vs goal' })}</section>
-  <section class="card"><h3>Protein vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.p), rows.map(r => r.goal.p), { title: 'Protein' })}</section>
-  <section class="card"><h3>Weight</h3>${w.some(Number.isFinite) ? line(rows.map(r => r.date), w, { trend: wt, title: 'Weight', fmt: r1 }) : '<p class="muted">Log weight on the Today tab (Garmin scale weigh-ins show up too).</p>'}</section>
-  ${steps.some(Boolean) ? `<section class="card"><h3>Steps</h3>${bars(rows.map(r => r.date), steps, null, { title: 'Steps' })}</section>
-  <section class="card"><h3>Active calories (Garmin)</h3>${bars(rows.map(r => r.date), rows.map(r => r.gd?.activeKcal || 0), null, { title: 'Active kcal' })}</section>
-  <section class="card"><h3>Sleep (h)</h3>${line(rows.map(r => r.date), rows.map(r => (r.gd?.sleepSec ? r.gd.sleepSec / 3600 : NaN)), { title: 'Sleep', fmt: r1 })}</section>` : ''}
-  <section class="card"><h3>Macro split (avg)</h3>${split(avg('p'), avg('c'), avg('f'))}</section>`;
+  <section class="card"><h3>🔥 Calories vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.kcal), rows.map(r => r.goal.kcal), { title: 'Calories vs goal' })}</section>
+  <section class="card"><h3>💪 Protein vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.p), rows.map(r => r.goal.p), { title: 'Protein', cls: 'p' })}</section>
+  <section class="card"><h3>⚖️ Weight</h3>${w.some(Number.isFinite) ? line(rows.map(r => r.date), w, { trend: wt, title: 'Weight', fmt: r1 }) : '<p class="muted">Log weight on the Today tab (Garmin scale weigh-ins show up too).</p>'}</section>
+  ${steps.some(Boolean) ? `<section class="card"><h3>👟 Steps</h3>${bars(rows.map(r => r.date), steps, null, { title: 'Steps', cls: 'steps' })}</section>
+  <section class="card"><h3>🔥 Active calories (Garmin)</h3>${bars(rows.map(r => r.date), rows.map(r => r.gd?.activeKcal || 0), null, { title: 'Active kcal', cls: 'burn' })}</section>
+  <section class="card"><h3>😴 Sleep (hours)</h3>${line(rows.map(r => r.date), rows.map(r => (r.gd?.sleepSec ? r.gd.sleepSec / 3600 : NaN)), { title: 'Sleep', fmt: r1 })}</section>` : ''}
+  <section class="card"><h3>🥧 Macro split (avg)</h3>${split(avg('p'), avg('c'), avg('f'))}</section>`;
 }
 function split(p, c, f) {
   const k = { p: p * 4, c: c * 4, f: f * 9 }, t = k.p + k.c + k.f || 1;
-  return `<div class="split">${['c', 'p', 'f'].map(x => `<div class="${x}" style="flex:${k[x] / t}">${x.toUpperCase()} ${Math.round((k[x] / t) * 100)}%</div>`).join('')}</div>`;
+  return `<div class="split">${['c', 'p', 'f'].map(x => `<div class="${x}" style="flex:${k[x] / t}">${k[x] / t >= 0.14 ? x.toUpperCase() + ' ' : ''}${Math.round((k[x] / t) * 100)}%</div>`).join('')}</div>`;
 }
 bind.trends = root => $$('#range button', root).forEach(b => (b.onclick = () => { local.set('range', +b.dataset.n); render(); }));
 
@@ -800,21 +804,21 @@ async function viewSettings() {
   const meta = await sync.garminMeta().catch(() => null);
   const dt = (k) => {
     const d = s.dayTypes[k], g = N.goalGrams(d), mk = r0(4 * g.p + 4 * g.c + 9 * g.f);
-    return `<fieldset data-dt="${k}"><legend>${esc(d.label)} day</legend>
+    return `<fieldset data-dt="${k}" class="dt-${k}"><legend>${{ rest: '🛋️', run: '🏃', long: '🏁' }[k]} ${esc(d.label)} day</legend>
       <div class="grid2"><label>Calories<input name="kcal" type="number" inputmode="numeric" value="${d.kcal}"></label>
       <label>Macros by<select name="mode"><option value="g" ${d.mode === 'g' ? 'selected' : ''}>grams</option><option value="%" ${d.mode === '%' ? 'selected' : ''}>percent</option></select></label></div>
-      <div class="grid3"><label>Carbs ${d.mode === '%' ? '%' : 'g'}<input name="c" type="number" step="any" inputmode="decimal" value="${d.c}"></label>
-      <label>Protein ${d.mode === '%' ? '%' : 'g'}<input name="p" type="number" step="any" inputmode="decimal" value="${d.p}"></label>
-      <label>Fat ${d.mode === '%' ? '%' : 'g'}<input name="f" type="number" step="any" inputmode="decimal" value="${d.f}"></label></div>
+      <div class="grid3"><label class="lc">Carbs ${d.mode === '%' ? '%' : 'g'}<input class="ic" name="c" type="number" step="any" inputmode="decimal" value="${d.c}"></label>
+      <label class="lp">Protein ${d.mode === '%' ? '%' : 'g'}<input class="ip" name="p" type="number" step="any" inputmode="decimal" value="${d.p}"></label>
+      <label class="lf">Fat ${d.mode === '%' ? '%' : 'g'}<input class="if" name="f" type="number" step="any" inputmode="decimal" value="${d.f}"></label></div>
       <p class="small ${Math.abs(mk - d.kcal) > 30 ? 'warn' : 'muted'}">Macros add up to ${mk} kcal${Math.abs(mk - d.kcal) > 30 ? ` (calorie goal is ${d.kcal})` : ''}.</p></fieldset>`;
   };
   return `
-  <section class="card"><h3>Goals</h3>
-    <p class="muted small">Each day picks a target on its own: <b>long run</b> if Garmin shows a run of ${s.longRunMi}+ mi, <b>run</b> for any other run or workout, otherwise <b>rest</b>. Tap the chip on Today to override a day.</p>
+  <section class="card"><h3>🎯 Daily goals</h3>
+    <p class="hint">Picked from Garmin each day (long run = ${s.longRunMi}+ mi). Tap the chip on Today to change.</p>
+    <button id="calc" class="primary wide">Recommend from my stats</button>
     <form id="dts">${dt('rest')}${dt('run')}${dt('long')}</form>
-    <button id="calc" class="primary">Recommend from my stats</button>
   </section>
-  <section class="card"><h3>Profile</h3><form id="prof" class="form">
+  <section class="card"><h3>👤 Profile</h3><form id="prof" class="form">
     <div class="grid3"><label>Sex<select name="sex"><option value="male" ${p.sex === 'male' ? 'selected' : ''}>male</option><option value="female" ${p.sex === 'female' ? 'selected' : ''}>female</option></select></label>
     <label>Age<input name="age" type="number" value="${p.age}"></label><label>Height in<input name="heightIn" type="number" step="0.5" value="${p.heightIn}"></label></div>
     <div class="grid3"><label>Weight lb<input name="weightLb" type="number" step="0.1" value="${p.weightLb}"></label>
@@ -822,27 +826,29 @@ async function viewSettings() {
     <label>lb / week<input name="rate" type="number" step="0.25" value="${s.goal.rateLbWk}"></label></div>
     <label>Daily movement outside workouts<select name="neat">${[[1.2, 'desk job, little walking'], [1.3, 'some walking'], [1.4, 'on your feet a lot'], [1.5, 'physical job']].map(([v, l]) => `<option value="${v}" ${+p.neat === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
   </form></section>
-  <section class="card"><h3>Tracking</h3><form id="opts" class="form">
+  <section class="card more"><h3>⚙️ More settings</h3>
+  <details><summary>Tracking options</summary><form id="opts" class="form">
     <label class="check"><input type="checkbox" name="caloriesFromMacros" ${s.caloriesFromMacros ? 'checked' : ''}> Count calories from macros (4/4/9). Keeps totals consistent when labels disagree.</label>
     <label class="check"><input type="checkbox" name="netCarbs" ${s.netCarbs ? 'checked' : ''}> Show net carbs (carbs − fiber)</label>
     <div class="grid2"><label>Long run at (mi)<input name="longRunMi" type="number" step="0.5" value="${s.longRunMi}"></label>
     <label>Eat back Garmin exercise kcal %<input name="eatBackPct" type="number" min="0" max="100" step="5" value="${s.eatBackPct}"></label></div>
     <label>Meals (one name = a single running list for the day; commas = separate meals)<input name="meals" value="${esc(s.meals.join(', '))}"></label>
-  </form></section>
-  <section class="card"><h3>Sync & Garmin</h3><form id="gh" class="form">
+  </form></details>
+  <details><summary>Sync & Garmin</summary><form id="gh" class="form">
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
     <div class="grid2"><label>Repo<input name="ghRepo" value="${esc(local.get('ghRepo', 'safaangit/safaan-personal'))}"></label><label>Branch<input name="ghBranch" value="${esc(local.get('ghBranch', ''))}" placeholder="repo default"></label></div>
     <p class="muted small">Food logs sync to <code>data/fuel/</code>. Garmin data comes from the nightly workflow into <code>data/garmin/</code>${meta?.lastSync ? `, last pulled ${new Date(meta.lastSync).toLocaleString()}${meta.backfillDone ? '' : ` (history back to ${meta.earliest || '…'}, still backfilling)`}` : ''}.</p>
     <div class="actions"><button type="button" id="syncNow">Sync now</button><button type="button" id="pullG">Pull Garmin now</button></div>
-  </form></section>
-  <section class="card"><h3>Food data & label reader</h3><form id="keys" class="form">
+  </form></details>
+  <details><summary>Food data & keys</summary><form id="keys" class="form">
     <label>USDA API key (free at api.data.gov)<input name="usdaKey" autocomplete="off" value="${esc(local.get('usdaKey', ''))}" placeholder="DEMO_KEY is rate-limited"></label>
     <details><summary class="small">Optional: Claude API label reader (paid, not covered by Pro)</summary>
     <label>Anthropic API key<input name="anthropicKey" type="password" autocomplete="off" value="${esc(local.get('anthropicKey', ''))}" placeholder="leave empty to stay free"></label>
     <label>Claude model<input name="claudeModel" value="${esc(local.get('claudeModel', 'claude-opus-5-5'))}"></label></details>
     <p class="muted small">Keys stay on this phone and never sync to GitHub. With no Anthropic key, nothing here can cost money.</p>
-  </form></section>
-  <section class="card"><h3>Data</h3><div class="actions"><button id="export">Export everything (JSON)</button></div></section>`;
+  </form></details>
+  <details><summary>Export data</summary><div class="actions"><button id="export">Export everything (JSON)</button></div></details>
+  </section>`;
 }
 bind.settings = root => {
   const s = state.s;
