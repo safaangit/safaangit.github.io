@@ -133,6 +133,7 @@ async function setHidden(keys, hide) {
   await db.saveSettings(state.s);
 }
 
+const tagLabel = t => (t === 'creami' ? 'Creami' : t === 'prep' ? 'Meal prep' : 'Recipe');
 // Recipe nutrition per serving, resolved through nested recipes.
 async function recipeFoods() {
   const recipes = await db.all('recipes'), foods = new Map((await db.all('foods')).map(f => [f.id, f]));
@@ -147,7 +148,7 @@ async function recipeFoods() {
     }
     return N.scale(t, 1 / Math.max(1, +r.servings || 1));
   };
-  return recipes.map(r => ({ id: r.id, recipeId: r.id, name: r.name, tag: r.tag, n: per(r), units: [{ label: r.servingLabel || 'serving', mult: 1 }], source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : 'Recipe', recipe: r }));
+  return recipes.map(r => ({ id: r.id, recipeId: r.id, name: r.name, tag: r.tag, n: per(r), units: [{ label: r.servingLabel || 'serving', mult: 1 }], source: 'recipe', srcLabel: tagLabel(r.tag), recipe: r }));
 }
 
 function macroLine(n, s = state.s) {
@@ -192,6 +193,7 @@ async function viewToday() {
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
 
   const single = s.meals.length === 1, sel = state.sel;
+  const preps = (await prepStatus()).map(x => `<button class="prepbtn" data-prep="${x.id}">${ico('plusc')}<span class="grow">${esc(x.name)}</span><span class="small">${x.left > 0 ? `${x.left} of ${x.total} left` : 'all eaten'} · ${kcalOf(x.n)} kcal</span></button>`).join('');
   const byMeal = s.meals.map((m, mi) => {
     const list = entries.filter(e => single || (e.meal ?? 0) === mi);
     const t = N.entryTotals(list, s.caloriesFromMacros), tc = s.netCarbs ? t.c - t.fib : t.c;
@@ -207,6 +209,7 @@ async function viewToday() {
       return `<li data-id="${e.id}" class="${sel?.has(e.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow">${row2(esc(e.name), n, esc([e.brand, qtyText(e.qty, e.unit)].filter(Boolean).join(', ')))}</div></li>`;
     }).join('') || (single ? '<li class="empty small">Nothing logged yet. Tap Say it and list everything, e.g. "chicken 8.5 oz, milk 240 grams, 2 eggs".</li>' : '')}</ul>
     ${list.length ? `<div class="mtot">${mt('c', tc, goals.c, s.netCarbs ? 'Net carbs' : 'Carbs')}${mt('p', t.p, goals.p, 'Protein')}${mt('f', t.f, goals.f, 'Fat')}${mt('k', t.kcal, goals.kcal, 'Calories')}</div>` : ''}
+    ${sel || mi !== 0 ? '' : preps}
     ${sel ? '' : `<div class="bigacts">${mi === 0 ? `<button class="voiceBtn">${ico('mic')}Say it</button>` : ''}<button class="addBig" data-meal="${mi}">${ico('plusc')}Add food</button></div>`}</section>`;
   }).join('');
   const selBar = sel ? `<div class="selbar"><span>${sel.size} selected</span><button id="selAll">All</button>
@@ -257,6 +260,10 @@ bind.today = root => {
   $('#fitBtn', root)?.addEventListener('click', () => openFits());
   $('#kcalBtn', root).onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); };
   $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
+  $$('.prepbtn', root).forEach(b => (b.onclick = async () => {
+    const f = (await recipeFoods()).find(x => x.id === b.dataset.prep); if (!f) return;
+    await logEntry({ name: f.name, recipeId: f.recipeId, qty: 1, unit: f.units[0].label, mult: 1, n: f.n, meal: 0 });
+  }));
   $$('.selBtn', root).forEach(b => (b.onclick = () => { state.sel = new Set(); render(); }));
   $$('.meal li[data-id]', root).forEach(li => (li.onclick = async () => {
     if (state.sel) { state.sel.has(li.dataset.id) ? state.sel.delete(li.dataset.id) : state.sel.add(li.dataset.id); return render(); }
@@ -465,6 +472,18 @@ async function openFits() {
       : '<p class="muted">Nothing in your foods fits what\'s left. A protein shake or egg whites usually does.</p>'}
     <p class="muted small" style="margin-top:12px">Ranked by how much protein it covers and how well it uses your calories without going over. Tap one to log it.</p>`, { title: 'What fits' });
   $$('li.food', b).forEach(li => (li.onclick = () => { const x = top[+li.dataset.i]; openPortion(x.f, { meal: 0, qty: x.q }); }));
+}
+
+// Meal preps with how many portions are left since the prep's week started.
+async function prepStatus() {
+  const preps = (await recipeFoods()).filter(r => r.tag === 'prep');
+  if (!preps.length) return [];
+  const logs = (await Promise.all([...new Set([monthOf(today()), monthOf(addDays(today(), -10))])].map(m => db.all('log/' + m)))).flat();
+  return preps.map(p => {
+    const since = p.recipe.weekStart || '0000', total = Math.round(+p.recipe.servings || 1);
+    const used = logs.filter(e => e.recipeId === p.id && e.date >= since).reduce((t, e) => t + (+e.qty || 0) * (+e.mult || 1), 0);
+    return { id: p.id, name: p.name, n: p.n, total, left: Math.max(0, Math.round((total - used) * 10) / 10) };
+  });
 }
 
 function openQuick(meal) {
@@ -831,26 +850,28 @@ bind.foods = root => {
 
 async function viewRecipes() {
   const rs = await recipeFoods();
-  const row = (r) => `<li data-id="${r.id}"><div class="grow"><div class="name">${esc(r.name)} <span class="badge src-recipe">${r.tag === 'creami' ? 'Creami' : 'Recipe'}</span></div>
+  const row = (r) => `<li data-id="${r.id}"><div class="grow"><div class="name">${esc(r.name)} <span class="badge src-recipe">${tagLabel(r.tag)}</span></div>
     <div class="qty">per ${esc(r.units[0].label)}</div>${macroLine(r.n)}</div>${kcalCol(r.n)}</li>`;
-  return `<div class="tools top"><button id="newR" class="primary">＋ Recipe</button><button id="newC">＋ Creami pint</button></div>
+  return `<div class="tools top"><button id="newR" class="primary">＋ Recipe</button><button id="newC">＋ Creami pint</button><button id="newP">＋ Meal prep</button></div>
     ${rs.length ? `<ul class="list card">${rs.sort((a, b) => a.name.localeCompare(b.name)).map(row).join('')}</ul>` : '<p class="muted">No recipes yet. Ingredients can be your foods, search results, or other recipes.</p>'}`;
 }
 bind.recipes = root => {
   $('#newR', root).onclick = () => openRecipe({ name: '', servings: 1, servingLabel: 'serving', items: [] });
   $('#newC', root).onclick = () => openRecipe({ name: 'Creami pint', tag: 'creami', servings: 1, servingLabel: 'pint', items: [] });
+  $('#newP', root).onclick = () => openRecipe({ name: 'Lunch prep', tag: 'prep', servings: 5, servingLabel: 'portion', items: [], weekStart: today() });
   $$('li[data-id]', root).forEach(li => (li.onclick = async () => openRecipe(await db.get('recipes', li.dataset.id))));
 };
 function openRecipe(r) {
   r = structuredClone(r);
   const b = sheet(`<form id="rf" class="form">
     <label>Name<input name="name" required value="${esc(r.name)}"></label>
-    <div class="grid3"><label>Type<select name="tag"><option value="">Recipe</option><option value="creami" ${r.tag === 'creami' ? 'selected' : ''}>Creami</option></select></label>
+    <div class="grid3"><label>Type<select name="tag"><option value="">Recipe</option><option value="creami" ${r.tag === 'creami' ? 'selected' : ''}>Creami</option><option value="prep" ${r.tag === 'prep' ? 'selected' : ''}>Meal prep</option></select></label>
     <label>Servings<input name="servings" type="number" step="any" inputmode="decimal" value="${r.servings}"></label><label>Serving name<input name="servingLabel" value="${esc(r.servingLabel)}"></label></div>
+    ${r.tag === 'prep' ? `<p class="hint">One prep you reuse every week. Days you already logged keep their numbers, so on Sunday just change the amounts${r.id ? ' and tap New week' : ''}. Each day, tap it on Today to log a portion.</p>` : ''}
     <h4>Ingredients</h4><ul class="list" id="items"></ul>
     <button type="button" id="addI">＋ Ingredient</button>
     <div id="rtot" class="live"></div>
-    <div class="actions">${r.id ? '<button type="button" class="danger" id="delR">Delete</button><button type="button" id="logR">Log a serving</button>' : ''}<button class="primary">Save</button></div></form>`, { title: r.id ? 'Edit recipe' : 'New recipe' });
+    <div class="actions">${r.id ? `<button type="button" class="danger" id="delR">Delete</button><button type="button" id="logR">Log a serving</button>${r.tag === 'prep' ? '<button type="button" id="newWeek">New week</button>' : ''}` : ''}<button class="primary">Save</button></div></form>`, { title: r.id ? (r.tag === 'prep' ? 'Edit meal prep' : 'Edit recipe') : r.tag === 'prep' ? 'New meal prep' : 'New recipe' });
   const form = $('#rf', b);
   const draw = () => {
     $('#items', b).innerHTML = r.items.map((it, i) => {
@@ -873,7 +894,9 @@ function openRecipe(r) {
     openAdd(0, { pick: it => { if (it.recipeId && it.recipeId === r.id) return toast("A recipe can't contain itself"); r.items.push(it); back(); } });
   };
   const readForm = () => ({ name: form.name.value, tag: form.tag.value || undefined, servings: +form.servings.value || 1, servingLabel: form.servingLabel.value || 'serving' });
-  form.onsubmit = async e => { e.preventDefault(); await db.put('recipes', { ...r, ...readForm() }); closeSheet(); toast('Recipe saved'); render(); };
+  form.onsubmit = async e => { e.preventDefault(); const x = { ...r, ...readForm() }; if (x.tag === 'prep') x.weekStart ??= today(); await db.put('recipes', x); closeSheet(); toast('Saved'); render(); };
+  // New week: same ingredients, amounts stay editable here, and the portion count restarts.
+  $('#newWeek', b)?.addEventListener('click', async () => { await db.put('recipes', { ...r, ...readForm(), weekStart: today() }); closeSheet(); toast('New week started. Past days keep their numbers.'); render(); });
   if (r.id) {
     $('#delR', b).onclick = async () => { await db.remove('recipes', r.id); closeSheet(); render(); };
     $('#logR', b).onclick = async () => {
@@ -970,7 +993,7 @@ async function viewSettings() {
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
     <div class="grid2"><label>Repo<input name="ghRepo" value="${esc(local.get('ghRepo', 'safaangit/safaan-personal'))}"></label><label>Branch<input name="ghBranch" value="${esc(local.get('ghBranch', ''))}" placeholder="repo default"></label></div>
     <p class="muted small">Food logs sync to <code>data/fuel/</code>. Garmin data comes from the nightly workflow into <code>data/garmin/</code>${meta?.lastSync ? `, last pulled ${new Date(meta.lastSync).toLocaleString()}${meta.backfillDone ? '' : ` (history back to ${meta.earliest || '…'}, still backfilling)`}` : ''}.</p>
-    <div class="actions"><button type="button" id="syncNow">Sync now</button><button type="button" id="pullG">Pull Garmin now</button></div>
+    <div class="actions"><button type="button" id="syncNow">Sync now</button><button type="button" id="pullG" ${s.garminPulledOn === today() ? 'disabled' : ''}>${s.garminPulledOn === today() ? 'Pulled Garmin today' : 'Pull Garmin now (1/day)'}</button></div>
   </form></details>
   <details><summary>Food data & keys</summary><form id="keys" class="form">
     <label>USDA API key (free at api.data.gov)<input name="usdaKey" autocomplete="off" value="${esc(local.get('usdaKey', ''))}" placeholder="DEMO_KEY is rate-limited"></label>
@@ -1034,7 +1057,9 @@ bind.settings = root => {
     catch (e) { syncBadge('sync failed'); $('#sync').className = 'warn'; toast(e.message); }
   };
   $('#pullG', root).onclick = async () => {
-    try { await sync.runGarminSync(); toast('Garmin sync started. Data lands in a few minutes.'); }
+    // Capped at one manual pull a day (synced, so it holds across devices); auto runs at 8am and 8pm.
+    if (s.garminPulledOn === today()) return toast('Already pulled today. Next auto sync is 8am or 8pm.');
+    try { await sync.runGarminSync(); s.garminPulledOn = today(); await db.saveSettings(s); toast('Garmin sync started. Data lands in a few minutes.'); render(); }
     catch (e) { toast(e.status === 403 ? 'Token needs Actions: read & write' : e.message); }
   };
   $('#calc', root).onclick = () => openRecommend();

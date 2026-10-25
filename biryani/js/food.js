@@ -141,7 +141,7 @@ export async function byBarcode(code) {
 // Text: generic USDA data is the most accurate for whole foods; brands come from USDA Branded + OFF.
 export async function search(q, { recipes = [] } = {}) {
   const ql = q.trim();
-  const own = [...(await mine()), ...recipes.map(r => ({ ...r, source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : 'Recipe' }))]
+  const own = [...(await mine()), ...recipes.map(r => ({ ...r, source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : r.tag === 'prep' ? 'Meal prep' : 'Recipe' }))]
     .filter(f => relevance(ql, f) >= 0.99);
   const [gen, br, off] = await Promise.all([
     usdaSearch(ql, 'Foundation,SR Legacy,Survey (FNDDS)'),
