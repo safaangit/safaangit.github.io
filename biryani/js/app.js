@@ -6,7 +6,7 @@ import * as food from './food.js';
 import * as scan from './scan.js';
 import * as sync from './sync.js';
 import { goalsFor, recommend, measuredTdee, autoDayType } from './goals.js';
-import { bars, line, ema } from './charts.js';
+import { bars, line, ema, bindCharts } from './charts.js';
 import * as voice from './voice.js';
 import * as train from './trainview.js';
 
@@ -59,6 +59,7 @@ async function render() {
   if (state.tab === 'training') train.bind(main, state.s, ui);
   bind[state.tab]?.(main);
   $('#gear').classList.toggle('on', state.tab === 'settings');
+  $('#trendsBtn').classList.toggle('on', state.tab === 'trends');
   syncBadge();
 }
 function syncBadge(msg) {
@@ -1159,50 +1160,105 @@ async function openAsk({ place = '', cuisine = '', photo = false, near = false }
 }
 
 // ---------- Trends ----------
-async function viewTrends() {
-  const s = state.s, range = local.get('range', 30);
-  const dates = Array.from({ length: range }, (_, i) => addDays(today(), i - range + 1));
+// Garmin-style: one metric at a time, a period you can page through, tap a bar for that day.
+const TR_METRICS = [['kcal', 'Calories'], ['p', 'Protein'], ['weight', 'Weight'], ['steps', 'Steps'], ['sleep', 'Sleep']];
+const TR_RANGES = [[7, '7d'], [28, '4w'], [91, '3m'], [182, '6m']];
+const fmtLong = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtShort = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const avgOf = a => { const v = a.filter(x => Number.isFinite(x) && x > 0); return v.length ? v.reduce((t, x) => t + x, 0) / v.length : NaN; };
+async function trendData() {
+  const s = state.s, range = TR_RANGES.some(r => r[0] === local.get('range')) ? local.get('range') : 28;
+  const end = state.trEnd && state.trEnd < today() ? state.trEnd : today();
+  const dates = Array.from({ length: range }, (_, i) => addDays(end, i - range + 1));
   const months = [...new Set(dates.map(monthOf))];
   const logs = (await Promise.all(months.map(m => db.all('log/' + m)))).flat();
   const garmin = Object.assign({}, ...(await Promise.all(months.map(m => sync.garminMonth(m).catch(() => ({ days: {} }))))).map(g => g.days || {}));
   const [weights, daysRec] = await Promise.all([db.all('weights'), db.all('days')]);
   const wBy = new Map(weights.map(w => [w.date, w.lb])), dtBy = new Map(daysRec.map(d => [d.id, d.dayType]));
   const rows = dates.map(d => {
-    const t = N.entryTotals(logs.filter(e => e.date === d), s.caloriesFromMacros);
-    const g = goalsFor(s, garmin[d], dtBy.get(d));
-    return { date: d, ...t, goal: g, type: g.type, weight: wBy.get(d) ?? garmin[d]?.weightLb, gd: garmin[d] };
+    const t = N.entryTotals(logs.filter(e => e.date === d), s.caloriesFromMacros), gd = garmin[d];
+    const runMi = (gd?.activities || []).filter(a => /run|track/.test(a.type || '')).reduce((x, a) => x + (a.distance || 0) / 1609.34, 0);
+    return { date: d, ...t, goal: goalsFor(s, gd, dtBy.get(d)), weight: wBy.get(d) ?? gd?.weightLb, steps: gd?.steps || 0, sleep: gd?.sleepSec ? gd.sleepSec / 3600 : NaN, runMi };
   });
-  const logged = rows.filter(r => r.kcal > 0);
-  const avg = k => (logged.length ? logged.reduce((t, r) => t + r[k], 0) / logged.length : 0);
-  const avgGoal = k => (logged.length ? logged.reduce((t, r) => t + r.goal[k], 0) / logged.length : 0);
-  const hit = logged.filter(r => Math.abs(r.kcal - r.goal.kcal) <= r.goal.kcal * 0.1 && r.p >= r.goal.p * 0.9).length;
-  const tdee = measuredTdee(rows.map(r => ({ kcal: r.kcal, weight: r.weight })));
-  const w = rows.map(r => r.weight ?? NaN), wt = ema(w);
-  const wFirst = wt.find(Number.isFinite), wLast = [...wt].reverse().find(Number.isFinite);
-  const runs = rows.filter(r => r.type !== 'rest').length; // days with real exercise
-  const card = (k, v, sub = '', cls = '') => `<div class="stat ${cls}"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="k">${sub}</div>` : ''}</div>`;
-  const steps = rows.map(r => r.gd?.steps || 0);
-  return `<div class="seg" id="range">${[7, 30, 90, 180].map(n => `<button data-n="${n}" class="${n === range ? 'on' : ''}">${n}d</button>`).join('')}</div>
-  <section class="card"><div class="stats">
-    ${card('Avg kcal', r0(avg('kcal')), 'goal ' + r0(avgGoal('kcal')), 'kc-t')}${card('Avg carbs', r0(avg('c')) + ' g', 'goal ' + r0(avgGoal('c')), 'c')}
-    ${card('Avg protein', r0(avg('p')) + ' g', 'goal ' + r0(avgGoal('p')), 'p')}${card('Avg fat', r0(avg('f')) + ' g', 'goal ' + r0(avgGoal('f')), 'f')}
-    ${card('On target', logged.length ? Math.round((hit / logged.length) * 100) + '%' : '–', `${logged.length}/${range} days logged`, 'steps')}
-    ${card('Weight trend', wFirst != null ? (wLast - wFirst >= 0 ? '+' : '') + r1(wLast - wFirst) + ' lb' : '–', wLast != null ? 'now ' + r1(wLast) : '', 'sleep')}
-    ${card('Measured TDEE', tdee ? r0(tdee) : '–', tdee ? 'from logs + weight' : 'needs 14+ days', 'burn')}${card('Active days', runs, 'of ' + range, 'run')}
-  </div></section>
-  <section class="card"><h3>🔥 Calories vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.kcal), rows.map(r => r.goal.kcal), { title: 'Calories vs goal' })}</section>
-  <section class="card"><h3>💪 Protein vs goal</h3>${bars(rows.map(r => r.date), rows.map(r => r.p), rows.map(r => r.goal.p), { title: 'Protein', cls: 'p' })}</section>
-  <section class="card"><h3>⚖️ Weight</h3>${w.some(Number.isFinite) ? line(rows.map(r => r.date), w, { trend: wt, title: 'Weight', fmt: r1 }) : '<p class="muted">Log weight on the Today tab (Garmin scale weigh-ins show up too).</p>'}</section>
-  ${steps.some(Boolean) ? `<section class="card"><h3>👟 Steps</h3>${bars(rows.map(r => r.date), steps, null, { title: 'Steps', cls: 'steps' })}</section>
-  <section class="card"><h3>🔥 Active calories (Garmin)</h3>${bars(rows.map(r => r.date), rows.map(r => r.gd?.activeKcal || 0), null, { title: 'Active kcal', cls: 'burn' })}</section>
-  <section class="card"><h3>😴 Sleep (hours)</h3>${line(rows.map(r => r.date), rows.map(r => (r.gd?.sleepSec ? r.gd.sleepSec / 3600 : NaN)), { title: 'Sleep', fmt: r1 })}</section>` : ''}
-  <section class="card"><h3>🥧 Macro split (avg)</h3>${split(avg('p'), avg('c'), avg('f'))}</section>`;
+  // 3m / 6m read as weeks, like Garmin's longer views.
+  const weekly = range > 28;
+  const pts = weekly ? Array.from({ length: Math.ceil(range / 7) }, (_, k) => rows.slice(k * 7, k * 7 + 7)).map(w => ({
+    date: w[0].date, end: w[w.length - 1].date, days: w, kcal: avgOf(w.map(r => r.kcal)), p: avgOf(w.map(r => r.kcal > 0 ? r.p : NaN)),
+    goal: { kcal: avgOf(w.map(r => r.goal.kcal)), p: avgOf(w.map(r => r.goal.p)) }, weight: avgOf(w.map(r => r.weight)),
+    steps: avgOf(w.map(r => r.steps)), sleep: avgOf(w.map(r => r.sleep)), runMi: w.reduce((t, r) => t + r.runMi, 0),
+  })) : rows.map(r => ({ ...r, end: r.date }));
+  return { range, end, rows, pts, weekly };
 }
-function split(p, c, f) {
-  const k = { p: p * 4, c: c * 4, f: f * 9 }, t = k.p + k.c + k.f || 1;
-  return `<div class="split">${['c', 'p', 'f'].map(x => `<div class="${x}" style="flex:${k[x] / t}">${k[x] / t >= 0.14 ? x.toUpperCase() + ' ' : ''}${Math.round((k[x] / t) * 100)}%</div>`).join('')}</div>`;
+function trendMetric(m, { rows, pts, weekly }) {
+  const logged = rows.filter(r => r.kcal > 0), n0 = v => (Number.isFinite(v) ? v : 0);
+  const row = (k, v) => `<div class="tsum"><span>${k}</span><b>${v}</b></div>`;
+  if (m === 'kcal' || m === 'p') {
+    const unit = m === 'kcal' ? ' kcal' : ' g', vals = pts.map(p => n0(m === 'kcal' ? p.kcal : p.kcal > 0 ? p.p : 0)), goals = pts.map(p => p.goal[m]);
+    const hit = m === 'kcal' ? logged.filter(r => Math.abs(r.kcal - r.goal.kcal) <= r.goal.kcal * 0.1).length : logged.filter(r => r.p >= r.goal.p * 0.9).length;
+    return { chart: bars(pts.map(p => p.date), vals, goals, { title: m, cls: m === 'p' ? 'p' : '', id: 'trend' }),
+      tip: i => vals[i] ? `<b>${r0(vals[i])}</b>${unit} <span class="muted">/ ${r0(goals[i])} goal${weekly ? ', daily avg' : ''}</span>` : `<span class="muted">${weekly ? 'Nothing logged' : 'Not logged'}</span>`,
+      sum: row(`Avg ${m === 'kcal' ? 'eaten' : 'protein'} (logged days)`, logged.length ? r0(avgOf(logged.map(r => r[m]))) + unit : '–') +
+        row('Avg goal', r0(avgOf(logged.map(r => r.goal[m]))) + unit) + row(m === 'kcal' ? 'Days within 10% of goal' : 'Days at 90%+ of goal', `${hit} of ${logged.length}`) + row('Days logged', `${logged.length} of ${rows.length}`) };
+  }
+  if (m === 'weight') {
+    const w = pts.map(p => (Number.isFinite(p.weight) ? p.weight : NaN)), wt = ema(w);
+    const first = wt.find(Number.isFinite), last = [...wt].reverse().find(Number.isFinite), tdee = measuredTdee(rows.map(r => ({ kcal: r.kcal, weight: r.weight })));
+    return { chart: w.some(Number.isFinite) ? line(pts.map(p => p.date), w, { trend: wt, title: 'Weight', fmt: r1, id: 'trend' }) : '<p class="muted">Log weight on Today (Garmin scale weigh-ins show up too).</p>',
+      tip: i => Number.isFinite(w[i]) ? `<b>${r1(w[i])}</b> lb <span class="muted">· trend ${r1(wt[i])}</span>` : '<span class="muted">No weigh-in</span>',
+      sum: row('Trend now', last != null ? r1(last) + ' lb' : '–') + row('Change this period', first != null ? (last - first >= 0 ? '+' : '') + r1(last - first) + ' lb' : '–') +
+        row('Measured TDEE', tdee ? r0(tdee) + ' kcal' : 'needs 14+ logged days') };
+  }
+  if (m === 'steps') {
+    const vals = pts.map(p => n0(p.steps)), days = rows.filter(r => r.steps);
+    return { chart: bars(pts.map(p => p.date), vals, null, { title: 'Steps', cls: 'steps', id: 'trend' }),
+      tip: i => vals[i] ? `<b>${r0(vals[i]).toLocaleString()}</b> steps${weekly ? ' <span class="muted">daily avg</span>' : ''}` : '<span class="muted">No data</span>',
+      sum: row('Daily average', days.length ? r0(avgOf(days.map(r => r.steps))).toLocaleString() : '–') +
+        row('Best day', days.length ? (b => `${b.steps.toLocaleString()} · ${fmtShort(b.date)}`)(days.reduce((a, r) => (r.steps > a.steps ? r : a))) : '–') + row('Days over 10k', `${days.filter(r => r.steps >= 10000).length} of ${days.length}`) };
+  }
+  const vals = pts.map(p => n0(p.sleep)), nights = rows.filter(r => Number.isFinite(r.sleep));
+  return { chart: nights.length ? bars(pts.map(p => p.date), vals, null, { title: 'Sleep', cls: 'sleep', id: 'trend' }) : '<p class="muted">No sleep data from Garmin in this period.</p>',
+    tip: i => vals[i] ? `<b>${r1(vals[i])}</b> h${weekly ? ' <span class="muted">nightly avg</span>' : ''}` : '<span class="muted">No data</span>',
+    sum: row('Average', nights.length ? r1(avgOf(nights.map(r => r.sleep))) + ' h' : '–') +
+      row('Shortest', nights.length ? (b => `${r1(b.sleep)} h · ${fmtShort(b.date)}`)(nights.reduce((a, r) => (r.sleep < a.sleep ? r : a))) : '–') + row('Nights under 7 h', `${nights.filter(r => r.sleep < 7).length} of ${nights.length}`) };
 }
-bind.trends = root => $$('#range button', root).forEach(b => (b.onclick = () => { local.set('range', +b.dataset.n); render(); }));
+async function viewTrends() {
+  const d = await trendData(), metric = local.get('trMetric', 'kcal'), M = trendMetric(metric, d);
+  state.trend = { d, M };
+  const { pts, weekly, range, end } = d;
+  // Day (or week) list, newest first; tap opens it.
+  const list = [...pts].reverse().map((p, k) => {
+    const i = pts.length - 1 - k, kc = weekly ? p.kcal : p.kcal || NaN;
+    const sub = [Number.isFinite(kc) && kc > 0 ? `${r0(kc)} / ${r0(p.goal.kcal)} kcal` : 'not logged', Number.isFinite(p.p) && p.kcal > 0 ? `P ${r0(p.p)}` : '',
+      p.steps ? `${r0(p.steps).toLocaleString()} steps` : '', p.runMi >= 0.5 ? `${r1(p.runMi)} mi` : ''].filter(Boolean).join(' · ');
+    const over = Number.isFinite(kc) && kc > p.goal.kcal * 1.1, ok = Number.isFinite(kc) && Math.abs(kc - p.goal.kcal) <= p.goal.kcal * 0.1;
+    return `<li data-i="${i}" ${k >= 7 && !state.trAll ? 'hidden' : ''}><span class="dot2 ${over ? 'over' : ok ? 'ok' : Number.isFinite(kc) && kc > 0 ? 'under' : ''}"></span><div class="grow"><div class="name">${weekly ? `${fmtShort(p.date)} – ${fmtShort(p.end)}` : fmtLong(p.date)}</div><div class="sub">${sub}</div></div>${ico('next')}</li>`;
+  }).join('');
+  return `<div class="seg" id="range">${TR_RANGES.map(([n, l]) => `<button data-n="${n}" class="${n === range ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="pnav"><button id="trPrev" aria-label="Earlier">${ico('prev')}</button><b>${fmtShort(d.rows[0].date)} – ${fmtShort(end)}</b><button id="trNext" aria-label="Later" ${end >= today() ? 'disabled' : ''}>${ico('next')}</button></div>
+  <div class="mtabs" id="trMetric">${TR_METRICS.map(([k, l]) => `<button data-m="${k}" class="${k === metric ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <section class="card tchart"><div class="tipbox" id="trTip"><span class="muted">Tap a ${weekly ? 'week' : 'day'} to see it</span></div>${M.chart}<div class="tsums">${M.sum}</div></section>
+  <section class="card daylist"><h3>${weekly ? 'Weeks' : 'Days'}</h3><ul class="entries" id="trDays">${list}</ul>${pts.length > 7 && !state.trAll ? `<button class="link more" id="trAll">Show all ${pts.length}</button>` : ''}</section>`;
+}
+bind.trends = root => {
+  const { d, M } = state.trend;
+  const open = i => {
+    const p = d.pts[i];
+    if (d.weekly) { local.set('range', 7); state.trEnd = p.end; return render(); }
+    state.date = p.date; state.tab = 'today'; render();
+  };
+  $$('#range button', root).forEach(b => (b.onclick = () => { local.set('range', +b.dataset.n); render(); }));
+  $$('#trMetric button', root).forEach(b => (b.onclick = () => { local.set('trMetric', b.dataset.m); render(); }));
+  $('#trPrev', root).onclick = () => { state.trEnd = addDays(d.end, -d.range); render(); };
+  $('#trNext', root).onclick = () => { const e = addDays(d.end, d.range); state.trEnd = e >= today() ? null : e; render(); };
+  bindCharts(root, (id, i) => {
+    const p = d.pts[i];
+    $('#trTip', root).innerHTML = `<div class="grow"><div class="tl">${d.weekly ? `${fmtShort(p.date)} – ${fmtShort(p.end)}` : fmtLong(p.date)}</div><div>${M.tip(i)}</div></div>
+      <button class="link" id="trOpen">${d.weekly ? 'See days' : 'Open day'} ${ico('next')}</button>`;
+    $('#trOpen', root).onclick = () => open(i);
+  });
+  $$('#trDays li', root).forEach(li => (li.onclick = () => open(+li.dataset.i)));
+  if ($('#trAll', root)) $('#trAll', root).onclick = () => { state.trAll = true; render(); };
+};
 
 // ---------- Settings ----------
 async function viewSettings() {
@@ -1349,9 +1405,11 @@ async function openRecommend() {
 
 // ---------- boot ----------
 // Helpers the Training tab module borrows.
-const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render };
+const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render, goDay: d => { state.date = d; state.tab = 'today'; render(); } };
 $$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ico(b.dataset.tab)));
 $('#gear').innerHTML = ico('settings');
+$('#trendsBtn').innerHTML = ico('trends');
+$('#trendsBtn').onclick = () => { state.tab = 'trends'; state.trEnd = null; state.trAll = false; render(); };
 $('#gear').onclick = () => { state.tab = 'settings'; state.sel = state.fsel = null; render(); };
 $$('nav button').forEach(b => (b.onclick = () => { if (b.dataset.tab === 'add') return openAdd(defaultMeal()); state.tab = b.dataset.tab; state.sel = state.fsel = null; render(); }));
 function defaultMeal() {
