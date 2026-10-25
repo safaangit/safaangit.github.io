@@ -186,13 +186,45 @@ function checkBadge(n) {
   if (c.missingKcal) return `<span class="badge warn" title="No calories listed">no kcal listed</span>`;
   return c.ok ? '' : `<span class="badge warn" title="Label ${c.listed} kcal vs macros ${c.est} kcal">kcal ≠ macros ${Math.round(c.pct * 100)}%</span>`;
 }
-function foodRow(f, i, selState = null) {
-  const p = food.preview(f);
+function foodRow(f, i, selState = null, amt = null) {
+  const p = amt ? { n: N.scale(f.n, amt.qty * amt.unit.mult), label: qtyText(amt.qty, amt.unit.label) } : (x => ({ n: x.n, label: unitText(x.unit.label) }))(food.preview(f));
   // Your own foods need no source tag; a verified one gets a check like Macros does.
   const badge = f.source === 'mine' ? '' : `<span class="badge src-${f.source}">${esc(f.srcLabel || f.source)}</span> `;
   const tick = f.source === 'mine' && f.verified ? ' <span class="badge ok">✓</span>' : '';
   return `<li class="food ${selState || ''}" data-i="${i}">${selState != null ? '<span class="box"></span>' : ''}<div class="grow">${row2(`${f.fav ? '★ ' : ''}${esc(f.name)}${tick}`, p.n,
-    `${badge}${checkBadge(f.n)}${[f.brand, unitText(p.unit.label)].filter(Boolean).map(esc).join(', ')}`)}</div></li>`;
+    `${badge}${checkBadge(f.n)}${[f.brand, p.label].filter(Boolean).map(esc).join(', ')}`)}</div></li>`;
+}
+
+// Latest log entry per food over the last ~3 months, keyed like recents.
+async function lastUses() {
+  const out = new Map();
+  for (const m of new Set([0, -31, -62].map(k => monthOf(addDays(today(), k))))) for (const e of await db.all('log/' + m)) {
+    const k = recentKey(e), o = out.get(k);
+    if (!o || e.date + (e.time || '') > o.date + (o.time || '')) out.set(k, e);
+  }
+  return out;
+}
+const keysOf = f => [f.source === 'mine' && !f._quick ? f.id : null, f.recipeId, f._key, 'n:' + (f.name || '').toLowerCase()].filter(Boolean);
+const lastOf = (f, uses) => keysOf(f).map(k => uses?.get(k)).find(Boolean);
+// Servings you count rather than weigh (a bar, a pouch, 7 dumplings) start at 1 serving.
+const COUNTED = /\b(bars?|pieces?|pcs?|pouch(es)?|cans?|bottles?|eggs?|rolls?|cookies?|slices?|packets?|packs?|packages?|pkgs?|containers?|cartons?|scoops?|sandwich(es)?|knots?|bags?|dumplings?|tortillas?|wraps?|patt(y|ies)|links?|sticks?|cones?|buns?|bagels?|muffins?|bowls?|trays?|box(es)?|meals?|ea|each|pints?)\b/i;
+// Amount a food starts at: what you logged last time (like Macros), else grams for anything
+// you weigh, else one serving.
+function startAmount(f, last) {
+  const units = f.units?.length ? f.units : [{ label: 'serving', mult: 1 }];
+  if (last) return { qty: last.qty, unit: units.find(u => u.label === last.unit) || { label: last.unit, mult: last.mult } };
+  const sv = units.find(u => u.label.startsWith('serving')), g = units.find(u => u.label === 'g');
+  if (g && !(sv && COUNTED.test(sv.label))) return { qty: sv ? r1(sv.mult * 100) : 100, unit: g };
+  return { qty: 1, unit: sv || units[0] };
+}
+const defaultAmount = async f => startAmount(f, lastOf(f, await lastUses()));
+async function logMany(rows, meal = 0) {
+  for (const { f, qty, unit, mult } of rows)
+    await db.put(logName(state.date), { date: state.date, time: nowTime(), meal, name: f.name, brand: f.brand,
+      foodId: f.source === 'mine' && !f._quick ? f.id : undefined, recipeId: f.recipeId, qty, unit, mult, n: f.n });
+  const keys = rows.map(r => recentKey({ foodId: r.f.source === 'mine' && !r.f._quick ? r.f.id : undefined, recipeId: r.f.recipeId, name: r.f.name }));
+  if (keys.some(k => (state.s.hiddenRecents || []).includes(k))) await setHidden(keys, false);
+  closeSheet(); render(); toast(`Logged ${rows.length} item${rows.length === 1 ? '' : 's'}`);
 }
 
 // ---------- Today ----------
@@ -368,8 +400,15 @@ function openAdd(meal, { pick } = {}) {
   let tab = tab0, list = [], lastSections = [];
   let editing = null; // Set of list indexes while cleaning up recents
   let data = null, libQ = '', libRes = null, libSeq = 0;
-  const words = () => q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const hit = f => { const t = `${f.name} ${f.brand || ''}`.toLowerCase(); return words().every(w => t.includes(w)); };
+  // Ticked foods, kept while you search for the next one; "Add N" logs them all at their usual amounts.
+  const sel = new Map(), selKey = f => keysOf(f)[0] + '|' + (f.srcId || '');
+  const words = () => food.tokens(q.value).filter(w => !food.STOP.has(w));
+  // Word starts with typo tolerance ("drizzalicious"), plus plain substrings for longer words ("berry" in strawberry).
+  const hit = f => { const hay = food.tokens(`${f.name} ${f.brand || ''}`), t = hay.join(' '); return words().every(w => food.wordHit(w, hay) || (w.length >= 4 && t.includes(w))); };
+  const header = b.closest('.sheet').querySelector('header');
+  if (!pick) header.insertAdjacentHTML('beforeend', '<button id="addN" class="addn" hidden>Add <b>0</b></button>');
+  const addN = $('#addN', header);
+  const updSel = () => { if (!addN) return; addN.hidden = !sel.size; $('b', addN).textContent = sel.size; };
   const show = (sections, extra = '') => {
     list = [];
     out.innerHTML = sections.filter(s => s.items.length || s.letters).map(s => {
@@ -378,16 +417,23 @@ function openAdd(meal, { pick } = {}) {
       const rows = s.items.map(f => {
         const i = list.push(f) - 1, L = (f.name[0] || '#').toUpperCase();
         const head = s.letters && L !== letter ? `<li class="letter">${esc((letter = L))}</li>` : '';
-        return head + foodRow(f, i, s.editable && editing ? (editing.has(i) ? 'picked' : '') : null);
+        const mark = s.editable && editing ? (editing.has(i) ? 'picked' : '') : pick ? null : sel.has(selKey(f)) ? 'picked' : '';
+        return head + foodRow(f, i, mark, startAmount(f, lastOf(f, data.uses)));
       }).join('');
       return `<h4 ${s.fold ? `class="fold" data-fold="${s.fold}"` : ''}><span>${s.title}</span><span>${s.editable && open ? `<button class="link" id="editRecents">${editing ? 'Cancel' : 'Clean up'}</button>` : ''}${s.fold ? `<span class="caret ${open ? 'up' : ''}">${ico('next')}</span>` : ''}</span></h4>
       ${open ? `<ul class="list ${s.editable && editing ? 'selecting' : ''}">${rows || '<li class="empty small">Nothing here yet.</li>'}</ul>` : ''}
       ${open && s.editable && editing ? `<div class="actions"><button class="danger" id="hideRecents">Remove ${editing.size || ''} from recents</button></div>` : ''}`;
     }).join('') + extra || '<p class="muted pad">Nothing found. Try the Library tab, snap the label, or make a new food.</p>';
-    $$('li.food', out).forEach(li => (li.onclick = () => {
-      const i = +li.dataset.i;
-      if (editing && list[i]._key) { editing.has(i) ? editing.delete(i) : editing.add(i); return show(lastSections, extra); }
-      choose(list[i]);
+    $$('li.food', out).forEach(li => (li.onclick = e => {
+      const i = +li.dataset.i, f = list[i];
+      if (editing && f._key) { editing.has(i) ? editing.delete(i) : editing.add(i); return show(lastSections, extra); }
+      if (!pick && !editing && e.target.closest('.box')) {
+        const k = selKey(f);
+        if (sel.has(k)) sel.delete(k); else sel.set(k, { f, amt: startAmount(f, lastOf(f, data.uses)) });
+        $$('li.food', out).forEach(x => list[+x.dataset.i] && selKey(list[+x.dataset.i]) === k && x.classList.toggle('picked', sel.has(k)));
+        return updSel();
+      }
+      choose(f);
     }));
     $$('h4.fold', out).forEach(h => (h.onclick = e => { if (e.target.closest('#editRecents')) return; const k = 'fold:' + h.dataset.fold; local.set(k, !local.get(k, true)); draw(); }));
     const er = $('#editRecents', out);
@@ -440,10 +486,11 @@ function openAdd(meal, { pick } = {}) {
   $$('.tabs button', b).forEach(x => (x.onclick = () => setTab(x.dataset.t)));
   const choose = f => (pick ? openPortion(f, { pick }) : openPortion(f, { meal }));
   (async () => {
-    const [recent, pantry, recipes] = await Promise.all([recentFoods(), food.mine(), recipeFoods()]);
-    data = { recent, pantry, recipes };
+    const [recent, pantry, recipes, uses] = await Promise.all([recentFoods(), food.mine(), recipeFoods(), lastUses()]);
+    data = { recent, pantry, recipes, uses };
     draw();
   })();
+  if (addN) addN.onclick = () => logMany([...sel.values()].map(({ f, amt }) => ({ f, qty: amt.qty, unit: amt.unit.label, mult: amt.unit.mult })), meal);
   let t;
   q.oninput = () => { editing = null; if (tab === 'library') { clearTimeout(t); t = setTimeout(draw, 650); } else draw(); };
   q.onkeydown = e => {
@@ -531,11 +578,13 @@ function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
   (async () => {
     // A logged entry's food may have more units now; reload it if it still exists.
     if (entry && f.id) { const live = await db.get('foods', f.id); if (live) f = { ...live, source: 'mine' }; }
-    const units = f.units?.length ? f.units : [{ label: 'serving', mult: 1 }];
-    let ui = entry ? Math.max(0, units.findIndex(u => u.label === entry.unit)) : Math.max(0, units.findIndex(u => u.label.startsWith('serving')));
-    if (entry && units[ui]?.label !== entry.unit) { units.unshift({ label: entry.unit, mult: entry.mult }); ui = 0; }
-    let q0 = entry ? entry.qty : qStart || 1;
-    if (!entry && !units[ui].label.startsWith('serving') && units.some(u => u.label === 'g') && !units.some(u => !['g', 'oz'].includes(u.label))) { ui = units.findIndex(u => u.label === 'g'); q0 = 100; }
+    const units = [...(f.units?.length ? f.units : [{ label: 'serving', mult: 1 }])];
+    // Editing keeps the entry's amount; "What fits" passes servings; otherwise start where you usually do.
+    const start = entry ? { qty: entry.qty, unit: { label: entry.unit, mult: entry.mult } }
+      : qStart ? { qty: qStart, unit: units.find(u => u.label.startsWith('serving')) || units[0] } : await defaultAmount(f);
+    let ui = units.findIndex(u => u.label === start.unit.label);
+    if (ui < 0) { units.unshift(start.unit); ui = 0; }
+    const q0 = start.qty;
     const remote = !['mine', 'recipe'].includes(f.source) || f._quick;
     const b = sheet(`
       <div class="pname">${esc(f.name)}</div><div class="sub">${f.brand ? esc(f.brand) + ' · ' : ''}<span class="badge src-${f.source}">${esc(f.srcLabel || '')}</span> ${checkBadge(f.n)}</div>
@@ -629,21 +678,31 @@ async function voiceCandidates() {
   return out;
 }
 async function matchRows(items, old = new Map()) {
-  const cands = await voiceCandidates();
+  const cands = await voiceCandidates(), vocab = voice.vocabOf(cands), brands = food.brandWords(cands, cands);
   return Promise.all(items.map(async it => {
     const said = [it.qty !== 1 || it.unit ? `${it.qty}${it.unit ? ' ' + it.unit : ''}` : '', it.text].filter(Boolean).join(' ');
     const prev = old.get(it.text);
-    if (prev?.food) return { ...prev, said, amount: prev.qty === it.qty && prev.unit === it.unit ? prev.amount : voice.resolveAmount(prev.food, it.qty, it.unit), qty: it.qty, unit: it.unit };
+    if (prev?.food) return { ...prev, said, amount: prev.qty === it.qty && prev.unit === it.unit ? prev.amount : await amountFor(prev.food, it), qty: it.qty, unit: it.unit };
     const row = { said, qty: it.qty, unit: it.unit, text: it.text };
-    const local = voice.bestLocal(it.text, cands);
-    if (local) { row.food = local.food; row.src = 'yours'; }
+    const q = voice.clean(voice.respell(it.text, vocab));
+    const local = voice.bestLocal(q, cands, brands);
+    if (local?.sure) { row.food = local.food; row.src = 'yours'; }
     else {
-      const res = await food.search(it.text).catch(() => ({ own: [], remote: [] }));
-      row.food = res.own[0] || res.remote[0]; row.src = row.food ? 'guess' : 'none';
+      // Library results only count if they actually match the words (and the brand, if you said one).
+      const res = await food.search(q).catch(() => ({ own: [], remote: [], brands }));
+      const remote = res.remote.find(f => food.coverage(q, f, res.brands) >= 0.75);
+      row.food = res.own[0] || remote || (local?.score >= 0.5 ? local.food : null);
+      row.src = row.food ? 'guess' : 'none';
     }
-    if (row.food) row.amount = voice.resolveAmount(row.food, it.qty, it.unit);
+    if (row.food) row.amount = await amountFor(row.food, it);
     return row;
   }));
+}
+// What you said, or your usual amount of that food when you only said its name.
+async function amountFor(f, it) {
+  if (it.given) return voice.resolveAmount(f, it.qty, it.unit);
+  const d = await defaultAmount(f);
+  return { qty: d.qty, unit: d.unit.label, mult: d.unit.mult };
 }
 function openVoice({ autostart = true } = {}) {
   const b = sheet(`
@@ -685,15 +744,8 @@ function openVoice({ autostart = true } = {}) {
     const la = $('#logAll', b);
     if (la) la.onclick = async () => {
       const list = rows.filter(r => r.food);
-      for (const r of list) {
-        const f = r.food;
-        await db.put(logName(state.date), { date: state.date, time: nowTime(), meal: 0, name: f.name, brand: f.brand,
-          foodId: f.source === 'mine' && !f._quick ? f.id : undefined, recipeId: f.recipeId, qty: r.amount.qty, unit: r.amount.unit, mult: r.amount.mult, n: f.n });
-      }
-      const keys = list.map(r => recentKey({ foodId: r.food.source === 'mine' && !r.food._quick ? r.food.id : undefined, recipeId: r.food.recipeId, name: r.food.name }));
-      if (keys.some(k => (state.s.hiddenRecents || []).includes(k))) await setHidden(keys, false);
       vstate = { text: '', rows: [] };
-      closeSheet(); render(); toast(`Logged ${list.length} item${list.length === 1 ? '' : 's'}`);
+      await logMany(list.map(r => ({ f: r.food, ...r.amount })));
     };
   };
   // Re-match only items whose words changed, so edits and picks survive.
@@ -755,7 +807,7 @@ function openScanner(meal, pick) {
     }
     const list = [...own, ...found];
     $('#scanMsg', b).textContent = list.length > 1 ? 'Pick the best match. Warnings mean the calories don\'t fit the macros.' : 'Found it:';
-    hits.innerHTML = `<ul class="list">${list.map(foodRow).join('')}</ul><div class="tools"><button id="snap">None match: snap label</button></div>`;
+    hits.innerHTML = `<ul class="list">${list.map((f, i) => foodRow(f, i)).join('')}</ul><div class="tools"><button id="snap">None match: snap label</button></div>`;
     $$('li.food', hits).forEach(li => (li.onclick = () => openPortion(list[+li.dataset.i], { meal, pick })));
     $('#snap', b).onclick = () => openLabel({ meal, pick, barcode: code });
   };

@@ -1,6 +1,6 @@
 // Voice / free-text logging: "chicken 8.5 oz, milk 24 grams, 2 eggs" -> items with
 // amounts, matched against your foods and recents first, then the food databases.
-import { relevance } from './food.js';
+import { relevance, coverage, wordHit, tokens, lev, STOP } from './food.js';
 
 const NUMS = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, half: 0.5, quarter: 0.25 };
 const UNIT = [
@@ -27,9 +27,13 @@ export function parseItems(raw) {
     .replace(/(\d)(g|oz|ml|lbs?|kg)\b/g, '$1 $2')
     .replace(/\b(\d+(?:\.\d+)?|one|two|three|four|five|six)\s+and\s+a\s+half\b/g, (_, n) => String(numOf(n) + 0.5))
     .replace(/[–—-]/g, ' ')
+    // "juicealicious, no I said drizzalicious": the part after a correction replaces the item before it.
+    .replace(/\b(?:no,?\s+(?:no,?\s+)?i\s+(?:said|say|meant|mean)|i\s+meant|i\s+mean|actually|sorry|scratch\s+that|not\s+that)\b[,\s]*/g, ',\u0001')
     .split(/\s*(?:,|;|\n|\.(?!\d))\s*/);
   const items = [];
-  for (const chunk of chunks) {
+  for (let chunk of chunks) {
+    const fix = chunk.startsWith('\u0001'), first = items.length;
+    chunk = chunk.replace(/\u0001/g, ' ');
     const words = chunk.split(/\s+/).filter(Boolean);
     let open = null; // item still waiting for its name (amount came first) or its amount (name came first)
     const close = () => { if (open) { if (open.name.length) items.push(open); open = null; } };
@@ -42,7 +46,8 @@ export function parseItems(raw) {
         else { close(); open = { name: [], ...q }; }
         continue;
       }
-      if (/^(then|also|plus|and)$/.test(w) && open && open.qty != null && open.name.length) { close(); continue; } // "creami then a banana"
+      if (/^(then|also|plus)$/.test(w) && open && open.name.length) { close(); continue; } // "creami then a banana"
+      if (w === 'and' && open && open.qty != null && open.name.length) { close(); continue; } // "2 eggs and toast", not "mac and cheese"
       if (FILLER.test(w) && !(open && open.name.length && words[i + 1] && numOf(words[i + 1]) == null)) continue;
       if (open && open.qty != null && open.name.length && !open.namedAfter) close();
       if (!open) open = { name: [], qty: null };
@@ -50,9 +55,18 @@ export function parseItems(raw) {
       open.name.push(w);
     }
     close();
+    if (fix && first > 0) {
+      if (items.length > first) { // a new food replaces the last one, keeping its amount if none was said
+        const [was] = items.splice(first - 1, 1), now = items[first - 1];
+        if (now.qty == null && !now.unit) { now.qty = was.qty; now.unit = was.unit; }
+      } else { // "chicken 8 oz, no I meant 9 oz": only the amount changes
+        const i = words.findIndex(w => numOf(w) != null && !['a', 'an'].includes(w));
+        if (i >= 0) Object.assign(items[first - 1], { qty: numOf(words[i]), unit: unitOf(words[i + 1] || '') || items[first - 1].unit });
+      }
+    }
   }
   return items
-    .map(it => ({ text: it.name.join(' ').replace(/^(a|an|some|the)\s+/, '').replace(/\s+(and|of)$/, '').trim(), qty: it.qty ?? 1, unit: it.unit }))
+    .map(it => ({ text: it.name.join(' ').replace(/^(a|an|some|the)\s+/, '').replace(/\s+(and|of)$/, '').trim(), qty: it.qty ?? 1, unit: it.unit, given: it.qty != null || !!it.unit }))
     .filter(it => it.text);
 }
 
@@ -80,14 +94,41 @@ export function resolveAmount(food, qty, unit) {
   return { qty, unit: sv.label, mult: sv.mult };
 }
 
-// Best local match (your foods, recipes, recent entries). Returns { food, score } or null.
-export function bestLocal(text, candidates) {
+// Speech splits or mishears brand names ("yeah so" for Yasso). Two spoken words that sound
+// like one word from your foods are rewritten to it, e.g. "yeah so cookie dough" -> "yasso cookie dough".
+const sound = w => w.replace(/ph/g, 'f').replace(/ck|q/g, 'k').replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k').replace(/z/g, 's').replace(/x/g, 'ks')
+  .replace(/(?!^)[aeiouyhw]/g, '').replace(/(.)\1+/g, '$1');
+export function vocabOf(foods) {
+  const v = new Map();
+  for (const f of foods) for (const w of [...tokens(f.name), ...tokens(f.brand)]) if (w.length >= 5 && /^[a-z]+$/.test(w) && !v.has(w)) v.set(w, sound(w));
+  return v;
+}
+export function respell(text, vocab) {
+  const ws = tokens(text);
+  for (let i = 0; i < ws.length - 1; i++) {
+    const pair = ws[i] + ws[i + 1];
+    if (vocab.has(ws[i]) || vocab.has(ws[i + 1]) || pair.length < 5) continue;
+    const key = sound(pair);
+    for (const [w, k] of vocab) if (k === key && k.length >= 2 && lev(pair, w) <= 2) { ws.splice(i, 2, w); break; }
+  }
+  return ws.join(' ');
+}
+// Drops filler around the food words ("yeah so", "no I said").
+export const clean = text => { const ws = tokens(text); while (ws.length > 1 && STOP.has(ws[0])) ws.shift(); return ws.join(' '); };
+
+// Best local match (your foods, recipes, recent entries): { food, score, sure }. Extra words
+// are fine ("grilled chicken breast" is still your chicken), but once you name a brand every
+// word has to match, since brands come in flavors ("yasso cookie dough" isn't the cookies & cream bar).
+export function bestLocal(text, candidates, brands) {
   let best = null;
   for (const f of candidates) {
-    const s = relevance(text, f) + (f.verified ? 0.05 : 0) + (f._uses || 0) * 0.01;
+    const s = relevance(text, f, brands) + (f.verified ? 0.05 : 0) + (f._uses || 0) * 0.01;
     if (!best || s > best.score) best = { food: f, score: s };
   }
-  return best && best.score >= 0.8 ? best : null;
+  if (!best) return null;
+  const branded = brands?.length && tokens(text).some(w => !STOP.has(w) && wordHit(w, brands));
+  best.sure = branded ? coverage(text, best.food, brands) >= 0.85 : best.score >= 0.8;
+  return best;
 }
 
 // Web Speech API (Chrome on Android uses Google's free recognizer; no key needed).

@@ -233,6 +233,12 @@ button.wide { width: 100%; padding: 13px; font-size: 16px; margin-bottom: 12px; 
 li.picked .box { background: var(--accent); border-color: var(--accent); }
 li.picked .box::after { content: "✓"; color: var(--accent-ink); font-size: 14px; font-weight: 700; }
 li.picked { background: color-mix(in srgb, var(--accent) 10%, var(--card)) !important; }
+/* Add food: tick boxes for adding several at once; the box gets a thumb-sized tap area. */
+ul.list li.food .box { position: relative; }
+ul.list li.food .box::before { content: ""; position: absolute; inset: -12px -10px -12px -14px; }
+.addn { border: 0; background: none; color: inherit; font-size: 18px; font-weight: 500; display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
+.addn[hidden] { display: none; }
+.addn b { background: #fff; color: var(--accent); border-radius: 6px; min-width: 28px; height: 28px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; font-weight: 500; }
 .selbar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--line2); border-radius: 14px; padding: 8px 10px; margin: 0 0 12px; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
 .selbar span { flex: 1 1 100%; font-size: 13px; color: var(--muted); }
 .selbar button { flex: 1 1 auto; padding: 8px; font-size: 14px; }

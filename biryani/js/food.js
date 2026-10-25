@@ -5,10 +5,15 @@ import { check, gramUnits, scale } from './nutrition.js';
 
 const usdaKey = () => local.get('usdaKey', '') || 'DEMO_KEY';
 const timeout = (ms) => AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
+// Answers are kept for the session: the free USDA demo key allows only ~30 lookups an hour.
+const cached = new Map();
 async function getJSON(url) {
+  if (cached.has(url)) return cached.get(url);
   const r = await fetch(url, { signal: timeout(12000) });
   if (!r.ok) throw new Error(`${r.status} ${new URL(url).host}`);
-  return r.json();
+  const d = await r.json();
+  cached.set(url, d);
+  return d;
 }
 
 // UPC-A (12) and EAN-13 with a leading 0 are the same product.
@@ -32,7 +37,7 @@ function fromOFF(p) {
   const sq = +p.serving_quantity;
   const brand = Array.isArray(p.brands) ? p.brands[0] : (p.brands || '').split(',')[0];
   return {
-    name: shortName(p.product_name || 'Unnamed product'), brand: brand?.trim(), barcode: p.code,
+    name: shortName(p.product_name || 'Unnamed product'), full: p.product_name, brand: brand?.trim(), barcode: p.code,
     n: clean(n), units: gramUnits(sq > 0 ? [{ label: `serving (${p.serving_size || Math.round(sq * 10) / 10 + ' g'})`, mult: sq / 100 }] : []),
     source: 'off', srcLabel: 'Open Food Facts', srcId: p.code,
   };
@@ -81,7 +86,7 @@ function fromUSDA(x) {
     extra.push({ label: `${m.disseminationText} (${Math.round(m.gramWeight)} g)`, mult: m.gramWeight / 100 });
   const generic = x.dataType !== 'Branded';
   return {
-    name: shortName(titleCase(x.description)), brand: x.brandName || x.brandOwner, barcode: x.gtinUpc,
+    name: shortName(titleCase(x.description)), full: x.description, brand: x.brandName || x.brandOwner, barcode: x.gtinUpc,
     n: clean(n), units: gramUnits(extra.slice(0, 6)),
     source: generic ? 'usda' : 'usda-b', srcLabel: generic ? `USDA ${x.dataType}` : 'USDA Branded', srcId: x.fdcId,
   };
@@ -100,19 +105,53 @@ async function usdaBarcode(code) {
 // ---- Ranking ----
 const SRC_W = { mine: 1.3, recipe: 1.25, usda: 1.0, 'usda-b': 0.85, off: 0.7 };
 const stem = w => (w.length > 3 ? w.replace(/(ies)$/, 'y').replace(/(es|s)$/, '') : w);
-export function relevance(q, f) {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean).map(stem);
-  const hay = `${f.name} ${f.brand || ''}`.toLowerCase().replace(/[’']/g, '');
-  if (!words.length) return 1;
-  const hits = words.filter(w => hay.includes(w)).length / words.length;
-  const starts = hay.startsWith(words[0]) ? 0.15 : 0;
-  const short = 0.2 / Math.max(1, hay.split(/\s+/).length / 4); // prefer "Chicken breast, cooked" over long descriptions
-  return hits + starts + short;
+// Words that say nothing about the food, including what speech adds ("yeah so", "no I said").
+export const STOP = new Set(['a', 'an', 'the', 'of', 'and', 'with', 'in', 'on', 'i', 'no', 'said', 'mean', 'meant', 'some', 'my', 'yeah', 'so', 'um', 'uh', 'okay', 'ok', 'like', 'had', 'ate']);
+export const tokens = s => (s || '').toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+export function lev(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
 }
-export function score(q, f) {
+// How well one query word matches a list of food words: whole word or word start counts fully
+// ("cookie" finds "cookies", but "i" no longer matches every word with an i in it); a typo in a
+// longer word ("drizzalicious" for Drizzilicious) counts most of the way.
+export function wordHit(w, hay) {
+  const s = stem(w);
+  if (hay.some(h => h === w || h.startsWith(s) || stem(h) === s)) return 1;
+  const tol = w.length >= 9 ? 2 : w.length >= 5 ? 1 : 0;
+  return tol && hay.some(h => h[0] === w[0] && lev(w, h) <= tol) ? 0.85 : 0;
+}
+// Share of the query's food words found in a food (0-1). Brand words count double, so
+// "yasso cookie dough" ranks Yasso bars above plain cookie dough.
+export function coverage(q, f, brands) {
+  const words = tokens(q).filter(w => !STOP.has(w));
+  if (!words.length) return tokens(q).length ? 0 : 1;
+  const hay = [...tokens(f.full || f.name), ...tokens(f.brand)]; // the full name, so a shortened one keeps its flavor
+  let got = 0, max = 0;
+  for (const w of words) { const wt = brands && wordHit(w, brands) ? 2 : 1; max += wt; got += wt * wordHit(w, hay); }
+  return got / max;
+}
+export function relevance(q, f, brands) {
+  const first = tokens(q).find(w => !STOP.has(w)), name = tokens(f.name);
+  const starts = first && name[0] && wordHit(first, [name[0]]) ? 0.15 : 0;
+  const short = 0.2 / Math.max(1, (name.length + tokens(f.brand).length) / 4); // prefer "Chicken breast, cooked" over long descriptions
+  return coverage(q, f, brands) + starts + short;
+}
+// Brand words from your foods and the results, minus words that also name foods ("Minute Rice" isn't a brand cue for rice).
+export function brandWords(list, generic = []) {
+  const common = new Set(generic.flatMap(f => tokens(f.name)));
+  return [...new Set(list.flatMap(f => tokens(f.brand)))].filter(w => w.length >= 3 && !STOP.has(w) && !common.has(w));
+}
+export function score(q, f, brands) {
   const c = check(f.n);
   const complete = ['kcal', 'p', 'c', 'f'].every(k => f.n?.[k] != null) ? 1 : 0.7;
-  return relevance(q, f) * (SRC_W[f.source] || 0.6) * (c.ok ? 1 : 0.6) * complete;
+  return relevance(q, f, brands) * (SRC_W[f.source] || 0.6) * (c.ok ? 1 : 0.6) * complete;
 }
 function dedupe(list) {
   const seen = new Map();
@@ -140,17 +179,18 @@ export async function byBarcode(code) {
 
 // Text: generic USDA data is the most accurate for whole foods; brands come from USDA Branded + OFF.
 export async function search(q, { recipes = [] } = {}) {
-  const ql = q.trim();
-  const own = [...(await mine()), ...recipes.map(r => ({ ...r, source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : r.tag === 'prep' ? 'Meal prep' : 'Recipe' }))]
-    .filter(f => relevance(ql, f) >= 0.99);
+  const ql = q.trim(), pantry = await mine();
   const [gen, br, off] = await Promise.all([
     usdaSearch(ql, 'Foundation,SR Legacy,Survey (FNDDS)'),
     usdaSearch(ql, 'Branded'),
     offSearch(ql),
   ]);
-  const remote = dedupe([...gen, ...br, ...off]).map(f => ({ f, s: score(ql, f) })).sort((a, b) => b.s - a.s).map(x => x.f);
-  own.sort((a, b) => score(ql, b) - score(ql, a));
-  return { own, remote: remote.slice(0, 30) };
+  const brands = brandWords([...pantry, ...br, ...off], [...gen, ...pantry]);
+  const own = [...pantry, ...recipes.map(r => ({ ...r, source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : r.tag === 'prep' ? 'Meal prep' : 'Recipe' }))]
+    .filter(f => relevance(ql, f, brands) >= 0.99);
+  const remote = dedupe([...gen, ...br, ...off]).map(f => ({ f, s: score(ql, f, brands) })).sort((a, b) => b.s - a.s).map(x => x.f);
+  own.sort((a, b) => score(ql, b, brands) - score(ql, a, brands));
+  return { own, remote: remote.slice(0, 30), brands };
 }
 
 // Per-serving preview for list rows.
@@ -160,11 +200,12 @@ export function preview(f) {
   return { unit: u, n: scale(f.n, u.mult) };
 }
 
-// Branded database names can be a whole ingredient list; keep the first clause.
+// Branded database names can be a whole ingredient list; keep the first clause of really long
+// ones, but leave "Frozen Greek Yogurt Bar, Chocolate Chip Cookie Dough" whole.
 export function shortName(s = '') {
   let n = s.trim();
-  if (n.length > 40 && n.includes(',')) n = n.split(',')[0].trim();
-  if (n.length > 48) n = n.slice(0, 46).replace(/\s+\S*$/, '') + '…';
+  if (n.length > 60 && n.includes(',')) n = n.split(',')[0].trim();
+  if (n.length > 64) n = n.slice(0, 62).replace(/\s+\S*$/, '') + '…';
   return n;
 }
 function clean(n) {
