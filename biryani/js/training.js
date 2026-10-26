@@ -203,6 +203,17 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
     const q = all.find(d => d.date >= ref && d.date <= addDays(ref, 3) && d.kind === 'quality' && !act(d.date) && toRace(d.date) > 0);
     if (q) set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail: 'Easy miles instead of the workout. Bring it back next week if you feel better.', pace: plan.z.list.find(z => z[0] === 'easy').slice(2, 4) }, 'Swapped for easy: ' + f.signals.join(' and ') + '.');
   }
+  // A run at tempo pace or faster on an easy day counts as the workout: the next one within 2 days goes easy.
+  const tempoSlow = plan.z.list.find(z => z[0] === 'tempo')[3];
+  for (const d of [yesterday, ref].map(at).filter(Boolean)) {
+    if (d.kind === 'quality' || d.kind === 'long' || d.kind === 'race' || d.date < cfg.planStart) continue;
+    const hard = runs.find(r => r.date === d.date && r.mi >= 3 && r.sec && r.sec / r.mi <= tempoSlow + 10);
+    if (!hard) continue;
+    const day = new Date(d.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'long' }), pace = fmtPace(hard.sec / hard.mi);
+    d.adj ??= `Ran as a workout (${r1(hard.mi)} mi at ${pace}/mi).`;
+    const q = all.find(x => x.date > d.date && x.date <= addDays(d.date, 2) && x.kind === 'quality' && !x.adj && !act(x.date) && toRace(x.date) > 2);
+    if (q) set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail: 'Easy miles: you already got this week\'s hard run in.', pace: plan.z.list.find(z => z[0] === 'easy').slice(2, 4) }, `Swapped for easy: ${day}'s run was at ${pace}/mi, already a workout.`);
+  }
   for (const w of plan.weeks) Object.assign(w, { mi: sumBy(w.days.filter(d => d.kind !== 'race'), 'mi'), lo: sumBy(w.days.filter(d => d.kind !== 'race'), 'lo'), hi: sumBy(w.days.filter(d => d.kind !== 'race'), 'hi') });
   return { changes, fatigue: f };
 }
