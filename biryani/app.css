@@ -533,3 +533,13 @@ details.pastwks[open] summary::after { transform: rotate(-90deg); }
 details.pastwks summary .muted { font-size: 12.5px; font-weight: 400; }
 details.pastwks[open] { padding-bottom: 8px; }
 details.pastwks .wk:first-of-type { margin-top: 0; }
+
+/* Lifts and day changes (Training) */
+.cal i.lift { left: 4px; right: auto; border-radius: 2px; background: #a78bfa; }
+.lifthint { font-size: 13.5px; margin: 8px 0 0; line-height: 1.4; }
+.liftrow { padding: 8px 0; border-top: 1px solid var(--line); }
+.liftrow .r1 { display: flex; justify-content: space-between; gap: 8px; }
+.lifttags button.on, .swaps button:active { background: #a78bfa; color: #fff; }
+.swaps button, .lifttags button { padding: 7px 10px; font-size: 13.5px; background: var(--tile); border: 1px solid var(--line2); }
+label.chk { display: flex !important; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; margin: 12px 0 4px; font-size: 14px; text-align: left; color: var(--ink); }
+label.chk input { width: 20px; height: 20px; flex: none; margin: 0; }

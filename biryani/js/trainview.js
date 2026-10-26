@@ -25,14 +25,14 @@ async function load(s, ref = today()) {
   const gdays = Object.assign({}, ...(await Promise.all(months.map(m => sync.garminMonth(m).catch(() => ({ days: {} }))))).map(g => g.days || {}));
   const manual = (await db.all('exercises')).filter(x => x.run && x.mi > 0);
   for (const x of manual) (gdays[x.date] ??= { activities: [] }).activities = [...(gdays[x.date].activities || []), { name: x.name, type: 'running', distance: x.mi * 1609.34, duration: (x.min || 0) * 60 }];
-  const runs = T.runsFrom(gdays);
+  const runs = T.runsFrom(gdays), lifts = T.liftsFrom(gdays);
   const pred = T.predict(runs, ref);
   const autoGoal = !cfg.goalSec;
   if (autoGoal) cfg.goalSec = pred ? T.suggestGoal(pred.sec) : 4 * 3600;
   const plan = T.buildPlan(cfg, runs, ref);
   const adapted = T.adapt(plan, runs, gdays, cfg, ref);
   const gear = ((await sync.garminGear().catch(() => null))?.gear || []).filter(g => /shoe/i.test(g.type || ''));
-  return { cfg, gdays, runs, pred, autoGoal, plan, adapted, gear };
+  return { cfg, gdays, runs, lifts, pred, autoGoal, plan, adapted, gear };
 }
 
 // ---------- Today card ----------
@@ -69,7 +69,7 @@ function hero({ cfg, autoGoal, plan }, ui) {
 }
 
 function planView(data, s, ui) {
-  const { plan, runs, cfg } = data, t = today();
+  const { plan, runs, cfg, lifts } = data, t = today();
   const nudges = T.notes({ ...data, s });
   for (const g of data.gear.filter(g => !/retired/i.test(g.status || ''))) {
     const { mi, max, pct } = shoeInfo(g), used = data.runs.filter(r => r.date > T.addDays(t, -21) && r.gear?.includes(g.uuid)).length;
@@ -95,11 +95,14 @@ function planView(data, s, ui) {
     if (x.date < cfg.planStart && x.kind !== 'past') x = { ...x, kind: 'past' };
     const act = T.milesOn(runs, x.date), st = x.kind === 'past' ? '' : T.status(x, act);
     const past = x.kind === 'past' || x.date < t;
-    const kind = x.kind === 'past' ? (act >= 13 ? 'long' : act > 0 ? 'easy' : 'rest') : x.kind;
-    const miTxt = past ? (act ? r1(act) : '–') : !x.mi ? '–' : x.kind === 'race' || x.lo === x.hi ? r1(x.mi) : `${x.lo}-${x.hi}`;
-    const lvl = x.kind === 'past' ? 0 : LEVEL[x.kind] || 0;
-    return `<button class="cal k-${kind} ${x.date === t ? 'now' : ''} ${st} ${x.adj && !past ? 'adj' : ''} ${miTxt.length > 4 ? 'rng' : ''}" data-d="${x.date}"><span class="dn">${+x.date.slice(8)}</span>
-      <span class="mi">${miTxt}</span><span class="kl">${x.kind === 'past' ? (act ? 'run' : '') : calLabel(x)}</span>
+    // Once you've run, the cell shows what you did (a tempo on an easy day shows as Tempo).
+    const ran = x.date <= t && x.kind !== 'race' ? T.ranAs(runs, x.date, plan.z) : null;
+    const kind = ran ? ran.kind : x.kind === 'past' ? 'rest' : x.kind;
+    const miTxt = past || ran ? (act ? r1(act) : '–') : !x.mi ? '–' : x.kind === 'race' || x.lo === x.hi ? r1(x.mi) : `${x.lo}-${x.hi}`;
+    const lvl = ran ? LEVEL[ran.kind] : x.kind === 'past' ? 0 : LEVEL[x.kind] || 0;
+    const lifted = lifts.some(l => l.date === x.date);
+    return `<button class="cal k-${kind} ${x.date === t ? 'now' : ''} ${st} ${(x.adj || x.moved) && !past ? 'adj' : ''} ${miTxt.length > 4 ? 'rng' : ''}" data-d="${x.date}"><span class="dn">${+x.date.slice(8)}</span>
+      ${lifted ? '<i class="lift"></i>' : ''}<span class="mi">${miTxt}</span><span class="kl">${ran ? ran.label : x.kind === 'past' ? '' : calLabel(x)}</span>
       ${lvl ? `<span class="pips">${'<i></i>'.repeat(lvl)}</span>` : ''}
       ${st === 'done' && x.mi ? '<i class="ok"></i>' : st === 'miss' || st === 'part' ? '<i class="miss"></i>' : ''}</button>`;
   };
@@ -121,7 +124,7 @@ function planView(data, s, ui) {
   return hero(data, ui) + `<section class="card calcard"><h3>Plan to race day</h3>
     <div class="calstick"><div class="pchips">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
     ${pastHtml}${ahead.map(wkHtml).join('')}
-    <p class="muted small">Paces are per mile. Dots show how hard the day is, and any distance in the range counts. Tap a day for the full workout.</p></section>
+    <p class="muted small">Paces are per mile. Dots show how hard the day is, and any distance in the range counts. Done days show what you actually ran; a purple corner means you lifted. Tap a day to see the workout, swap it with another day, or skip it.</p></section>
   ${todayCardHtml}${notesHtml}
   <section class="card"><details class="how"><summary><h3>How this plan adjusts</h3></summary><ul class="tips">
     <li><b>Ranges, not exact miles.</b> Anything in the range counts as done. Long runs flex down, not up.</li>
@@ -227,14 +230,54 @@ export function bind(root, s, ui) {
 }
 
 async function openDay(s, date, ui) {
-  const { plan, runs, gear } = await load(s);
-  const d = T.planFor(plan, date), done = runs.filter(r => r.date === date);
+  const { plan, runs, lifts, gear, cfg } = await load(s);
+  const d = T.planFor(plan, date), done = runs.filter(r => r.date === date), lf = lifts.filter(l => l.date === date), t = today();
+  const ran = date <= t && d && d.kind !== 'race' ? T.ranAs(runs, date, plan.z) : null;
+  const diff = ran && d.kind !== 'rest' && ran.label !== calLabel(d) ? `You ran ${ran.label.toLowerCase()} (${r1(ran.mi)} mi); the plan had ${calLabel(d).toLowerCase()}.` : ran && d.kind === 'rest' ? `Planned rest; you ran ${r1(ran.mi)} mi.` : '';
+  const tags = cfg.lifts || {};
+  const legsBefore = lifts.some(l => l.date === T.addDays(date, -1) && (tags[l.id] || []).includes('Legs'));
+  const hint = !d ? '' : (legsBefore && (d.kind === 'quality' || d.kind === 'long') ? 'Legs yesterday, so start this one easy and see how they feel. ' : '') + T.liftHint(plan, date);
+  // Swap targets: other days of the same week that haven't happened yet.
+  const wk = plan.weeks.find(w => w.days.some(x => x.date === date));
+  const open = x => x.date >= t && x.kind !== 'race' && !T.milesOn(runs, x.date);
+  const canMove = d && open(d);
+  const others = canMove ? wk.days.filter(x => x.date !== date && open(x)) : [];
   const b = ui.sheet(`${d ? `<div class="wo k-${d.kind}"><span class="kst"></span><div class="grow"><div class="name">${d.mi ? miRange(d) + ' · ' : ''}${ui.esc(d.title)}</div>
-      ${d.pace ? `<div class="pace">${paceRange(d.pace)}</div>` : ''}<div class="sub">${ui.esc(d.detail)}</div>${d.adj ? `<div class="adjn">${ui.ico('refresh')}${ui.esc(d.adj)}</div>` : ''}</div></div>` : '<p class="muted">Before the plan started.</p>'}
+      ${d.pace ? `<div class="pace">${paceRange(d.pace)}</div>` : ''}<div class="sub">${ui.esc(d.detail)}</div>
+      ${[d.moved, d.adj, diff].filter(Boolean).map(x => `<div class="adjn">${ui.ico('refresh')}${ui.esc(x)}</div>`).join('')}</div></div>
+      ${hint ? `<p class="lifthint"><b>Lifting:</b> ${ui.esc(hint)}</p>` : ''}` : '<p class="muted">Before the plan started.</p>'}
     <h4>Garmin</h4>${done.length ? `<ul class="entries runs">${done.map(r => `<li><div class="grow"><div class="r1"><span class="name">${ui.esc(r.name || 'Run')}</span><span class="kc">${r1(r.mi)} mi</span></div>
       <div class="r2"><span class="sub">${r.tread ? 'treadmill' : 'outdoor'}</span><span class="macros">${r.sec ? T.fmtPace(r.sec / r.mi) + '/mi' : ''}${r.hr ? ` · ${r.hr} bpm` : ''}</span></div>
-      ${T.feelText(r) || r.gear?.length ? `<div class="r3">${[T.feelText(r), shoeName(gear, r.gear)].filter(Boolean).map(ui.esc).join(' · ')}</div>` : ''}</div></li>`).join('')}</ul>` : `<p class="muted small">${date > today() ? 'Not yet.' : 'No run logged.'}</p>`}`,
+      ${T.feelText(r) || r.gear?.length ? `<div class="r3">${[T.feelText(r), shoeName(gear, r.gear)].filter(Boolean).map(ui.esc).join(' · ')}</div>` : ''}</div></li>`).join('')}</ul>` : ''}
+    ${lf.map(l => `<div class="liftrow"><div class="r1"><span class="name">${ui.esc(l.name || 'Strength')}</span><span class="muted">${l.min} min${l.hr ? ` · ${l.hr} bpm` : ''}</span></div>
+      <div class="wkruns lifttags" data-id="${l.id}">${T.LIFTS.map(k => `<button data-t="${k}" class="${(tags[l.id] || []).includes(k) ? 'on' : ''}">${k}</button>`).join('')}</div></div>`).join('')}
+    ${!done.length && !lf.length ? `<p class="muted small">${date > t ? 'Not yet.' : 'Nothing from Garmin.'}</p>` : ''}
+    ${canMove ? `<h4>Change this day</h4><p class="muted small">Tap a day to swap with it.</p>
+      <div class="wkruns swaps">${others.map(x => `<button data-sw="${x.date}">${wkday(x.date)} · ${x.kind === 'rest' ? 'Rest' : calLabel(x)}</button>`).join('')}</div>
+      <label class="chk"><input type="checkbox" id="swEvery"> Every week until race week</label>
+      <div class="actions">${d.moved ? '<button id="swUndo">Undo change</button>' : ''}${d.kind !== 'rest' ? '<button id="swSkip">Skip this day</button>' : ''}</div>` : ''}`,
     { title: new Date(date + 'T12:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) });
+  const save = async (patch, msg) => { await db.saveSettings({ ...s, training: { ...(s.training || {}), ...patch } }); ui.closeSheet(); ui.toast(msg); ui.render(); };
+  const tr = s.training || {}, dw = x => new Date(x + 'T12:00').getDay();
+  ui.$$('[data-sw]', b).forEach(x => (x.onclick = () => ui.$('#swEvery', b).checked
+    ? save({ weekSwaps: [...(tr.weekSwaps || []), [dw(date), dw(x.dataset.sw), T.weekStart(t)]] }, `${T.DOW[dw(date)]} and ${T.DOW[dw(x.dataset.sw)]} swapped every week`)
+    : save({ swaps: [...(tr.swaps || []), [date, x.dataset.sw]] }, 'Swapped')));
+  const undo = ui.$('#swUndo', b);
+  if (undo) undo.onclick = () => save({
+    swaps: (tr.swaps || []).filter(p => !p.includes(date)), skips: (tr.skips || []).filter(x => x !== date),
+    weekSwaps: /^Every week/.test(d.moved) ? (tr.weekSwaps || []).filter(p => p[0] !== dw(date) && p[1] !== dw(date)) : tr.weekSwaps || [],
+  }, 'Back to the plan');
+  const skip = ui.$('#swSkip', b);
+  if (skip) skip.onclick = () => save({ skips: [...(tr.skips || []), date] }, 'Skipped');
+  // Lift tags: tap Push / Pull / Legs... on a watch "Strength" session. Saved with your settings.
+  ui.$$('.lifttags', b).forEach(g => ui.$$('button', g).forEach(x => (x.onclick = async () => {
+    const id = g.dataset.id, cur = new Set(tags[id] || []);
+    cur.has(x.dataset.t) ? cur.delete(x.dataset.t) : cur.add(x.dataset.t);
+    x.classList.toggle('on');
+    const lifts2 = { ...(s.training?.lifts || {}), [id]: [...cur] };
+    s.training = { ...(s.training || {}), lifts: lifts2 };
+    await db.saveSettings({ ...s });
+  })));
   return b;
 }
 
@@ -247,9 +290,11 @@ function openRace(s, ui) {
     <label>Distance<select id="rMi"><option value="26.2" ${c.raceMi > 26 ? 'selected' : ''}>Marathon</option><option value="13.1" ${c.raceMi < 26 ? 'selected' : ''}>Half marathon</option></select></label>
     <label>Goal time (h:mm:ss, blank = auto from your runs)<input id="rGoal" inputmode="numeric" placeholder="auto" value="${c.goalSec ? T.fmtTime(c.goalSec) : ''}"></label>
     <label>Long run day<select id="rLong">${days.map((d, i) => `<option value="${i}" ${i === c.longDay ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
+    <label>Rest days a week<select id="rRest">${[[2, '2 (after and before the long run)'], [1, '1 (after the long run)'], [0, 'None (easy runs instead)']].map(([v, l]) => `<option value="${v}" ${v === c.restDays ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <p class="muted small">Same weekly miles either way, spread over more days. To move a rest day, tap it on the calendar and swap.</p>
     <div class="actions"><button class="primary" id="rSave">Save</button></div>`, { title: 'Race settings' });
   ui.$('#rSave', b).onclick = async () => {
-    const training = { raceName: ui.$('#rName', b).value.trim() || c.raceName, raceDate: ui.$('#rDate', b).value || c.raceDate, raceStart: ui.$('#rStart', b).value.trim(),
+    const training = { ...(s.training || {}), restDays: +ui.$('#rRest', b).value, raceName: ui.$('#rName', b).value.trim() || c.raceName, raceDate: ui.$('#rDate', b).value || c.raceDate, raceStart: ui.$('#rStart', b).value.trim(),
       raceMi: +ui.$('#rMi', b).value, goalSec: T.parseTime(ui.$('#rGoal', b).value), longDay: +ui.$('#rLong', b).value,
       planStart: ui.$('#rDate', b).value !== c.raceDate ? T.weekStart(today()) : c.planStart };
     await db.saveSettings({ ...s, training });

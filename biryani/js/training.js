@@ -2,7 +2,7 @@
 // and fitness read from the Garmin runs the nightly workflow writes to data/garmin/.
 import { today } from './db.js';
 
-export const DEFAULTS = { raceName: 'Philadelphia Marathon', raceDate: '2026-11-22', raceStart: '7:00 AM', raceMi: 26.2, goalSec: null, longDay: 6, planStart: '2026-10-26' };
+export const DEFAULTS = { raceName: 'Philadelphia Marathon', raceDate: '2026-11-22', raceStart: '7:00 AM', raceMi: 26.2, goalSec: null, longDay: 6, planStart: '2026-10-26', restDays: 2 };
 const RUN = /running|treadmill|track|trail_run|ultra/i;
 const M = 1609.34, MARATHON = 26.2188;
 
@@ -109,6 +109,11 @@ export function buildPlan(cfg, runs, ref = today()) {
     : w === 2 ? 'Middle 6 mi @ marathon pace, the rest easy.' : w === 1 ? 'Easy, with 3 mi @ marathon pace near the end.'
     : 'Easy and conversational. Practice race fueling (a gel every 35-40 min).';
   const PHASE = { 0: 'Race week', 1: 'Taper', 2: 'Taper', 3: 'Peak week' };
+  // How the non-long miles spread over the running days (by days after the long run). Fewer rest days
+  // spreads the same weekly miles thinner, not more miles.
+  const share = { 2: 0.24, 3: 0.30, 4: 0.20, 5: 0.26, ...(cfg.restDays < 2 ? { 6: 0.12 } : {}), ...(cfg.restDays < 1 ? { 1: 0.12 } : {}) };
+  const tot = Object.values(share).reduce((a, b) => a + b, 0);
+  for (const k in share) share[k] /= tot;
 
   const weeks = [];
   for (let w = nWeeks; w >= 0; w--) {
@@ -128,15 +133,75 @@ export function buildPlan(cfg, runs, ref = today()) {
         continue;
       }
       if (off === 0) days.push(day(date, 'long', longMi, `Long run`, longText(w), P('long')));
+      else if (off === 1 && cfg.restDays < 1) days.push(day(date, 'easy', Math.max(3, rest * share[1]), 'Recovery', 'Very easy, the day after the long run.', P('recovery')));
+      else if (off === 6 && cfg.restDays < 2) days.push(day(date, 'easy', Math.max(3, rest * share[6]), 'Shakeout', 'Short and easy before the long run. A few strides.', P('recovery')));
       else if (off === 1 || off === 6) days.push(day(date, 'rest', 0, 'Rest', off === 1 ? 'Off, or strength / mobility. Ice the knee if it talks back.' : 'Off. Legs up before the long run.'));
-      else if (off === 2) days.push(day(date, 'easy', Math.max(3, rest * 0.24), 'Easy', 'Easy miles. Add 4-6 strides at the end.', P('easy')));
-      else if (off === 3) { const mi = Math.max(4, rest * 0.30), [t, d, p] = quality(w, mi); days.push(day(date, 'quality', mi, t, d, p)); }
-      else if (off === 4) days.push(day(date, 'easy', Math.max(3, rest * 0.20), 'Recovery', 'Truly easy after the workout.', P('recovery')));
-      else days.push(day(date, 'medium', Math.max(4, rest * 0.26), 'Medium long', 'Steady easy run, a bit longer.', P('easy')));
+      else if (off === 2) days.push(day(date, 'easy', Math.max(3, rest * share[2]), 'Easy', 'Easy miles. Add 4-6 strides at the end.', P('easy')));
+      else if (off === 3) { const mi = Math.max(4, rest * share[3]), [t, d, p] = quality(w, mi); days.push(day(date, 'quality', mi, t, d, p)); }
+      else if (off === 4) days.push(day(date, 'easy', Math.max(3, rest * share[4]), 'Recovery', 'Truly easy after the workout.', P('recovery')));
+      else days.push(day(date, 'medium', Math.max(4, rest * share[5]), 'Medium long', 'Steady easy run, a bit longer.', P('easy')));
     }
     weeks.push({ start, w, phase: PHASE[w] || (w % 3 === 0 && w !== nWeeks ? 'Cutback' : 'Build'), days, mi: days.filter(d => d.kind !== 'race').reduce((t, d) => t + d.mi, 0) });
   }
+  applyMoves(weeks, cfg);
   return { weeks, z, peak, longPeak };
+}
+
+// Your own changes, on top of the generated plan:
+// - weekSwaps [[weekdayA, weekdayB, fromDate]]: e.g. rest Thursday instead of Friday, every week before race week.
+// - swaps [[dateA, dateB]]: a one-off swap. skips [date]: that day becomes rest.
+// Race day never moves.
+export const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const PLAN_KEYS = ['kind', 'mi', 'title', 'detail', 'pace', 'lo', 'hi'];
+function applyMoves(weeks, cfg) {
+  const all = weeks.flatMap(w => w.days), at = d => all.find(x => x.date === d), ok = d => d && d.kind !== 'race';
+  const swap = (a, b, every) => {
+    for (const k of PLAN_KEYS) [a[k], b[k]] = [b[k], a[k]];
+    a.moved = `${every ? 'Every week: s' : 'S'}wapped with ${DOW[dow(b.date)]}.`; b.moved = `${every ? 'Every week: s' : 'S'}wapped with ${DOW[dow(a.date)]}.`;
+  };
+  for (const w of weeks) {
+    if (w.w === 0) continue;
+    for (const [x, y, from = ''] of cfg.weekSwaps || []) {
+      const a = w.days.find(d => dow(d.date) === x), b = w.days.find(d => dow(d.date) === y);
+      if (ok(a) && ok(b) && a.date >= from && b.date >= from) swap(a, b, true);
+    }
+  }
+  for (const [x, y] of cfg.swaps || []) { const a = at(x), b = at(y); if (ok(a) && ok(b)) swap(a, b, false); }
+  for (const x of cfg.skips || []) {
+    const d = at(x);
+    if (ok(d) && d.kind !== 'rest') Object.assign(d, { kind: 'rest', mi: 0, lo: 0, hi: 0, pace: null, moved: `Skipped (was ${d.title.toLowerCase()}${d.mi ? `, ${d.mi} mi` : ''}).`, title: 'Rest', detail: 'Day off, your call.' });
+  }
+  const hard = d => d && (d.kind === 'quality' || d.kind === 'long');
+  all.forEach((d, i) => { if (d.moved && hard(d) && (hard(all[i - 1]) || hard(all[i + 1]))) d.moved += ' That puts two hard days in a row; take one of them easy if your legs are heavy.'; });
+}
+
+// What a day's running actually was, from pace and distance, so the calendar shows what you did.
+export function ranAs(runs, date, z) {
+  const rs = runs.filter(r => r.date === date), mi = rs.reduce((t, r) => t + r.mi, 0);
+  if (!mi) return null;
+  const slow = k => zone(z, k)[3], best = Math.min(Infinity, ...rs.filter(r => r.mi >= 3 && r.sec).map(r => r.sec / r.mi));
+  const tempo = best <= slow('tempo') + 10;
+  if (mi >= 16 || (mi >= 13 && !tempo)) return { kind: 'long', label: 'Long', mi };
+  if (tempo) return { kind: 'quality', label: 'Tempo', mi };
+  if (best <= slow('mp') + 5) return { kind: 'quality', label: 'MP', mi };
+  return { kind: 'easy', label: 'Easy', mi };
+}
+
+// Strength sessions from Garmin (a plain "Strength" tap on the watch is enough).
+export const liftsFrom = gdays => Object.entries(gdays).flatMap(([date, g]) => (g.activities || [])
+  .filter(a => /strength|weight/.test(a.type || '')).map(a => ({ date, id: a.id, name: a.name, min: Math.round((a.duration || 0) / 60), hr: a.avgHR })));
+export const LIFTS = ['Push', 'Pull', 'Legs', 'Shoulders', 'Abs'];
+
+// What kind of lifting fits a plan day, so legs never land right before a long run or workout.
+export function liftHint(plan, date) {
+  const d = planFor(plan, date), next = planFor(plan, addDays(date, 1)), toRace = d && plan.weeks.length ? daysBetween(date, plan.weeks.at(-1).days.find(x => x.kind === 'race')?.date || date) : 99;
+  if (!d || d.kind === 'race' || toRace < 0) return '';
+  if (toRace <= 6) return 'Race week: skip legs. Light upper body early in the week at most.';
+  if (d.kind === 'long') return 'No lifting today. Eat and recover.';
+  if (next && (next.kind === 'long' || next.kind === 'quality')) return `Upper body or abs only. ${next.kind === 'long' ? 'Long run' : 'Workout'} tomorrow, so no legs.`;
+  if (d.kind === 'quality') return 'Legs fit best today, after the run, so your easy days stay easy.';
+  if (toRace <= 13) return 'Upper body, abs, or light legs (bodyweight, no heavy squats).';
+  return 'Any split. Legs are fine if nothing hard is tomorrow.';
 }
 
 // Any distance in the range counts as done. Easy days flex the most; long runs flex down, not up.
