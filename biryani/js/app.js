@@ -71,10 +71,14 @@ async function render() {
   $('#trendsBtn').classList.toggle('on', state.tab === 'trends');
   syncBadge();
 }
+// Sync problems show in the header only (tap it for details) and retry on their own,
+// so a failed save never pops up over what you're doing. Your entries stay on the phone meanwhile.
+let syncErr = null, syncFails = 0;
 function syncBadge(msg) {
   const el = $('#sync');
   if (!sync.configured()) { el.textContent = 'local only'; el.className = ''; return; }
-  if (msg) { el.textContent = msg; return; }
+  if (msg) { el.textContent = msg; el.className = ''; return; }
+  if (syncErr) { el.textContent = 'not synced ⟳'; el.className = 'warn'; return; }
   const t = local.get('lastSync', 0);
   el.textContent = t ? '✓ ' + new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not synced';
   el.className = '';
@@ -84,12 +88,16 @@ function scheduleSync(ms = 6000) { clearTimeout(syncTimer); syncTimer = setTimeo
 async function runSync() {
   if (!sync.configured()) return;
   syncBadge('syncing…');
-  try { const r = await sync.sync(); syncBadge(); if (r.pulled) render(); }
-  catch (e) { syncBadge('sync failed'); $('#sync').className = 'warn'; toast(e.message); }
+  try { const r = await sync.sync(); syncErr = null; syncFails = 0; syncBadge(); if (r.pulled) render(); }
+  catch (e) {
+    syncErr = navigator.onLine === false ? 'Offline. Your entries are saved on this phone and sync when you\'re back online.' : e.message;
+    syncBadge(); scheduleSync(Math.min(5 * 60e3, 15e3 * 2 ** syncFails++));
+  }
 }
+$('#sync').onclick = () => { if (syncErr) toast(syncErr.length > 140 ? 'Sync failed; retrying now.' : syncErr); runSync(); };
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), Math.max(3500, msg.length * 70));
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), Math.min(5000, Math.max(2200, msg.length * 55)));
 }
 
 // Bottom sheet modal. Returns the sheet body element.
@@ -501,6 +509,7 @@ function openAdd(meal, { pick } = {}) {
     q.blur();
   };
   $('#qx', b).onclick = () => { q.value = ''; draw(); q.focus(); };
+  q.focus(); // keyboard up right away, like Macros
   $('#scanBtn', b).onclick = () => openScanner(meal, pick);
   $('#labelBtn', b).onclick = () => openLabel({ meal, pick });
   $('#newBtn', b).onclick = () => openFoodEditor(null, { meal, pick });
@@ -574,38 +583,70 @@ async function logEntry(e) {
   closeSheet(); render(); toast(`Logged ${e.name}`);
 }
 
-// Portion picker: log a food, edit a logged entry, or pick a recipe ingredient.
+// Per-serving foods whose label gives grams ("1 bar (65 g)") can still be weighed in g or oz.
+const gramsOf = l => +(/([\d.]+)\s*g\b/.exec(l || '')?.[1]) || 0;
+function withMass(units) {
+  if (units.some(u => u.label === 'g')) return units;
+  const sv = units.find(u => gramsOf(u.label));
+  if (!sv) return units;
+  const g = sv.mult / gramsOf(sv.label);
+  return [...units, { label: 'g', mult: g }, { label: 'oz', mult: g * 28.3495 }];
+}
+const unitsOf = f => withMass([...(f?.units?.length ? f.units : [{ label: 'serving', mult: 1 }])]);
+// Same amount in another unit: 220 g -> 7.8 oz, 2 servings (28 g) -> 56 g.
+const convertQty = (q, from, to) => { const v = (q * from.mult) / to.mult; return to.label === 'g' || to.label === 'ml' ? Math.round(v) : to.label === 'oz' ? Math.round(v * 10) / 10 : Math.round(v * 100) / 100; };
+
+// Portion page, laid out like Macros: name, calorie split, big C/P/F/kcal, amount with a
+// one-tap g / oz / serving switch that converts the amount. Logs a food, edits an entry, or picks an ingredient.
 function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
   (async () => {
     // A logged entry's food may have more units now; reload it if it still exists.
     if (entry && f.id) { const live = await db.get('foods', f.id); if (live) f = { ...live, source: 'mine' }; }
-    const units = [...(f.units?.length ? f.units : [{ label: 'serving', mult: 1 }])];
+    const units = unitsOf(f);
     // Editing keeps the entry's amount; "What fits" passes servings; otherwise start where you usually do.
     const start = entry ? { qty: entry.qty, unit: { label: entry.unit, mult: entry.mult } }
       : qStart ? { qty: qStart, unit: units.find(u => u.label.startsWith('serving')) || units[0] } : await defaultAmount(f);
     let ui = units.findIndex(u => u.label === start.unit.label);
     if (ui < 0) { units.unshift(start.unit); ui = 0; }
-    const q0 = start.qty;
     const remote = !['mine', 'recipe'].includes(f.source) || f._quick;
-    const b = sheet(`
-      <div class="pname">${esc(f.name)}</div><div class="sub">${f.brand ? esc(f.brand) + ' · ' : ''}<span class="badge src-${f.source}">${esc(f.srcLabel || '')}</span> ${checkBadge(f.n)}</div>
-      ${!N.check(f.n).ok && !N.check(f.n).missingKcal ? `<p class="warn small">Listed calories don't match the macros. ${state.s.caloriesFromMacros ? 'The app is counting calories from macros, so your totals stay consistent.' : 'Consider turning on "calories from macros" in Settings.'}</p>` : ''}
-      <div class="qtyrow"><input id="qty" type="number" inputmode="decimal" step="any" value="${q0}"><select id="unit">${units.map((u, i) => `<option value="${i}" ${i === ui ? 'selected' : ''}>${esc(u.label)}</option>`).join('')}</select></div>
-      <div id="live" class="live"></div>
+    const chips = [units.findIndex(u => u.label === 'g'), units.findIndex(u => u.label === 'oz'), units.findIndex(u => !['g', 'oz'].includes(u.label))].filter(i => i >= 0);
+    const chipLabel = u => (u.label === 'g' || u.label === 'oz' ? u.label : /^serving/.test(u.label) ? 'serving' : unitText(u.label));
+    const c = N.check(f.n);
+    const b = sheet(`<div class="pv">
+      <div class="phead"><div class="grow"><div class="pname">${esc(f.name)}</div>
+        <div class="pbrand">${[f.brand ? esc(f.brand) : '', f.source === 'mine' ? '' : `<span class="badge src-${f.source}">${esc(f.srcLabel || '')}</span>`, checkBadge(f.n)].filter(Boolean).join(' ')}</div></div>
+        ${donutSvg(f.n)}</div>
+      <div id="live" class="pmac"></div>
+      ${!c.ok && !c.missingKcal ? `<p class="warn small">Listed calories don't match the macros. ${state.s.caloriesFromMacros ? 'The app counts calories from macros, so your totals stay consistent.' : 'Consider turning on "calories from macros" in Settings.'}</p>` : ''}
+      <div class="qtyrow"><input id="qty" type="number" inputmode="decimal" step="any" value="${start.qty}"><select id="unit">${units.map((u, i) => `<option value="${i}" ${i === ui ? 'selected' : ''}>${esc(unitText(u.label))}</option>`).join('')}</select></div>
+      ${chips.length > 1 ? `<div class="uchips">${chips.map(i => `<button data-u="${i}">${esc(chipLabel(units[i]))}</button>`).join('')}<span class="conv" id="conv"></span></div>` : ''}
       ${pick || state.s.meals.length < 2 ? '' : `<label>Meal<select id="meal">${state.s.meals.map((m, i) => `<option value="${i}" ${i === (entry?.meal ?? meal) ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`}
-      ${remote && !pick ? `<label class="check"><input type="checkbox" id="save"> Save to my foods (for staples; it shows in recents either way once you eat it again)</label>` : ''}
-      <div class="actions">
-        ${entry ? '<button class="danger" id="del">Delete</button>' : ''}
-        ${f.source !== 'recipe' ? '<button id="edit">Edit nutrition</button>' : ''}
-        <button class="primary" id="go">${entry ? 'Update' : pick ? 'Add ingredient' : 'Log'}</button>
-      </div>`, { title: entry ? 'Edit entry' : 'Portion' });
+      ${remote && !pick ? `<label class="check"><input type="checkbox" id="save"> Save to my foods</label>` : ''}
+      <div class="pacts"><button class="primary" id="go">${entry ? 'Update' : pick ? 'Add ingredient' : 'Add'}</button>${f.source !== 'recipe' ? '<button class="link" id="edit">Edit</button>' : ''}</div>
+      ${entry ? '<button class="link danger" id="del">Delete entry</button>' : ''}
+    </div>`, { title: entry ? 'Edit entry' : pick ? 'Add ingredient' : 'Add food', full: true });
     const qty = $('#qty', b), unit = $('#unit', b);
+    let cur = +unit.value;
+    // Switching back and forth keeps the exact amount (220 g -> 7.8 oz -> 220 g, not 221).
+    let exact = (+qty.value || 0) * units[cur].mult;
     const upd = () => {
-      const n = N.scale(f.n, (+qty.value || 0) * units[+unit.value].mult);
-      $('#live', b).innerHTML = `<div class="kcal">${kcalOf(n)} kcal</div>${macroLine(n)}<div class="muted small">fiber ${r1(n.fib)} g · sugar ${r1(n.sug)} g · sodium ${r0(n.na)} mg</div>`;
+      const u = units[+unit.value], q = exact / u.mult, n = N.scale(f.n, exact);
+      const col = (k, v, l) => `<div class="${k}"><b>${v}</b><span>${l}</span></div>`;
+      $('#live', b).innerHTML = col('c', r1(state.s.netCarbs ? Math.max(0, n.c - (n.fib || 0)) : n.c), state.s.netCarbs ? 'Net carbs' : 'Carbs') + col('p', r1(n.p), 'Protein') + col('f', r1(n.f), 'Fat') + col('k', kcalOf(n), 'Calories') +
+        `<p class="muted small">${[n.fib ? `fiber ${r1(n.fib)} g` : '', n.sug ? `sugar ${r1(n.sug)} g` : '', n.na ? `sodium ${r0(n.na)} mg` : ''].filter(Boolean).join(' · ')}</p>`;
+      $$('.uchips button', b).forEach(x => x.classList.toggle('on', +x.dataset.u === +unit.value));
+      const conv = $('#conv', b);
+      if (conv) {
+        const other = units.find(x => x.label === (u.label === 'g' ? 'oz' : 'g'));
+        conv.textContent = other && q ? `= ${convertQty(exact / other.mult, { mult: 1 }, { ...other, mult: 1 })} ${other.label}` : '';
+      }
     };
-    qty.oninput = unit.onchange = upd; upd();
-    qty.select();
+    const setUnit = i => { qty.value = convertQty(exact / units[i].mult, { mult: 1 }, { ...units[i], mult: 1 }); unit.value = i; cur = i; upd(); };
+    qty.oninput = () => { exact = (+qty.value || 0) * units[cur].mult; upd(); };
+    unit.onchange = () => setUnit(+unit.value);
+    $$('.uchips button', b).forEach(x => (x.onclick = () => setUnit(+x.dataset.u)));
+    upd();
+    qty.focus(); qty.select();
     if (entry) $('#del', b).onclick = async () => { await db.remove(logName(entry.date), entry.id); closeSheet(); render(); };
     const editBtn = $('#edit', b);
     if (editBtn) editBtn.onclick = () => openFoodEditor(f, { meal, pick, entry });
@@ -616,7 +657,7 @@ function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
         foodId = saved.id;
       }
       const u = units[+unit.value];
-      const base = { name: f.name, brand: f.brand, foodId, recipeId: f.recipeId, qty: +qty.value || 0, unit: u.label, mult: u.mult, n: f.n };
+      const base = { name: f.name, brand: f.brand, foodId, recipeId: f.recipeId, qty: Math.round((exact / u.mult) * 1000) / 1000, unit: u.label, mult: u.mult, n: f.n };
       if (pick) return pick(base, { ...f, units });
       const m = +($('#meal', b)?.value ?? 0);
       if (entry) { await db.put(logName(entry.date), { ...entry, ...base, meal: m }); closeSheet(); render(); }
@@ -719,7 +760,7 @@ function openVoice({ autostart = true } = {}) {
   const draw = () => {
     const rows = vstate.rows;
     $('#vrows', b).innerHTML = rows.map((r, i) => {
-      const units = r.food?.units?.length ? r.food.units : [{ label: 'serving', mult: 1 }];
+      const units = unitsOf(r.food);
       const n = r.food ? N.scale(r.food.n, r.amount.qty * r.amount.mult) : null;
       return `<li class="vrow ${r.src}" data-i="${i}"><div class="grow">
         <div class="vhead"><div class="name">${r.food ? esc(r.food.name) : `No match for "${esc(r.text)}"`}</div><button class="rm" aria-label="Remove">✕</button></div>
@@ -740,7 +781,7 @@ function openVoice({ autostart = true } = {}) {
       } }); };
       const q = $('.vq', li), u = $('.vu', li);
       if (q) q.oninput = () => { r.amount.qty = +q.value || 0; const n = N.scale(r.food.n, r.amount.qty * r.amount.mult); $('.vfoot', li).innerHTML = `${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span>`; $('#logAll', b).textContent = `Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal`; };
-      if (u) u.onchange = () => { const unit = r.food.units[u.selectedIndex]; r.amount = { ...r.amount, unit: unit.label, mult: unit.mult }; draw(); };
+      if (u) u.onchange = () => { const unit = unitsOf(r.food)[u.selectedIndex]; r.amount = { qty: convertQty(r.amount.qty, { label: r.amount.unit, mult: r.amount.mult }, unit), unit: unit.label, mult: unit.mult }; draw(); };
     });
     const la = $('#logAll', b);
     if (la) la.onclick = async () => {
@@ -1513,8 +1554,9 @@ async function viewSettings() {
   </section>`;
 }
 // Grams + kcal per macro next to a donut of the calorie split, like Macros' goal screen.
-function macroSplit(g) {
-  const k = { c: g.c * 4, p: g.p * 4, f: g.f * 9 }, t = k.c + k.p + k.f || 1;
+// Calorie split ring (C / P / F) with percentages, like Macros.
+function donutSvg(g) {
+  const k = { c: (g.c || 0) * 4, p: (g.p || 0) * 4, f: (g.f || 0) * 9 }, t = k.c + k.p + k.f || 1;
   let a0 = -Math.PI / 2;
   const arc = x => {
     const frac = k[x] / t; if (frac <= 0) return '';
@@ -1524,8 +1566,12 @@ function macroSplit(g) {
     const out = `<path d="${d}" class="${x}"/>${frac >= 0.08 ? `<text x="${50 + 29 * Math.cos(mid)}" y="${50 + 29 * Math.sin(mid) + 4}" text-anchor="middle">${Math.round(frac * 100)}</text>` : ''}`;
     a0 = a1; return out;
   };
+  return `<svg viewBox="0 0 100 100" class="donut" role="img" aria-label="Calorie split">${['c', 'p', 'f'].map(arc).join('')}</svg>`;
+}
+function macroSplit(g) {
+  const k = { c: g.c * 4, p: g.p * 4, f: g.f * 9 };
   const col = (x, l) => `<div class="${x}"><div>${l}</div><b>${r0(g[x])} g</b><span>${r0(k[x])} kcal</span></div>`;
-  return `<div class="msplit"><div class="mcols3">${col('c', 'Carbs')}${col('p', 'Protein')}${col('f', 'Fat')}</div><svg viewBox="0 0 100 100" class="donut" role="img" aria-label="Calorie split">${['c', 'p', 'f'].map(arc).join('')}</svg></div>`;
+  return `<div class="msplit"><div class="mcols3">${col('c', 'Carbs')}${col('p', 'Protein')}${col('f', 'Fat')}</div>${donutSvg(g)}</div>`;
 }
 bind.settings = root => {
   const s = state.s;
@@ -1560,8 +1606,8 @@ bind.settings = root => {
     for (const [k, v] of new FormData($('#gh', root))) local.set(k, String(v).trim()); // pasted but not yet blurred
     if (!sync.configured()) return toast('Paste your GitHub token first');
     syncBadge('syncing…');
-    try { const r = await sync.sync(); syncBadge(); toast(`Synced ✓ ${r.pulled ? `pulled ${r.pulled} file(s)` : 'token works'}`); render(); }
-    catch (e) { syncBadge('sync failed'); $('#sync').className = 'warn'; toast(e.message); }
+    try { const r = await sync.sync(); syncErr = null; syncBadge(); toast(`Synced ✓ ${r.pulled ? `pulled ${r.pulled} file(s)` : 'token works'}`); render(); }
+    catch (e) { syncErr = e.message; syncBadge(); toast(e.message); }
   };
   $('#pullG', root).onclick = async () => {
     // Capped at one manual pull a day (synced, so it holds across devices); auto runs at 8am and 8pm.
@@ -1617,6 +1663,7 @@ function defaultMeal() {
   return Math.min(n - 1, h < 15 ? 0 : h < 18 ? 1 : 2);
 }
 db.onChange(() => scheduleSync());
+addEventListener('online', () => scheduleSync(500));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') runSync(); else scheduleSync(500); });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
 render().then(() => scheduleSync(300));

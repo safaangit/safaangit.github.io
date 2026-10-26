@@ -9,14 +9,16 @@ export const configured = () => !!cfg().token;
 
 async function gh(path, opts = {}) {
   const { token, repo } = cfg();
+  // no-store: GitHub marks API answers cacheable for 60 s, and a cached file sha makes the next save fail with 409.
   const r = await fetch(`https://api.github.com/repos/${repo}${path ? '/' + path : ''}`, {
-    ...opts,
+    cache: 'no-store', ...opts,
     headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', ...opts.headers },
   });
   if (r.status === 404) return null;
   if (!r.ok) {
     let msg = `GitHub ${r.status}: ${(await r.text()).slice(0, 160)}`;
     if (r.status === 401) msg = 'GitHub rejected the token: it was mistyped, expired or revoked. Make a new one and paste it again.';
+    else if (r.status === 409 || r.status === 422) msg = 'The synced copy changed while saving (another device or a nightly job). Merging and retrying.';
     else if (r.status === 403 && r.headers.get('x-ratelimit-remaining') === '0') msg = 'GitHub rate limit hit; try again in a few minutes.';
     else if (r.status === 403) msg = path.startsWith('actions')
       ? 'Token is missing the "Actions: Read and write" permission (only needed for Pull Garmin now).'
