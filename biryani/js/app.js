@@ -96,9 +96,36 @@ async function runSync() {
   }
 }
 $('#sync').onclick = () => { if (syncErr) toast(syncErr.length > 140 ? 'Sync failed; retrying now.' : syncErr); runSync(); };
-function toast(msg) {
-  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), Math.min(5000, Math.max(2200, msg.length * 55)));
+// Small notice above the nav. With an action ("Undo") it stays a little longer and is tappable.
+function toast(msg, { action, onAction } = {}) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show'); t.classList.toggle('act', !!action);
+  if (action) {
+    const btn = document.createElement('button'); btn.textContent = action;
+    btn.onclick = () => { t.classList.remove('show'); onAction(); };
+    t.append(btn);
+  }
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), action ? 5000 : Math.min(5000, Math.max(2200, msg.length * 55)));
+}
+// Swipe a row left past a third of its width to delete it (red "Delete" shows underneath).
+function swipeToDelete(li, onDelete) {
+  let x0, y0, dx = 0, drag = null, bg = null;
+  const reset = () => { li.style.transform = ''; bg?.remove(); bg = null; };
+  li.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; drag = null; li.style.transition = 'none'; }, { passive: true });
+  li.addEventListener('touchmove', e => {
+    const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+    if (drag === null) { if (Math.abs(mx) < 10 && Math.abs(my) < 10) return; drag = mx < 0 && Math.abs(mx) > Math.abs(my) * 1.3; }
+    if (!drag) return;
+    if (!bg) { bg = document.createElement('div'); bg.className = 'swipebg'; bg.textContent = 'Delete'; Object.assign(bg.style, { top: li.offsetTop + 'px', height: li.offsetHeight + 'px' }); li.parentNode.append(bg); }
+    dx = Math.min(0, mx); li.style.transform = `translateX(${dx}px)`;
+    bg.classList.toggle('armed', -dx > li.offsetWidth / 3);
+  }, { passive: true });
+  li.addEventListener('touchend', () => {
+    li.style.transition = '';
+    if (!drag) return;
+    li._swiped = true; setTimeout(() => (li._swiped = false), 400); // no tap-to-edit after a swipe
+    if (-dx > li.offsetWidth / 3) { li.style.transform = 'translateX(-100%)'; setTimeout(onDelete, 160); } else reset();
+  });
+  li.addEventListener('touchcancel', () => { li.style.transition = ''; reset(); });
 }
 
 // Bottom sheet modal. Returns the sheet body element.
@@ -371,7 +398,13 @@ bind.today = root => {
     await logEntry({ name: f.name, recipeId: f.recipeId, qty: 1, unit: f.units[0].label, mult: 1, n: f.n, meal: 0 });
   }));
   $$('.selBtn', root).forEach(b => (b.onclick = () => { state.sel = new Set(); render(); }));
+  if (!state.sel) $$('.meal li[data-id]', root).forEach(li => swipeToDelete(li, async () => {
+    const e = await db.get(logName(state.date), li.dataset.id); if (!e) return render();
+    await db.remove(logName(e.date), e.id); render();
+    toast(`Deleted ${e.name}`, { action: 'Undo', onAction: async () => { await db.put(logName(e.date), { ...e }); render(); } });
+  }));
   $$('.meal li[data-id]', root).forEach(li => (li.onclick = async () => {
+    if (li._swiped) return;
     if (state.sel) { state.sel.has(li.dataset.id) ? state.sel.delete(li.dataset.id) : state.sel.add(li.dataset.id); return render(); }
     const e = await db.get(logName(state.date), li.dataset.id);
     openPortion({ name: e.name, brand: e.brand, n: e.n, units: [{ label: e.unit, mult: e.mult }], id: e.foodId, recipeId: e.recipeId, source: 'mine' }, { entry: e });
