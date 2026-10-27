@@ -88,7 +88,8 @@ button.add { border: 0; background: none; color: var(--accent); width: 36px; hei
 .mcol { text-align: center; min-width: 0; }
 .mcol .lbl { font-size: 15px; font-weight: 500; }
 .mcol .num { font-size: 19px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.mcol .rem { font-size: 12.5px; color: var(--muted); } .mcol .rem.over { color: var(--warn); font-weight: 600; }
+.mcols { cursor: pointer; } .mcol .num.over { color: var(--warn); }
+
 .mcol.c { color: var(--c); } .mcol.p { color: var(--p); } .mcol.f { color: var(--f); }
 .track { height: 9px; border-radius: 9px; overflow: hidden; margin: 5px 0 4px; background: color-mix(in srgb, currentColor 22%, transparent); }
 .track > div { height: 100%; border-radius: 9px; background: currentColor; transition: width .3s; }
