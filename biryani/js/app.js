@@ -5,7 +5,8 @@ import { r0, r1 } from './nutrition.js';
 import * as food from './food.js';
 import * as scan from './scan.js';
 import * as sync from './sync.js';
-import { goalsFor, recommend, measuredTdee, autoDayType } from './goals.js';
+import { goalsFor, recommend, measuredTdee, autoDayType, weekAdjust, withWeek } from './goals.js';
+import { weekStart, daysBetween } from './training.js';
 import { bars, line, ema, bindCharts } from './charts.js';
 import * as voice from './voice.js';
 import * as train from './trainview.js';
@@ -123,11 +124,35 @@ const logName = date => 'log/' + monthOf(date);
 async function entriesFor(date) {
   return (await db.all(logName(date))).filter(e => e.date === date).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 }
-async function dayContext(date) {
+// base: skip the weekly budget (it is built from the base goals of the week's other days).
+async function dayContext(date, base = false) {
   const [gday, dayRec, manual] = await Promise.all([sync.garminDay(date).catch(() => null), db.get('days', date), db.all('exercises')]);
   const mine = manual.filter(x => x.date === date).map(x => ({ ...x, manual: true, distance: (x.mi || 0) * 1609.34, type: x.run ? 'running' : 'other' }));
   const g = { ...(gday || {}), activities: [...(gday?.activities || []), ...mine] };
-  return { gday, g, dayRec, goals: goalsFor(state.s, g, dayRec?.dayType) };
+  const goals = goalsFor(state.s, g, dayRec?.dayType);
+  const week = base ? null : await weekBudget(date, goals).catch(() => null);
+  return { gday, g, dayRec, week, goals: withWeek(goals, week?.adj) };
+}
+// Where this week stands vs the goals so far, and what that moves today's goal by (goals.js weekAdjust).
+async function weekBudget(date, goals) {
+  if (state.s.weekBudget === false || date > today()) return null;
+  const start = weekStart(date), prior = [], rest = [];
+  for (let d = start; d < date; d = addDays(d, 1)) {
+    const [es, ctx] = await Promise.all([entriesFor(d), dayContext(d, true)]);
+    prior.push({ date: d, eaten: N.entryTotals(es, state.s.caloriesFromMacros).kcal, goal: ctx.goals.kcal });
+  }
+  const { kinds, raceDate } = await train.planKinds(state.s).catch(() => ({ kinds: {} }));
+  const why = d => {
+    const k = kinds[d], toRace = raceDate ? daysBetween(d, raceDate) : 99;
+    if (toRace >= -1 && toRace <= 6) return 'race week';
+    if (k === 'long') return 'long run day';
+    if (k === 'quality') return 'workout day';
+    if (kinds[addDays(d, -1)] === 'long') return 'day after the long run';
+    if (d === date && goals.exKcal >= 600) return 'big training day';
+    return '';
+  };
+  for (let d = date; d <= addDays(start, 6); d = addDays(d, 1)) rest.push({ date: d, protect: why(d) });
+  return { ...weekAdjust(prior, rest, date), prior, start };
 }
 // Recents ranked by how often and how lately you ate them. One-offs drop off after a
 // week, and anything you remove stays hidden until you log it again.
@@ -264,6 +289,9 @@ async function viewToday() {
   const kbar = `<button class="kbar ${isOver(tot.kcal, goals.kcal) ? 'over' : ''}" id="kcalBtn" aria-label="Toggle eaten / remaining">${fill(tot.kcal, goals.kcal)}
     <div class="num">${showLeft ? `<b>${r0(left)}</b> kcal left` : `<b>${r0(tot.kcal)}</b> / ${r0(goals.kcal)} kcal`}</div></button>`;
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
+  const wk = ctx.week, sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') + r0(Math.abs(v));
+  const weekLine = !wk?.logged ? '' : `<button class="weekline" id="weekBtn">${ico('cal')}<span>Week <b>${sgn(wk.balance)}</b> ${wk.small ? '· on track' : wk.balance > 0 ? 'over' : 'under'}${
+    wk.adj ? ` · today <b>${sgn(wk.adj)}</b>` : wk.protect ? ` · not from today (${wk.protect})` : ''}</span>${ico('next')}</button>`;
 
   const single = s.meals.length === 1, sel = state.sel;
   const preps = (await prepStatus()).map(x => `<button class="prepbtn" data-prep="${x.id}">${ico('plusc')}<span class="grow">${esc(x.name)}</span><span class="small">${x.left > 0 ? `${x.left} of ${x.total} left` : 'all eaten'} · ${kcalOf(x.n)} kcal</span></button>`).join('');
@@ -304,10 +332,11 @@ async function viewToday() {
   <section class="card summary">
     <div class="mcols" id="macroBtn" role="button" aria-label="Toggle eaten / remaining">${col('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${col('p', 'Protein', tot.p, goals.p)}${col('f', 'Fat', tot.f, goals.f)}</div>
     ${kbar}
+    ${weekLine}
     ${date !== today() ? '' : left > 50 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}What fits my ${r0(left)} kcal left?</button>`
       : pLeft >= 15 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}Still ${r0(pLeft)} g protein short · lean picks</button>` : ''}
     <div class="sumfoot"><button class="chip" id="dayType" title="Tap to ignore or count exercise">${ico('pie')}${esc(goals.label)}${goals.auto ? '' : ' · set by you'}</button>
-      <div class="goalline">Goal <b>${r0(goals.kcal)}</b>${goals.eatBack ? ` <span class="small">(+${goals.eatBack} exercise)</span>` : ''}</div></div>
+      <div class="goalline">Goal <b>${r0(goals.kcal)}</b>${goals.eatBack || goals.weekAdj ? ` <span class="small">(${[goals.eatBack ? `+${goals.eatBack} exercise` : '', goals.weekAdj ? `${sgn(goals.weekAdj)} week` : ''].filter(Boolean).join(', ')})</span>` : ''}</div></div>
   </section>
   ${byMeal}
   ${selBar}
@@ -333,6 +362,7 @@ bind.today = root => {
   };
   $$('.meal .addBig[data-meal]', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
   $('#fitBtn', root)?.addEventListener('click', () => openFits());
+  $('#weekBtn', root)?.addEventListener('click', () => openWeek());
   // Tap the macros or the calorie bar to flip all four between eaten and left, like Macros.
   $$('#kcalBtn, #macroBtn', root).forEach(x => (x.onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); }));
   $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
@@ -530,6 +560,27 @@ function openAdd(meal, { pick } = {}) {
   $('#labelBtn', b).onclick = () => openLabel({ meal, pick });
   $('#newBtn', b).onclick = () => openFoodEditor(null, { meal, pick });
   if (!pick) { $('#quickBtn', b).onclick = () => openQuick(meal); $('#voiceBtn', b).onclick = () => openVoice(); }
+}
+
+// The week so far: each logged day vs its goal, and how the rest of the week is adjusted.
+async function openWeek() {
+  const { week: wk, goals } = await dayContext(state.date);
+  if (!wk) return;
+  const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') + r0(Math.abs(v));
+  const day = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const rows = wk.prior.map(d => {
+    const counted = d.eaten >= d.goal * 0.5, diff = d.eaten - d.goal;
+    return `<li><div class="grow"><div class="name">${day(d.date)}</div><div class="sub">${counted ? `${r0(d.eaten)} / ${r0(d.goal)} kcal` : d.eaten ? 'Not counted: under half logged' : 'Not logged'}</div></div>
+      ${counted ? `<b class="wdiff ${diff > 0 ? 'over' : 'under'}">${sgn(diff)}</b>` : ''}</li>`;
+  }).join('');
+  const now = wk.small ? `That's within 300 kcal, which is tracking noise, so today's goal is unchanged.`
+    : wk.adj < 0 ? `Today's goal is ${r0(-wk.adj)} kcal lower (taken from fat and carbs, never protein) to even it out over the days left.`
+    : wk.adj > 0 ? `Today's goal is ${r0(wk.adj)} kcal higher, mostly carbs, to use what you saved.`
+    : wk.protect ? `Nothing comes off today because it's a ${wk.protect}. Fuel it fully.` : 'No days left this week to spread it over, so it\'s let go.';
+  sheet(`<p class="wsum">This week (from ${day(wk.start)}): <b>${sgn(wk.balance)} kcal</b> ${wk.balance >= 0 ? 'over' : 'under'} your goals so far. ${now}</p>
+    <ul class="entries card weekdays">${rows || '<li class="empty small">Today is the first day of the week.</li>'}</ul>
+    <p class="hint">Today's goal: <b>${r0(goals.kcal)}</b> kcal · ${macroLine(goals)}</p>
+    <p class="muted small">How it works: the week runs Monday to Sunday and starts clean every Monday. Gaps under 300 kcal are ignored. Bigger ones are spread over the days left, at most 250 kcal a day. Overs are never taken from a long run, workout, day after a long run, or race week. Anything left on Sunday is let go. Turn it off in Settings → Daily goals.</p>`, { title: 'Weekly budget' });
 }
 
 // Suggest your own foods and recipes that fit what's left today, protein first.
@@ -1555,7 +1606,8 @@ async function viewSettings() {
     <p class="hint">Set your base day (no exercise). Each day the app adds what you actually burned from Garmin or manual exercise, so a hard 9.5 mi run, a lift, or an hour of basketball all count, mostly as extra carbs. Big days (over ~500 exercise kcal) also get up to half your deficit back for recovery.</p>
     <button id="calc" class="primary wide">Recommend from my stats</button>
     <form id="dts">${dt('rest')}</form>
-    <form id="fuel" class="form"><label>Exercise calories to eat back (%)<input name="fuelPct" type="number" min="0" max="150" step="5" inputmode="numeric" value="${s.fuelPct ?? 100}"></label></form>
+    <form id="fuel" class="form"><label>Exercise calories to eat back (%)<input name="fuelPct" type="number" min="0" max="150" step="5" inputmode="numeric" value="${s.fuelPct ?? 100}"></label>
+      <label class="check"><input type="checkbox" name="weekBudget" ${s.weekBudget !== false ? 'checked' : ''}> Weekly budget: spread big overs and unders across the rest of the week (Mon–Sun, max 250 kcal a day, never on long run, workout or race-week days)</label></form>
   </section>
   <section class="card"><h3>👤 Profile</h3><form id="prof" class="form">
     <div class="grid3"><label>Sex<select name="sex"><option value="male" ${p.sex === 'male' ? 'selected' : ''}>male</option><option value="female" ${p.sex === 'female' ? 'selected' : ''}>female</option></select></label>
@@ -1620,7 +1672,11 @@ bind.settings = root => {
     }
     await db.saveSettings(s); render();
   };
-  $('#fuel', root).onchange = async e => { s.fuelPct = Math.max(0, +e.target.value || 0); await db.saveSettings(s); toast('Saved'); };
+  $('#fuel', root).onchange = async e => {
+    const f = new FormData(e.currentTarget);
+    Object.assign(s, { fuelPct: Math.max(0, +f.get('fuelPct') || 0), weekBudget: f.get('weekBudget') === 'on' });
+    await db.saveSettings(s); toast('Saved');
+  };
   $('#prof', root).onchange = async e => {
     const f = Object.fromEntries(new FormData(e.currentTarget));
     s.profile = { sex: f.sex, age: +f.age, heightIn: +f.heightIn, weightLb: +f.weightLb, neat: +f.neat };

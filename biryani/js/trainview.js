@@ -35,6 +35,17 @@ async function load(s, ref = today()) {
   return { cfg, gdays, runs, lifts, pred, autoGoal, plan, adapted, gear };
 }
 
+// Plan day kinds by date plus the race date, for the weekly calorie budget. Today asks on every
+// render, so keep it for a minute.
+let kindsMemo = null;
+export async function planKinds(s) {
+  if (kindsMemo && Date.now() - kindsMemo.t < 60e3) return kindsMemo.v;
+  const { cfg, plan } = await load(s);
+  const kinds = Object.fromEntries(plan.weeks.flatMap(w => w.days).map(d => [d.date, d.kind]));
+  kindsMemo = { t: Date.now(), v: { kinds, raceDate: cfg.raceDate } };
+  return kindsMemo.v;
+}
+
 // ---------- Today card ----------
 export async function todayCard(s, date, ui) {
   const { cfg, runs, plan } = await load(s);
