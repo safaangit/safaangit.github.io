@@ -555,7 +555,7 @@ function openAdd(meal, { pick } = {}) {
       if (libQ !== q.value.trim()) return runLib();
       if (!libRes) { out.innerHTML = '<p class="muted pad">Searching USDA and Open Food Facts…</p>'; return; }
       show([{ title: 'Library', items: libRes }], libRes.length ? '' : '<p class="muted pad">No library matches. Try fewer words, scan the barcode, or snap the label.</p>');
-      if (food.usdaThrottled && !local.get('usdaKey')) out.insertAdjacentHTML('afterbegin', '<p class="warn small">USDA demo key is rate-limited. Add your free key in Settings for better generic results.</p>');
+      if (food.usdaThrottled && !local.get('usdaKey')) out.insertAdjacentHTML('afterbegin', '<p class="warn small">USDA demo key is rate-limited. Add your free key in Settings for more branded results.</p>');
     }
   };
   const runLib = async () => {

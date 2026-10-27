@@ -1,5 +1,5 @@
-// Food lookup across your pantry, Open Food Facts and USDA FoodData Central,
-// ranked by source quality, name match and whether calories agree with macros.
+// Food lookup across your pantry, the bundled USDA whole-foods list, Open Food Facts and USDA
+// FoodData Central, ranked by source quality, name match and whether calories agree with macros.
 import { all, local } from './db.js';
 import { check, gramUnits, scale } from './nutrition.js';
 
@@ -102,11 +102,40 @@ async function usdaBarcode(code) {
   return hits.filter(h => sameCode(h.barcode, code));
 }
 
+// ---- Bundled whole foods ----
+// app/generic.json (built by tools/generic_foods.js): ~5,000 plain foods per 100 g from USDA
+// Foundation + SR Legacy, so "shrimp" or "chicken breast" works instantly, offline and without a key.
+let genP;
+function fromGeneric([id, name, full, kcal, p, c, f, fib, sug, na, por, pop]) {
+  const units = por ? por.split('|').map(x => { const i = x.lastIndexOf(':'); return { label: x.slice(0, i), mult: +x.slice(i + 1) / 100 }; }) : [];
+  return {
+    name: name || full, full, n: clean({ kcal, p, c, f, fib, sug, na }), units: gramUnits(units),
+    source: 'gen', srcLabel: 'USDA', srcId: id, pop,
+  };
+}
+export function generic() {
+  genP ??= fetch(new URL('../generic.json', import.meta.url)).then(r => r.json()).then(d => d.foods.map(fromGeneric)).catch(() => { genP = null; return []; });
+  return genP;
+}
+async function genericSearch(q, brands) {
+  const list = await generic();
+  return list.filter(f => coverage(q, f, brands) >= 0.66).map(f => ({ f, s: score(q, f, brands) }))
+    .sort((a, b) => b.s - a.s).slice(0, 15).map(x => x.f);
+}
+
 // ---- Ranking ----
-const SRC_W = { mine: 1.3, recipe: 1.25, usda: 1.0, 'usda-b': 0.85, off: 0.7 };
+const SRC_W = { mine: 1.3, recipe: 1.25, gen: 1.1, usda: 1.0, 'usda-b': 0.85, off: 0.7 };
 const stem = w => (w.length > 3 ? w.replace(/(ies)$/, 'y').replace(/(es|s)$/, '') : w);
 // Words that say nothing about the food, including what speech adds ("yeah so", "no I said").
 export const STOP = new Set(['a', 'an', 'the', 'of', 'and', 'with', 'in', 'on', 'i', 'no', 'said', 'mean', 'meant', 'some', 'my', 'yeah', 'so', 'um', 'uh', 'okay', 'ok', 'like', 'had', 'ate']);
+// Words that only say "the ordinary one" ("plain shrimp"): fine to have, never required.
+const SOFT = new Set(['plain', 'fresh', 'natural', 'regular', 'unseasoned', 'organic', 'simple', 'just']);
+// Cooking words match how USDA names the method ("cooked" finds "boiled", "roasted", "dry heat").
+const SYN = {
+  cooked: ['cooked', 'boiled', 'steamed', 'roasted', 'grilled', 'baked', 'broiled', 'stewed', 'braised', 'poached', 'heat', 'browned'],
+  grilled: ['grilled', 'broiled', 'roasted', 'heat'], baked: ['baked', 'roasted', 'heat'], boiled: ['boiled', 'moist', 'steamed'],
+  steamed: ['steamed', 'boiled', 'moist'], raw: ['raw', 'uncooked', 'dry'], uncooked: ['raw', 'uncooked', 'dry'], dry: ['dry', 'raw', 'uncooked'],
+};
 export const tokens = s => (s || '').toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter(Boolean);
 export function lev(a, b) {
   if (Math.abs(a.length - b.length) > 2) return 9;
@@ -122,6 +151,7 @@ export function lev(a, b) {
 // ("cookie" finds "cookies", but "i" no longer matches every word with an i in it); a typo in a
 // longer word ("drizzalicious" for Drizzilicious) counts most of the way.
 export function wordHit(w, hay) {
+  if (SYN[w] && hay.some(h => SYN[w].includes(h))) return 1;
   const s = stem(w);
   if (hay.some(h => h === w || h.startsWith(s) || stem(h) === s)) return 1;
   const tol = w.length >= 9 ? 2 : w.length >= 5 ? 1 : 0;
@@ -129,16 +159,18 @@ export function wordHit(w, hay) {
 }
 // Share of the query's food words found in a food (0-1). Brand words count double, so
 // "yasso cookie dough" ranks Yasso bars above plain cookie dough.
+const foodWords = q => { const w = tokens(q).filter(x => !STOP.has(x)), hard = w.filter(x => !SOFT.has(x)); return hard.length ? hard : w; };
+const hayOf = f => (f._hay ??= [...tokens(f.full || f.name), ...tokens(f.brand)]); // the full name, so a shortened one keeps its flavor
 export function coverage(q, f, brands) {
-  const words = tokens(q).filter(w => !STOP.has(w));
+  const words = foodWords(q);
   if (!words.length) return tokens(q).length ? 0 : 1;
-  const hay = [...tokens(f.full || f.name), ...tokens(f.brand)]; // the full name, so a shortened one keeps its flavor
+  const hay = hayOf(f);
   let got = 0, max = 0;
   for (const w of words) { const wt = brands && wordHit(w, brands) ? 2 : 1; max += wt; got += wt * wordHit(w, hay); }
   return got / max;
 }
 export function relevance(q, f, brands) {
-  const first = tokens(q).find(w => !STOP.has(w)), name = tokens(f.name);
+  const first = foodWords(q)[0], name = tokens(f.name);
   const starts = first && name[0] && wordHit(first, [name[0]]) ? 0.15 : 0;
   const short = 0.2 / Math.max(1, (name.length + tokens(f.brand).length) / 4); // prefer "Chicken breast, cooked" over long descriptions
   return coverage(q, f, brands) + starts + short;
@@ -148,15 +180,18 @@ export function brandWords(list, generic = []) {
   const common = new Set(generic.flatMap(f => tokens(f.name)));
   return [...new Set(list.flatMap(f => tokens(f.brand)))].filter(w => w.length >= 3 && !STOP.has(w) && !common.has(w));
 }
+// Not halal: sinks to the bottom rather than hiding, so a search for it still finds something.
+const HARAM = /\b(pork|lard|gelatine?|wine|beer|rum|liqueur|whiske?y|vodka|bourbon|brandy|tequila|pepperoni|salami|prosciutto|chorizo|pancetta)\b|(?<!(turkey|beef|chicken) )\b(ham|bacon)\b/i;
 export function score(q, f, brands) {
   const c = check(f.n);
   const complete = ['kcal', 'p', 'c', 'f'].every(k => f.n?.[k] != null) ? 1 : 0.7;
-  return relevance(q, f, brands) * (SRC_W[f.source] || 0.6) * (c.ok ? 1 : 0.6) * complete;
+  const rel = relevance(q, f, brands), staple = f.pop && rel >= 1 ? 0.3 : 0; // shrimp, chicken breast, rice, eggs…
+  return (rel + staple) * (SRC_W[f.source] || 0.6) * (c.ok ? 1 : 0.6) * complete * (HARAM.test(`${f.full || f.name} ${f.brand || ''}`) ? 0.3 : 1);
 }
 function dedupe(list) {
   const seen = new Map();
   for (const f of list) {
-    const k = f.barcode ? 'b' + String(f.barcode).replace(/^0+/, '') : 'n' + `${f.name}|${f.brand || ''}`.toLowerCase();
+    const k = f.barcode ? 'b' + String(f.barcode).replace(/^0+/, '') : ['gen', 'usda'].includes(f.source) ? 'u' + f.srcId : 'n' + `${f.name}|${f.brand || ''}`.toLowerCase();
     if (!seen.has(k) || (SRC_W[f.source] || 0) > (SRC_W[seen.get(k).source] || 0)) seen.set(k, f);
   }
   return [...seen.values()];
@@ -177,14 +212,17 @@ export async function byBarcode(code) {
   return { own: [], found };
 }
 
-// Text: generic USDA data is the most accurate for whole foods; brands come from USDA Branded + OFF.
+// Text: generic USDA data is the most accurate for whole foods (bundled, plus the live API when
+// you've added your own key); brands come from USDA Branded + OFF.
 export async function search(q, { recipes = [] } = {}) {
   const ql = q.trim(), pantry = await mine();
-  const [gen, br, off] = await Promise.all([
-    usdaSearch(ql, 'Foundation,SR Legacy,Survey (FNDDS)'),
+  const [api, br, off, bundled] = await Promise.all([
+    local.get('usdaKey', '') ? usdaSearch(ql, 'Foundation,SR Legacy,Survey (FNDDS)') : [], // saves the demo key's ~10/hour for brands
     usdaSearch(ql, 'Branded'),
     offSearch(ql),
+    genericSearch(ql),
   ]);
+  const gen = [...bundled, ...api];
   const brands = brandWords([...pantry, ...br, ...off], [...gen, ...pantry]);
   const own = [...pantry, ...recipes.map(r => ({ ...r, source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : r.tag === 'prep' ? 'Meal prep' : 'Recipe' }))]
     .filter(f => relevance(ql, f, brands) >= 0.99);
@@ -195,6 +233,7 @@ export async function search(q, { recipes = [] } = {}) {
 
 // Per-serving preview for list rows.
 export function preview(f) {
+  if (f.source === 'gen') return { unit: { label: '100 g', mult: 1 }, n: f.n }; // you weigh these
   const u = f.units?.find(x => x.label.startsWith('serving')) || f.units?.find(x => !['g', 'oz'].includes(x.label)) ||
     (f.units?.some(x => x.label === 'g') ? { label: '100 g', mult: 1 } : f.units?.[0] || { label: 'serving', mult: 1 });
   return { unit: u, n: scale(f.n, u.mult) };
