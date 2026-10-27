@@ -22,7 +22,11 @@ const wordsToNum = str => str.replace(NUMWORD, m => {
   const ws = m.trim().split(/[\s-]+/);
   if (!ws.some(w => TENS.includes(w) || w === 'hundred')) return m; // "two eggs" stays as is
   let n = 0;
-  for (const w of ws) n = w === 'hundred' ? (n || 1) * 100 : n + (ONES.includes(w) ? ONES.indexOf(w) : TENS.indexOf(w) * 10);
+  for (const w of ws) {
+    if (w === 'hundred') n = (n || 1) * 100;
+    else if (TENS.includes(w)) n = (n > 0 && n < 10 ? n * 100 : n) + TENS.indexOf(w) * 10; // "one twenty six" = 126
+    else n += ONES.indexOf(w);
+  }
   return n + ' ';
 });
 const FILLER = /^(of|um|uh|like|about|around|plus|also|then|i|had|ate|and)$/;
