@@ -183,6 +183,17 @@ function macroLine(n, s = state.s) {
   return `<span class="macros">${s.netCarbs ? 'NC' : 'C'}: <b class="c">${r1(c)}</b>P: <b class="p">${r1(n.p)}</b>F: <b class="f">${r1(n.f)}</b></span>`;
 }
 const kcalOf = n => r0(N.countedKcal(n, state.s.caloriesFromMacros));
+// What's left today in words, so going over reads "248 g over" instead of a minus sign.
+function leftLine(rem) {
+  const amt = (v, u) => `${r0(Math.abs(v))}${u} ${v < 0 ? 'over' : 'left'}`;
+  return `<span class="leftline"><b class="${rem.kcal < 0 ? 'neg' : ''}">${amt(rem.kcal, ' kcal')}</b> · <span class="p">P ${amt(rem.p, ' g')}</span> · <span class="c">${state.s.netCarbs ? 'NC' : 'C'} ${amt(rem.c, ' g')}</span> · <span class="f">F ${amt(rem.f, ' g')}</span></span>`;
+}
+// Once you're out of calories, only lean protein still "fits" (60%+ of its calories from
+// protein, 250 kcal or less), and only while protein is short, so suggestions never add carbs or fat.
+const outOfKcal = rem => rem.kcal <= 50;
+const isLean = (n, k) => k > 0 && k <= 250 && (n.p * 4) / k >= 0.6;
+const fitsLeft = (n, k, rem) => outOfKcal(rem) ? rem.p >= 15 && isLean(n, k) : k <= rem.kcal + 40 && n.f <= Math.max(rem.f, 0) + 4;
+const netC = t => Math.max(0, t.c - (t.fib || 0));
 // "serving (1 pita (57g))" reads better as "1 pita (57g)" in tight rows.
 const unitText = l => (/^serving \((.*)\)$/.exec(l || '')?.[1] || l || '').replace(/\d+\.\d{2,}/g, m => String(Math.round(m * 10) / 10));
 // Macros-style two-line row: name + kcal, then brand/serving + C P F.
@@ -242,12 +253,15 @@ async function viewToday() {
   const [entries, ctx, weights] = await Promise.all([entriesFor(date), dayContext(date), db.all('weights')]);
   const { g, gday, goals } = ctx;
   const tot = N.entryTotals(entries, s.caloriesFromMacros);
-  const carbs = s.netCarbs ? tot.c - tot.fib : tot.c;
-  const left = goals.kcal - tot.kcal;
+  const carbs = s.netCarbs ? netC(tot) : tot.c;
+  const left = goals.kcal - tot.kcal, pLeft = goals.p - tot.p;
   const showLeft = local.get('kcalView', 'eaten') === 'left';
-  const fill = (have, goal) => `<div class="track"><div style="width:${Math.min(100, (have / Math.max(1, goal)) * 100)}%" class="${have > goal * 1.08 ? 'over' : ''}"></div></div>`;
-  const col = (k, label, have, goal) => `<div class="mcol ${k}"><div class="lbl">${label}</div>${fill(have, goal)}<div class="num">${r0(have)} / ${r0(goal)} g</div><div class="rem">${have > goal ? r0(have - goal) + ' g over' : r0(goal - have) + ' g left'}</div></div>`;
-  const kbar = `<button class="kbar ${left < 0 ? 'over' : ''}" id="kcalBtn" aria-label="Toggle eaten / remaining">${fill(tot.kcal, goals.kcal)}
+  // Past the goal (with 8% slack) the bar stays full: goal part in color, the overshoot in red.
+  const isOver = (have, goal) => have > goal * 1.08;
+  const fill = (have, goal) => `<div class="track">${isOver(have, goal) ? `<div class="over" style="width:100%;--g:${((goal / have) * 100).toFixed(1)}%"></div>`
+    : `<div style="width:${Math.min(100, (have / Math.max(1, goal)) * 100)}%"></div>`}</div>`;
+  const col = (k, label, have, goal) => `<div class="mcol ${k}"><div class="lbl">${label}</div>${fill(have, goal)}<div class="num">${r0(have)} / ${r0(goal)} g</div><div class="rem ${isOver(have, goal) ? 'over' : ''}">${have > goal ? r0(have - goal) + ' g over' : r0(goal - have) + ' g left'}</div></div>`;
+  const kbar = `<button class="kbar ${isOver(tot.kcal, goals.kcal) ? 'over' : ''}" id="kcalBtn" aria-label="Toggle eaten / remaining">${fill(tot.kcal, goals.kcal)}
     <div class="num">${showLeft ? `<b>${r0(Math.abs(left))}</b> kcal ${left < 0 ? 'over' : 'left'}` : `<b>${r0(tot.kcal)}</b> / ${r0(goals.kcal)} kcal`}</div></button>`;
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
 
@@ -255,12 +269,12 @@ async function viewToday() {
   const preps = (await prepStatus()).map(x => `<button class="prepbtn" data-prep="${x.id}">${ico('plusc')}<span class="grow">${esc(x.name)}</span><span class="small">${x.left > 0 ? `${x.left} of ${x.total} left` : 'all eaten'} · ${kcalOf(x.n)} kcal</span></button>`).join('');
   const byMeal = s.meals.map((m, mi) => {
     const list = entries.filter(e => single || (e.meal ?? 0) === mi);
-    const t = N.entryTotals(list, s.caloriesFromMacros), tc = s.netCarbs ? t.c - t.fib : t.c;
+    const t = N.entryTotals(list, s.caloriesFromMacros), tc = s.netCarbs ? netC(t) : t.c;
     // Stripe under the title shows this meal's calorie split, like Macros.
     const kc = { c: tc * 4, p: t.p * 4, f: t.f * 9 }, ks = kc.c + kc.p + kc.f;
     const stripe = `<div class="mstripe">${ks ? ['c', 'p', 'f'].map(k => `<div class="${k}" style="flex:${kc[k] / ks}"></div>`).join('') : '<div class="e"></div>'}</div>`;
     // With one running list the meal total is the day total, so show it against the goal.
-    const mt = (k, v, goal, label) => `<div class="${k}"><b>${r0(v)}${single ? ' / ' + r0(goal) : ''}</b><span>${label}</span></div>`;
+    const mt = (k, v, goal, label) => `<div class="${k}"><b class="${single && isOver(v, goal) ? 'over' : ''}">${r0(v)}${single ? ' / ' + r0(goal) : ''}</b><span>${label}</span></div>`;
     return `<section class="card meal"><header><h3>${esc(single && /^food$/i.test(m) ? (date === today() ? 'Today meals' : 'Meals') : m)}</h3>
       ${list.length && !sel ? '<button class="link selBtn">Select</button>' : ''}</header>${stripe}
     <ul class="entries ${sel ? 'selecting' : ''}">${list.map(e => {
@@ -290,7 +304,8 @@ async function viewToday() {
   <section class="card summary">
     <div class="mcols">${col('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${col('p', 'Protein', tot.p, goals.p)}${col('f', 'Fat', tot.f, goals.f)}</div>
     ${kbar}
-    ${date === today() && left > 50 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}What fits my ${r0(left)} kcal left?</button>` : ''}
+    ${date !== today() ? '' : left > 50 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}What fits my ${r0(left)} kcal left?</button>`
+      : pLeft >= 15 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}Still ${r0(pLeft)} g protein short · lean picks</button>` : ''}
     <div class="sumfoot"><button class="chip" id="dayType" title="Tap to ignore or count exercise">${ico('pie')}${esc(goals.label)}${goals.auto ? '' : ' · set by you'}</button>
       <div class="goalline">Goal <b>${r0(goals.kcal)}</b>${goals.eatBack ? ` <span class="small">(+${goals.eatBack} exercise)</span>` : ''}</div></div>
   </section>
@@ -375,15 +390,15 @@ function openExercise(id) {
     const b = sheet(`<form id="ex" class="form">
       <label>Name<input name="name" value="${esc(x.name)}" required></label>
       <label class="check"><input type="checkbox" name="run" ${x.run ? 'checked' : ''}> Counts as a run</label>
-      <div class="grid3"><label>Miles<input name="mi" type="number" step="0.01" inputmode="decimal" value="${x.mi ?? ''}"></label>
-      <label>Minutes<input name="min" type="number" inputmode="numeric" value="${x.min ?? ''}"></label>
-      <label>kcal<input name="kcal" type="number" inputmode="numeric" value="${x.kcal ?? ''}"></label></div>
+      <div class="grid3"><label>Miles<input name="mi" type="number" min="0" step="0.01" inputmode="decimal" value="${x.mi ?? ''}"></label>
+      <label>Minutes<input name="min" type="number" min="0" inputmode="numeric" value="${x.min ?? ''}"></label>
+      <label>kcal<input name="kcal" type="number" min="0" inputmode="numeric" value="${x.kcal ?? ''}"></label></div>
       <p class="muted small">Garmin activities show up on their own after the nightly sync; use this for anything not on your watch.</p>
       <div class="actions">${id ? '<button type="button" class="danger" id="del">Delete</button>' : ''}<button class="primary">Save</button></div></form>`, { title: id ? 'Edit exercise' : 'Add exercise' });
     $('#ex', b).onsubmit = async ev => {
       ev.preventDefault();
       const f = new FormData(ev.target);
-      await db.put('exercises', { ...x, date: x.date || state.date, name: f.get('name'), run: f.get('run') === 'on', mi: +f.get('mi') || 0, min: +f.get('min') || 0, kcal: +f.get('kcal') || 0 });
+      await db.put('exercises', { ...x, date: x.date || state.date, name: f.get('name'), run: f.get('run') === 'on', mi: Math.max(0, +f.get('mi') || 0), min: Math.max(0, +f.get('min') || 0), kcal: Math.max(0, +f.get('kcal') || 0) });
       closeSheet(); render();
     };
     if (id) $('#del', b).onclick = async () => { await db.remove('exercises', id); closeSheet(); render(); };
@@ -520,7 +535,8 @@ function openAdd(meal, { pick } = {}) {
 async function openFits() {
   const s = state.s, [entries, ctx] = await Promise.all([entriesFor(state.date), dayContext(state.date)]);
   const tot = N.entryTotals(entries, s.caloriesFromMacros), goals = ctx.goals;
-  const rem = { kcal: goals.kcal - tot.kcal, p: goals.p - tot.p, c: goals.c - (s.netCarbs ? tot.c - tot.fib : tot.c), f: goals.f - tot.f };
+  const rem = { kcal: goals.kcal - tot.kcal, p: goals.p - tot.p, c: goals.c - (s.netCarbs ? netC(tot) : tot.c), f: goals.f - tot.f };
+  const lean = outOfKcal(rem);
   const [recent, pantry, recipes] = await Promise.all([recentFoods(300), food.mine(), recipeFoods()]);
   const seen = new Set(), cands = [];
   for (const f of [...pantry, ...recipes, ...recent]) { const k = f.id || f._key || f.name; if (!seen.has(k)) { seen.add(k); cands.push(f); } }
@@ -532,6 +548,13 @@ async function openFits() {
     // One serving, or 2 of small things (egg whites, tuna) so a suggestion is a real portion.
     for (const q of k1 < 150 ? [1, 2] : [0.5, 1]) {
       const n = N.scale(one, q), k = k1 * q;
+      if (lean) {
+        // Over on calories: lean protein only, sized to the protein still missing.
+        if (rem.p < 15 || !isLean(n, k) || n.p > rem.p + 15) continue;
+        const score = (Math.min(n.p, rem.p) / rem.p) * 2 + (n.p * 4) / k - (q === 1 ? 0 : 0.1);
+        if (!best || score > best.score) best = { f, q, n, k, score, unit: pv.unit };
+        continue;
+      }
       if (k > rem.kcal + 40 || n.f > Math.max(rem.f, 0) + 4 || n.c > Math.max(rem.c, 0) + 8) continue;
       // Reward filling protein and using the calories; penalize going over any macro.
       // Aim at a meal-sized chunk (≤700 kcal, ≤50 g protein) so a big budget doesn't just suggest doubles.
@@ -544,10 +567,11 @@ async function openFits() {
   }
   picks.sort((a, b) => b.score - a.score);
   const top = picks.slice(0, 15);
-  const b = sheet(`<p class="hint">Left today: <b>${r0(rem.kcal)}</b> kcal · ${macroLine(rem)}</p>
-    ${top.length ? `<ul class="list">${top.map((x, i) => `<li class="food" data-i="${i}"><div class="grow">${row2(esc(x.f.name), x.n, esc(`${x.q === 1 ? '' : x.q + ' × '}${unitText(x.unit.label)}${x.f.brand ? ', ' + x.f.brand : ''}`))}</div></li>`).join('')}</ul>`
+  const b = sheet(`<p class="hint">Today: ${leftLine(rem)}</p>
+    ${lean ? `<p class="hint">${rem.p >= 15 ? "You're out of calories, so these are lean protein only (mostly protein, almost no carbs or fat). Skip them if you're not hungry." : 'Calories and protein are both covered today. Nothing to add.'}</p>` : ''}
+    ${lean && rem.p < 15 ? '' : top.length ? `<ul class="list">${top.map((x, i) => `<li class="food" data-i="${i}"><div class="grow">${row2(esc(x.f.name), x.n, esc(`${x.q === 1 ? '' : x.q + ' × '}${unitText(x.unit.label)}${x.f.brand ? ', ' + x.f.brand : ''}`))}</div></li>`).join('')}</ul>`
       : '<p class="muted">Nothing in your foods fits what\'s left. A protein shake or egg whites usually does.</p>'}
-    <p class="muted small" style="margin-top:12px">Ranked by how much protein it covers and how well it uses your calories without going over. Tap one to log it.</p>`, { title: 'What fits' });
+    ${lean ? '' : `<p class="muted small" style="margin-top:12px">Ranked by how much protein it covers and how well it uses your calories without going over. Tap one to log it.</p>`}`, { title: lean ? 'Lean protein' : 'What fits' });
   $$('li.food', b).forEach(li => (li.onclick = () => { const x = top[+li.dataset.i]; openPortion(x.f, { meal: 0, qty: x.q }); }));
 }
 
@@ -565,14 +589,15 @@ async function prepStatus() {
 
 function openQuick(meal) {
   const b = sheet(`<form id="qa" class="form"><label>Name<input name="name" value="Quick add"></label>
-    <div class="grid4"><label>Carbs<input name="c" type="number" step="any" inputmode="decimal"></label><label>Protein<input name="p" type="number" step="any" inputmode="decimal"></label>
-    <label>Fat<input name="f" type="number" step="any" inputmode="decimal"></label><label>kcal<input name="kcal" type="number" step="any" inputmode="decimal" placeholder="auto"></label></div>
+    <div class="grid4"><label>Carbs<input name="c" type="number" min="0" step="any" inputmode="decimal"></label><label>Protein<input name="p" type="number" min="0" step="any" inputmode="decimal"></label>
+    <label>Fat<input name="f" type="number" min="0" step="any" inputmode="decimal"></label><label>kcal<input name="kcal" type="number" min="0" step="any" inputmode="decimal" placeholder="auto"></label></div>
     <div class="actions"><button class="primary">Log</button></div></form>`, { title: 'Quick add' });
   $('#qa', b).onsubmit = async e => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.target));
-    const n = { p: +f.p || 0, c: +f.c || 0, f: +f.f || 0 };
-    n.kcal = +f.kcal || N.macroKcal(n);
+    const pos = v => Math.max(0, +v || 0);
+    const n = { p: pos(f.p), c: pos(f.c), f: pos(f.f) };
+    n.kcal = pos(f.kcal) || N.macroKcal(n);
     await logEntry({ name: f.name || 'Quick add', n, qty: 1, unit: 'serving', mult: 1, meal });
   };
 }
@@ -618,7 +643,7 @@ function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
         ${donutSvg(f.n)}</div>
       <div id="live" class="pmac"></div>
       ${!c.ok && !c.missingKcal ? `<p class="warn small">Listed calories don't match the macros. ${state.s.caloriesFromMacros ? 'The app counts calories from macros, so your totals stay consistent.' : 'Consider turning on "calories from macros" in Settings.'}</p>` : ''}
-      <div class="qtyrow"><input id="qty" type="number" inputmode="decimal" step="any" value="${start.qty}"><select id="unit">${units.map((u, i) => `<option value="${i}" ${i === ui ? 'selected' : ''}>${esc(unitText(u.label))}</option>`).join('')}</select></div>
+      <div class="qtyrow"><input id="qty" type="number" min="0" inputmode="decimal" step="any" value="${start.qty}"><select id="unit">${units.map((u, i) => `<option value="${i}" ${i === ui ? 'selected' : ''}>${esc(unitText(u.label))}</option>`).join('')}</select></div>
       ${chips.length > 1 ? `<div class="uchips">${chips.map(i => `<button data-u="${i}">${esc(chipLabel(units[i]))}</button>`).join('')}<span class="conv" id="conv"></span></div>` : ''}
       ${pick || state.s.meals.length < 2 ? '' : `<label>Meal<select id="meal">${state.s.meals.map((m, i) => `<option value="${i}" ${i === (entry?.meal ?? meal) ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></label>`}
       ${remote && !pick ? `<label class="check"><input type="checkbox" id="save"> Save to my foods</label>` : ''}
@@ -642,7 +667,7 @@ function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
       }
     };
     const setUnit = i => { qty.value = convertQty(exact / units[i].mult, { mult: 1 }, { ...units[i], mult: 1 }); unit.value = i; cur = i; upd(); };
-    qty.oninput = () => { exact = (+qty.value || 0) * units[cur].mult; upd(); };
+    qty.oninput = () => { exact = Math.max(0, +qty.value || 0) * units[cur].mult; $('#go', b).disabled = !(exact > 0); upd(); };
     unit.onchange = () => setUnit(+unit.value);
     $$('.uchips button', b).forEach(x => (x.onclick = () => setUnit(+x.dataset.u)));
     upd();
@@ -677,16 +702,16 @@ function openFoodEditor(f, { meal, pick, entry, barcode, prefill } = {}) {
     ${prefill?.notes ? `<p class="warn small">${esc(prefill.notes)}</p>` : ''}
     <label>Name<input name="name" required value="${esc(prefill?.name || f?.name || '')}"></label>
     <div class="grid2"><label>Brand<input name="brand" value="${esc(prefill?.brand || f?.brand || '')}"></label><label>Barcode<input name="barcode" inputmode="numeric" value="${esc(barcode || f?.barcode || '')}"></label></div>
-    <div class="grid2"><label>Serving<input name="sl" value="${esc(servingLabel)}"></label><label>Serving grams<input name="sg" type="number" step="any" inputmode="decimal" value="${servingG}" placeholder="optional"></label></div>
+    <div class="grid2"><label>Serving<input name="sl" value="${esc(servingLabel)}"></label><label>Serving grams<input name="sg" type="number" min="0" step="any" inputmode="decimal" value="${servingG}" placeholder="optional"></label></div>
     <h4>Per serving</h4>
-    <div class="grid4"><label>kcal<input name="kcal" type="number" step="any" inputmode="decimal" value="${v('kcal')}"></label><label>Carbs<input name="c" type="number" step="any" inputmode="decimal" value="${v('c')}"></label>
-    <label>Protein<input name="p" type="number" step="any" inputmode="decimal" value="${v('p')}"></label><label>Fat<input name="f" type="number" step="any" inputmode="decimal" value="${v('f')}"></label></div>
-    <div class="grid3"><label>Fiber<input name="fib" type="number" step="any" inputmode="decimal" value="${v('fib')}"></label><label>Sugar<input name="sug" type="number" step="any" inputmode="decimal" value="${v('sug')}"></label><label>Sodium mg<input name="na" type="number" step="any" inputmode="decimal" value="${v('na')}"></label></div>
+    <div class="grid4"><label>kcal<input name="kcal" type="number" min="0" step="any" inputmode="decimal" value="${v('kcal')}"></label><label>Carbs<input name="c" type="number" min="0" step="any" inputmode="decimal" value="${v('c')}"></label>
+    <label>Protein<input name="p" type="number" min="0" step="any" inputmode="decimal" value="${v('p')}"></label><label>Fat<input name="f" type="number" min="0" step="any" inputmode="decimal" value="${v('f')}"></label></div>
+    <div class="grid3"><label>Fiber<input name="fib" type="number" min="0" step="any" inputmode="decimal" value="${v('fib')}"></label><label>Sugar<input name="sug" type="number" min="0" step="any" inputmode="decimal" value="${v('sug')}"></label><label>Sodium mg<input name="na" type="number" min="0" step="any" inputmode="decimal" value="${v('na')}"></label></div>
     <div id="chk"></div>
     <label class="check"><input type="checkbox" name="verified" ${f?.verified || prefill ? 'checked' : ''}> Verified against the package</label>
     <div class="actions">${f?.source === 'mine' && f.id && !f._quick ? '<button type="button" class="danger" id="delFood">Delete food</button>' : ''}<button class="primary">Save</button></div></form>`, { title: f ? 'Edit food' : 'New food' });
   const form = $('#fe', b);
-  const read = () => { const d = Object.fromEntries(new FormData(form)); return { d, n: Object.fromEntries(N.KEYS.map(k => [k, d[k] === '' ? undefined : +d[k]])) }; };
+  const read = () => { const d = Object.fromEntries(new FormData(form)); return { d, n: Object.fromEntries(N.KEYS.map(k => [k, d[k] === '' ? undefined : Math.max(0, +d[k] || 0)])) }; };
   const chk = () => {
     const { n } = read(), c = N.check(n);
     $('#chk', b).innerHTML = c.ok ? (n.kcal ? '<p class="ok small">✓ Calories match the macros</p>' : '') :
@@ -765,7 +790,7 @@ function openVoice({ autostart = true } = {}) {
       return `<li class="vrow ${r.src}" data-i="${i}"><div class="grow">
         <div class="vhead"><div class="name">${r.food ? esc(r.food.name) : `No match for "${esc(r.text)}"`}</div><button class="rm" aria-label="Remove">✕</button></div>
         <div class="qty">${r.src === 'yours' ? '✓ your food' : r.src === 'guess' ? '⚠ best guess, check it' : 'tap Pick to choose'} · heard "${esc(r.said)}"</div>
-        ${r.food ? `<div class="vamt"><input class="vq" type="number" step="any" inputmode="decimal" value="${r.amount.qty}"><select class="vu">${units.map(u => `<option ${u.label === r.amount.unit ? 'selected' : ''}>${esc(unitText(u.label))}</option>`).join('')}</select></div>
+        ${r.food ? `<div class="vamt"><input class="vq" type="number" min="0" step="any" inputmode="decimal" value="${r.amount.qty}"><select class="vu">${units.map(u => `<option ${u.label === r.amount.unit ? 'selected' : ''}>${esc(unitText(u.label))}</option>`).join('')}</select></div>
         <div class="vfoot">${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span></div>` : ''}
         <button class="chg">${r.food ? 'Wrong food? Pick another' : 'Pick food'}</button>
       </div></li>`;
@@ -780,7 +805,7 @@ function openVoice({ autostart = true } = {}) {
         openVoice({ autostart: false });
       } }); };
       const q = $('.vq', li), u = $('.vu', li);
-      if (q) q.oninput = () => { r.amount.qty = +q.value || 0; const n = N.scale(r.food.n, r.amount.qty * r.amount.mult); $('.vfoot', li).innerHTML = `${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span>`; $('#logAll', b).textContent = `Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal`; };
+      if (q) q.oninput = () => { r.amount.qty = Math.max(0, +q.value || 0); const n = N.scale(r.food.n, r.amount.qty * r.amount.mult); $('.vfoot', li).innerHTML = `${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span>`; $('#logAll', b).textContent = `Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal`; };
       if (u) u.onchange = () => { const unit = unitsOf(r.food)[u.selectedIndex]; r.amount = { qty: convertQty(r.amount.qty, { label: r.amount.unit, mult: r.amount.mult }, unit), unit: unit.label, mult: unit.mult }; draw(); };
     });
     const la = $('#logAll', b);
@@ -990,12 +1015,12 @@ function openRecipe(r) {
     $('#items', b).innerHTML = r.items.map((it, i) => {
       const n = N.scale(it.n, it.qty * it.mult);
       return `<li><div class="grow"><div class="name">${esc(it.name)}</div><div class="qty"><b>${kcalOf(n)} kcal</b></div>${macroLine(n)}</div>
-      <input class="iq" data-i="${i}" type="number" step="any" inputmode="decimal" value="${it.qty}"><span class="small">${esc(it.unit)}</span><button type="button" class="rm" data-i="${i}" aria-label="Remove">✕</button></li>`;
+      <input class="iq" data-i="${i}" type="number" min="0" step="any" inputmode="decimal" value="${it.qty}"><span class="small">${esc(it.unit)}</span><button type="button" class="rm" data-i="${i}" aria-label="Remove">✕</button></li>`;
     }).join('');
     const t = N.zero(); r.items.forEach(it => N.add(t, N.scale(it.n, it.qty * it.mult)));
     const sv = Math.max(1, +form.servings.value || 1), per = N.scale(t, 1 / sv);
     $('#rtot', b).innerHTML = `<div class="qty">Whole recipe: <b>${kcalOf(t)} kcal</b></div>${macroLine(t)}<div class="kcal" style="margin-top:10px">Per ${esc(form.servingLabel.value)}: ${kcalOf(per)} kcal</div>${macroLine(per)}`;
-    $$('.iq', b).forEach(x => (x.oninput = () => { r.items[+x.dataset.i].qty = +x.value || 0; drawTotals(); }));
+    $$('.iq', b).forEach(x => (x.oninput = () => { r.items[+x.dataset.i].qty = Math.max(0, +x.value || 0); drawTotals(); }));
     $$('.rm', b).forEach(x => (x.onclick = () => { r.items.splice(+x.dataset.i, 1); draw(); }));
   };
   const drawTotals = () => { const keep = document.activeElement?.dataset?.i; draw(); if (keep != null) { const el = $(`.iq[data-i="${keep}"]`, b); el?.focus(); el?.setSelectionRange?.(99, 99); } };
@@ -1065,7 +1090,7 @@ function dealRow(d, buys, { store = true } = {}) {
 async function leftToday() {
   const s = state.s, [entries, ctx] = await Promise.all([entriesFor(today()), dayContext(today())]);
   const tot = N.entryTotals(entries, s.caloriesFromMacros), g = ctx.goals;
-  return { kcal: g.kcal - tot.kcal, p: g.p - tot.p, c: g.c - (s.netCarbs ? tot.c - tot.fib : tot.c), f: g.f - tot.f };
+  return { kcal: g.kcal - tot.kcal, p: g.p - tot.p, c: g.c - (s.netCarbs ? netC(tot) : tot.c), f: g.f - tot.f };
 }
 
 const exModeBar = m => `<div class="seg mode" id="exMode">${EX_MODES.map(([k, l]) => `<button data-m="${k}" class="${k === m ? 'on' : ''}">${l}</button>`).join('')}</div>`;
@@ -1086,8 +1111,9 @@ async function viewExplore() {
   if (chip === 'you') shown = [...shown].sort((a, b) => b.score - a.score || density(a, b));
   else if (chip === 'fits') {
     const rem = await leftToday();
-    shown = shown.filter(x => x.k <= rem.kcal + 40 && x.n.f <= Math.max(rem.f, 0) + 4).sort((a, b) => b.n.p - a.n.p);
-    note = `<p class="hint">Left today: <b>${r0(rem.kcal)}</b> kcal · ${macroLine(rem)}</p>`;
+    shown = shown.filter(x => fitsLeft(x.n, x.k, rem)).sort((a, b) => b.n.p - a.n.p);
+    state.exFitsDone = outOfKcal(rem) && rem.p < 15;
+    note = `<p class="hint">Today: ${leftLine(rem)}${outOfKcal(rem) && rem.p >= 15 ? '<br>Out of calories, so only lean protein shows.' : ''}</p>`;
   } else shown = shown.filter(x => (chip === 'hack' ? x.hack : x.cat === chip)).sort(density);
   state.exShown = shown;
   const sub = x => [CAT[x.cat], ...new Set(x.links.map(l => LINK[l.t]))].join(' · ');
@@ -1096,7 +1122,7 @@ async function viewExplore() {
   return `${exModeBar(mode)}<div class="row eoq"><input id="exQ" type="search" placeholder="Search ideas or an ingredient" value="${esc(state.exQ || '')}" enterkeyhint="search"></div>
     <div class="chips" id="exChips">${EX_CHIPS.map(([k, l]) => `<button data-c="${k}" class="${k === chip ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${note}
-    ${shown.length ? `<ul class="list card ideas">${shown.map(row).join('')}</ul>` : `<p class="muted pad">${chip === 'fits' ? "None of the ideas fit what's left today." : 'Nothing matches.'}</p>`}
+    ${shown.length ? `<ul class="list card ideas">${shown.map(row).join('')}</ul>` : `<p class="muted pad">${chip !== 'fits' ? 'Nothing matches.' : state.exFitsDone ? 'Calories and protein are covered today. Nothing to add.' : "None of the ideas fit what's left today."}</p>`}
     ${chip === 'fits' ? `<button class="wide" id="exFits">${ico('pie')}What fits from my own foods</button>` : ''}
     <p class="muted small">All halal: vegetarian, seafood or halal meat, no gelatin or alcohol. Macros are worked out from labels for the amounts listed. Tap an idea for the videos and posts it came from.</p>`;
 }
@@ -1171,7 +1197,7 @@ function halalBadges(h) {
 function eoOrders(orders, f, rem, halalPlace) {
   const want = ['veg', 'fish'].filter(k => f.includes(k));
   return orders.filter(o => (!want.length || want.includes(o.tag)) && (o.tag !== 'meat' || halalPlace !== false)
-    && (!f.includes('fits') || !rem || o.n.kcal <= rem.kcal + 40))
+    && (!f.includes('fits') || !rem || (outOfKcal(rem) ? rem.p >= 15 && isLean(o.n, o.n.kcal) : o.n.kcal <= rem.kcal + 40)))
     .sort((a, b) => b.n.p / b.n.kcal - a.n.p / a.n.kcal);
 }
 const orderRow = (o, i, halalPlace) => `<li class="food eo" data-o="${i}"><div class="grow">${row2(esc(o.name), o.n, esc(o.price || ''))}
@@ -1366,6 +1392,13 @@ function openCuisine(c) {
   $('#cAsk', b).onclick = () => openAsk({ place: '', cuisine: c.name });
 }
 
+// Macros for the prompt; once over, say so instead of sending negative numbers.
+function askMacros(rem) {
+  const amt = (v, u, what) => `${r0(Math.abs(v))}${u} ${what} ${v < 0 ? 'over' : 'left'}`;
+  const line = `Today so far: ${[amt(rem.kcal, ' kcal', 'calories'), amt(rem.p, ' g', 'protein'), amt(rem.c, ' g', 'carbs'), amt(rem.f, ' g', 'fat')].join(', ')}.`;
+  return line + (outOfKcal(rem) ? " I'm already at or over my calories, so I want the lightest, leanest high-protein option (or tell me to skip it)." : ' I want high protein for the calories.');
+}
+
 // Hands the question to Claude (free on your plan) with macros left and halal rules filled in.
 async function openAsk({ place = '', cuisine = '', photo = false, near = false } = {}) {
   const rem = await leftToday(), f = local.get('eoF', []);
@@ -1382,7 +1415,7 @@ async function openAsk({ place = '', cuisine = '', photo = false, near = false }
     return [
       near ? `Find halal restaurants near ${w || loc || 'me'}. For each: fully vs partly halal, certifier, hand vs machine slaughter (say "unconfirmed" if no source says), alcohol served, and the source (Zabihah, HMS, HFSAA, the restaurant) with a link. Then the best macro-friendly order at each.`
         : `What should I order at ${w || 'this restaurant'}?${photo ? ' I attached a photo of the menu.' : ''}`,
-      `Macros left today: ${r0(rem.kcal)} kcal, ${r0(rem.p)} g protein, ${r0(rem.c)} g carbs, ${r0(rem.f)} g fat. I want high protein for the calories.`,
+      askMacros(rem),
       'I eat halal only: no pork, no alcohol (including mirin, sake, wine in sauces). If the meat isn\'t halal, give vegetarian or fish options instead. Show the halal status with sources: fully vs partly halal, certifier, hand vs machine slaughter, alcohol served.',
       diet.length ? `Prefer ${diet.join(' or ')} orders.` : '',
       'Give the 3 best orders with exact customizations to ask for, estimated calories / protein / carbs / fat (say whether it\'s from published nutrition or an estimate, and the portion you assumed), the price if you can find it, and what to skip.',
@@ -1508,7 +1541,7 @@ async function viewSettings() {
   const dt = (k) => {
     const d = s.dayTypes[k], g = N.goalGrams(d), mk = r0(4 * g.p + 4 * g.c + 9 * g.f);
     return `<fieldset data-dt="${k}" class="dt-${k}"><legend>${k === 'rest' ? 'Base day' : esc(d.label) + ' day'}</legend>
-      <div class="grid2"><label>Calories<input name="kcal" type="number" inputmode="numeric" value="${d.kcal}"></label>
+      <div class="grid2"><label>Calories<input name="kcal" type="number" min="0" inputmode="numeric" value="${d.kcal}"></label>
       <label>Macros by<select name="mode"><option value="g" ${d.mode === 'g' ? 'selected' : ''}>grams</option><option value="%" ${d.mode === '%' ? 'selected' : ''}>percent</option></select></label></div>
       <div class="grid3"><label class="lc">Carbs ${d.mode === '%' ? '%' : 'g'}<input class="ic" name="c" type="number" step="any" inputmode="decimal" value="${d.c}"></label>
       <label class="lp">Protein ${d.mode === '%' ? '%' : 'g'}<input class="ip" name="p" type="number" step="any" inputmode="decimal" value="${d.p}"></label>
