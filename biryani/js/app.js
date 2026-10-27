@@ -260,9 +260,9 @@ async function viewToday() {
   const isOver = (have, goal) => have > goal * 1.08;
   const fill = (have, goal) => `<div class="track">${isOver(have, goal) ? `<div class="over" style="width:100%;--g:${((goal / have) * 100).toFixed(1)}%"></div>`
     : `<div style="width:${Math.min(100, (have / Math.max(1, goal)) * 100)}%"></div>`}</div>`;
-  const col = (k, label, have, goal) => `<div class="mcol ${k}"><div class="lbl">${label}</div>${fill(have, goal)}<div class="num">${r0(have)} / ${r0(goal)} g</div><div class="rem ${isOver(have, goal) ? 'over' : ''}">${have > goal ? r0(have - goal) + ' g over' : r0(goal - have) + ' g left'}</div></div>`;
+  const col = (k, label, have, goal) => `<div class="mcol ${k}"><div class="lbl">${label}</div>${fill(have, goal)}${showLeft ? `<div class="num ${have > goal ? 'over' : ''}">${r0(goal - have)} left</div>` : `<div class="num ${isOver(have, goal) ? 'over' : ''}">${r0(have)} / ${r0(goal)} g</div>`}</div>`;
   const kbar = `<button class="kbar ${isOver(tot.kcal, goals.kcal) ? 'over' : ''}" id="kcalBtn" aria-label="Toggle eaten / remaining">${fill(tot.kcal, goals.kcal)}
-    <div class="num">${showLeft ? `<b>${r0(Math.abs(left))}</b> kcal ${left < 0 ? 'over' : 'left'}` : `<b>${r0(tot.kcal)}</b> / ${r0(goals.kcal)} kcal`}</div></button>`;
+    <div class="num">${showLeft ? `<b>${r0(left)}</b> kcal left` : `<b>${r0(tot.kcal)}</b> / ${r0(goals.kcal)} kcal`}</div></button>`;
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
 
   const single = s.meals.length === 1, sel = state.sel;
@@ -302,7 +302,7 @@ async function viewToday() {
 
   return `
   <section class="card summary">
-    <div class="mcols">${col('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${col('p', 'Protein', tot.p, goals.p)}${col('f', 'Fat', tot.f, goals.f)}</div>
+    <div class="mcols" id="macroBtn" role="button" aria-label="Toggle eaten / remaining">${col('c', s.netCarbs ? 'Net carbs' : 'Carbs', carbs, goals.c)}${col('p', 'Protein', tot.p, goals.p)}${col('f', 'Fat', tot.f, goals.f)}</div>
     ${kbar}
     ${date !== today() ? '' : left > 50 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}What fits my ${r0(left)} kcal left?</button>`
       : pLeft >= 15 ? `<button class="fitbtn" id="fitBtn">${ico('zap')}Still ${r0(pLeft)} g protein short · lean picks</button>` : ''}
@@ -333,7 +333,8 @@ bind.today = root => {
   };
   $$('.meal .addBig[data-meal]', root).forEach(b => (b.onclick = () => openAdd(+b.dataset.meal)));
   $('#fitBtn', root)?.addEventListener('click', () => openFits());
-  $('#kcalBtn', root).onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); };
+  // Tap the macros or the calorie bar to flip all four between eaten and left, like Macros.
+  $$('#kcalBtn, #macroBtn', root).forEach(x => (x.onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); }));
   $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
   $$('.prepbtn', root).forEach(b => (b.onclick = async () => {
     const f = (await recipeFoods()).find(x => x.id === b.dataset.prep); if (!f) return;
