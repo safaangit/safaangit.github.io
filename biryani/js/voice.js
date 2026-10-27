@@ -14,14 +14,24 @@ const UNIT = [
 ];
 const unitOf = w => UNIT.find(([re]) => re.test(w))?.[1];
 const numOf = w => (/^\d+(\.\d+)?$/.test(w) ? +w : /^\d+\/\d+$/.test(w) ? w.split('/')[0] / w.split('/')[1] : NUMS[w]);
+// "one hundred twenty six" -> "126" (Google usually writes digits, but not always).
+const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+const NUMWORD = new RegExp(`\\b(?:(?:${[...ONES, ...TENS.filter(Boolean), 'hundred'].join('|')})(?:\\s+|-|\\b))+`, 'g');
+const wordsToNum = str => str.replace(NUMWORD, m => {
+  const ws = m.trim().split(/[\s-]+/);
+  if (!ws.some(w => TENS.includes(w) || w === 'hundred')) return m; // "two eggs" stays as is
+  let n = 0;
+  for (const w of ws) n = w === 'hundred' ? (n || 1) * 100 : n + (ONES.includes(w) ? ONES.indexOf(w) : TENS.indexOf(w) * 10);
+  return n + ' ';
+});
 const FILLER = /^(of|um|uh|like|about|around|plus|also|then|i|had|ate|and)$/;
 
 // Splits a transcript into { text, qty, unit } items. Works with or without commas:
 // "22 grams eggs 2 packets ketchup 1 pound chicken" and "chicken 8 oz rice 150 g" both split
 // at each amount, pairing it with the words before it (name first) or after it (amount first).
 export function parseItems(raw) {
-  const chunks = raw
-    .toLowerCase()
+  const chunks = wordsToNum(raw.toLowerCase())
     .replace(/(\d),(\d)/g, '$1.$2')           // "8,5" -> 8.5
     .replace(/(\d)\s*point\s*(\d)/g, '$1.$2') // "8 point 5"
     .replace(/(\d)(g|oz|ml|lbs?|kg)\b/g, '$1 $2')
@@ -36,7 +46,14 @@ export function parseItems(raw) {
     chunk = chunk.replace(/\u0001/g, ' ');
     const words = chunk.split(/\s+/).filter(Boolean);
     let open = null; // item still waiting for its name (amount came first) or its amount (name came first)
-    const close = () => { if (open) { if (open.name.length) items.push(open); open = null; } };
+    // An amount on its own ("pasta, 126 grams") belongs to the food just before it.
+    const close = () => {
+      if (!open) return;
+      const last = items[items.length - 1];
+      if (open.name.length) items.push(open);
+      else if (open.qty != null && last && last.qty == null && !last.unit) Object.assign(last, { qty: open.qty, unit: open.unit });
+      open = null;
+    };
     for (let i = 0; i < words.length; i++) {
       const w = words[i], n = numOf(w), nextUnit = unitOf(words[i + 1] || '');
       if (n != null && (!['a', 'an'].includes(w) || nextUnit)) {
@@ -86,6 +103,8 @@ export function resolveAmount(food, qty, unit) {
     const sv = units.find(u => gramsIn(u.label));
     if (sv) return { qty: Math.round(((qty * toGrams) / gramsIn(sv.label)) * 100) / 100, unit: sv.label, mult: sv.mult };
   }
+  // A bare number for something you weigh ("feta 26") means grams, not 26 servings.
+  if (!unit && g && qty >= 10) return { qty, unit: 'g', mult: g.mult };
   if (unit && unit !== 'serving') {
     const u = units.find(x => x.label.toLowerCase().includes(unit));
     if (u) return { qty, unit: u.label, mult: u.mult };

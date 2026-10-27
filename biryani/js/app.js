@@ -843,7 +843,7 @@ function openVoice({ autostart = true } = {}) {
         <div class="vhead"><div class="name">${r.food ? esc(r.food.name) : `No match for "${esc(r.text)}"`}</div><button class="rm" aria-label="Remove">✕</button></div>
         <div class="qty">${r.src === 'yours' ? '✓ your food' : r.src === 'guess' ? '⚠ best guess, check it' : 'tap Pick to choose'} · heard "${esc(r.said)}"</div>
         ${r.food ? `<div class="vamt"><input class="vq" type="number" min="0" step="any" inputmode="decimal" value="${r.amount.qty}"><select class="vu">${units.map(u => `<option ${u.label === r.amount.unit ? 'selected' : ''}>${esc(unitText(u.label))}</option>`).join('')}</select></div>
-        <div class="vfoot">${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span></div>` : ''}
+        <div class="vfoot">${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span></div>${n.kcal > 1500 ? '<div class="warn small">⚠ That\'s a lot for one item. Check the amount and unit.</div>' : ''}` : ''}
         <button class="chg">${r.food ? 'Wrong food? Pick another' : 'Pick food'}</button>
       </div></li>`;
     }).join('');
@@ -858,7 +858,8 @@ function openVoice({ autostart = true } = {}) {
       } }); };
       const q = $('.vq', li), u = $('.vu', li);
       if (q) q.oninput = () => { r.amount.qty = Math.max(0, +q.value || 0); const n = N.scale(r.food.n, r.amount.qty * r.amount.mult); $('.vfoot', li).innerHTML = `${macroLine(n)}<span class="vk">${kcalOf(n)} kcal</span>`; $('#logAll', b).textContent = `Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal`; };
-      if (u) u.onchange = () => { const unit = unitsOf(r.food)[u.selectedIndex]; r.amount = { qty: convertQty(r.amount.qty, { label: r.amount.unit, mult: r.amount.mult }, unit), unit: unit.label, mult: unit.mult }; draw(); };
+      // The number is what you said, so switching the unit relabels it ("26" serving -> 26 g) instead of converting.
+      if (u) u.onchange = () => { const unit = unitsOf(r.food)[u.selectedIndex]; r.amount = { qty: r.amount.qty, unit: unit.label, mult: unit.mult }; draw(); };
     });
     const la = $('#logAll', b);
     if (la) la.onclick = async () => {
