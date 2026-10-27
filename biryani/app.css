@@ -88,15 +88,15 @@ button.add { border: 0; background: none; color: var(--accent); width: 36px; hei
 .mcol { text-align: center; min-width: 0; }
 .mcol .lbl { font-size: 15px; font-weight: 500; }
 .mcol .num { font-size: 19px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.mcol .rem { font-size: 12.5px; color: var(--muted); }
+.mcol .rem { font-size: 12.5px; color: var(--muted); } .mcol .rem.over { color: var(--warn); font-weight: 600; }
 .mcol.c { color: var(--c); } .mcol.p { color: var(--p); } .mcol.f { color: var(--f); }
 .track { height: 9px; border-radius: 9px; overflow: hidden; margin: 5px 0 4px; background: color-mix(in srgb, currentColor 22%, transparent); }
 .track > div { height: 100%; border-radius: 9px; background: currentColor; transition: width .3s; }
-.track > div.over { background: var(--warn); }
+.track > div.over { background: linear-gradient(to right, currentColor var(--g), var(--card) var(--g), var(--card) calc(var(--g) + 2px), var(--warn) calc(var(--g) + 2px)); }
 .kbar { margin-top: 10px; color: var(--kc); border: 0; background: none; padding: 0; width: 100%; text-align: center; font-weight: 400; }
 .kbar .track { height: 10px; }
 .kbar .num { font-size: 17px; font-variant-numeric: tabular-nums; } .kbar .num b { font-weight: 700; }
-.kbar.over { color: var(--warn); }
+.kbar.over .num { color: var(--warn); }
 .sumfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .chip { background: none; border: 0; padding: 4px 2px; font-size: 15px; font-weight: 700; color: var(--f); display: inline-flex; align-items: center; gap: 6px; }
 .chip .ico { width: 20px; height: 20px; }
@@ -112,7 +112,7 @@ button.add { border: 0; background: none; color: var(--accent); width: 36px; hei
 .mtot { display: grid; grid-template-columns: repeat(4, 1fr); padding: 10px 6px; border-top: 1px solid var(--line); text-align: center; }
 .mtot b { display: block; font-size: 17px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .mtot span { font-size: 12.5px; }
-.mtot .c { color: var(--c); } .mtot .p { color: var(--p); } .mtot .f { color: var(--f); } .mtot .k { color: var(--kc); }
+.mtot .c { color: var(--c); } .mtot .p { color: var(--p); } .mtot .f { color: var(--f); } .mtot .k { color: var(--kc); } .mtot b.over { color: var(--warn); }
 .bigacts { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
 .bigacts button { border: 0; border-radius: 0; background: none; color: var(--accent); padding: 14px 8px; font-size: 17px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .bigacts button + button { border-left: 1px solid var(--line); }
@@ -135,6 +135,7 @@ ul.entries .name, ul.list .name { display: -webkit-box; -webkit-line-clamp: 2; -
 .r2 .sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .macros { white-space: nowrap; font-size: 15px; font-variant-numeric: tabular-nums; }
 .macros b { font-weight: 400; margin-right: 6px; } .macros b:last-child { margin-right: 0; }
+.leftline > * { white-space: nowrap; } .leftline .c { color: var(--c); } .leftline .p { color: var(--p); } .leftline .f { color: var(--f); } .leftline b.neg { color: var(--warn); }
 .macros .c { color: var(--c); } .macros .p { color: var(--p); } .macros .f { color: var(--f); }
 .kcol { text-align: right; min-width: 52px; }
 .kcol .kc { font-size: 17px; color: var(--kc); } .kcol .kl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
