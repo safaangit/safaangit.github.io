@@ -53,7 +53,7 @@ export async function todayCard(s, date, ui) {
   if (toRace < -1) return '';
   const d = T.planFor(plan, date);
   if (!d) return '';
-  const done = T.milesOn(runs, date), st = T.status(d, done);
+  const done = T.milesOn(runs, date), st = T.status(d, T.doneMiles(runs, d));
   const short = cfg.raceName.replace(/ (Marathon|Half Marathon)$/, '');
   return `<section class="card trainday k-${d.kind}" id="trainCard"><header><h3>Training</h3><span class="cd">${toRace === 0 ? 'Race day!' : toRace > 0 ? `${toRace} days to ${ui.esc(short)}` : ''}</span>${ui.ico('next')}</header>
     <div class="tdrow"><span class="kst"></span><div class="grow"><div class="name">${d.mi ? `${miRange(d)} · ` : ''}${ui.esc(d.title)}</div>
@@ -104,7 +104,7 @@ function planView(data, s, ui) {
   }));
   const cell = x => {
     if (x.date < cfg.planStart && x.kind !== 'past') x = { ...x, kind: 'past' };
-    const act = T.milesOn(runs, x.date), st = x.kind === 'past' ? '' : T.status(x, act);
+    const act = T.milesOn(runs, x.date), st = x.kind === 'past' ? '' : T.status(x, T.doneMiles(runs, x));
     const past = x.kind === 'past' || x.date < t;
     // Once you've run, the cell shows what you did (a tempo on an easy day shows as Tempo).
     const ran = x.date <= t && x.kind !== 'race' ? T.ranAs(runs, x.date, plan.z) : null;
@@ -130,7 +130,7 @@ function planView(data, s, ui) {
   const pastHtml = done.length ? `<details class="pastwks" id="pastWks" ${local.get('calPastOpen', false) ? 'open' : ''}><summary><span>${done.length} earlier weeks</span><span class="muted">${mon(done[0].start)} – ${mon(T.addDays(done[done.length - 1].start, 6))} · ${Math.round(doneMi)} mi</span></summary>${done.map(wkHtml).join('')}</details>` : '';
   // Target paces for each kind of day, pinned above the calendar while you scroll it.
   const Z = k => plan.z.list.find(x => x[0] === k);
-  const chips = [['easy', 'Easy', 'easy'], ['long', 'Long', 'long'], ['quality', 'MP', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
+  const chips = [['easy', 'Recovery', 'recovery'], ['easy', 'Easy', 'easy'], ['long', 'Long &amp; medium', 'long'], ['quality', 'MP', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
     .map(([k, l, z]) => `<span class="pchip k-${k}"><b>${l}</b>${T.fmtPace(Z(z)[3])}-${T.fmtPace(Z(z)[2])}</span>`).join('');
   return hero(data, ui) + `<section class="card calcard"><h3>Plan to race day</h3>
     <div class="calstick"><div class="pchips">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
@@ -199,7 +199,7 @@ function race({ cfg, plan, pred, autoGoal }, s, ui) {
   const split = mi => T.fmtTime(z.mp * mi);
   const splits = (marathon ? [[3.107, '5K'], [6.214, '10K'], [13.109, 'Half'], [20, '20 mi'], [26.219, 'Finish']] : [[3.107, '5K'], [6.214, '10K'], [10, '10 mi'], [13.109, 'Finish']]);
   return hero({ cfg, autoGoal, plan }, ui) + `
-  <section class="card"><h3>Fitness check</h3>${pred ? `<p>Your recent runs point to about <b>${T.fmtTime(pred.sec)}</b> for the marathon. ${autoGoal ? `With the taper, a goal of <b>${T.fmtTime(cfg.goalSec)}</b> is realistic.` : ''}</p>
+  <section class="card"><h3>Fitness check</h3>${pred ? `<p>Your recent runs point to about <b>${T.fmtTime(pred.sec)}</b> for the marathon. ${pred.vol ? `That includes +${Math.round(pred.vol * 100)}% because you've averaged ${Math.round(pred.avgWk)} mi a week; race formulas run fast on lower mileage. ` : ''}${autoGoal ? `Goal: <b>${T.fmtTime(cfg.goalSec)}</b>.` : ''}</p>
     <ul class="entries runs">${pred.basis.map(r => `<li><div class="grow"><div class="r1"><span class="name">${r1(r.mi)} mi in ${T.fmtTime(r.sec)}</span><span class="kc">${T.fmtTime(r.eq)}</span></div><div class="r2"><span class="sub">${mon(r.date)}${r.tread ? ' · treadmill (+2%)' : ''}</span><span class="macros">${T.fmtPace(r.sec / r.mi)}/mi</span></div></div></li>`).join('')}</ul>
     <p class="muted small">Riegel formula on your 3 fastest runs of 5+ mi from the last 8 weeks (the middle one counts). Treadmill runs get +2% for no wind or hills.</p>` : '<p class="muted">Sync a few Garmin runs of 5+ miles to get a prediction.</p>'}</section>
   <section class="card"><h3>Paces</h3><table class="tbl zones">${z.list.map(([k, l, lo, hi, d]) => `<tr class="k-${k}"><td><b>${l}</b><div class="muted small">${d}</div></td><td>${T.fmtPace(lo)}-${T.fmtPace(hi)}</td></tr>`).join('')}</table></section>

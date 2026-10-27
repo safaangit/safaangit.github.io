@@ -29,29 +29,37 @@ export function runsFrom(gdays) {
 export const FEEL = { 0: 'Very weak', 25: 'Weak', 50: 'Normal', 75: 'Strong', 100: 'Very strong' };
 export const feelText = r => [r.feel != null ? 'felt ' + (FEEL[r.feel] || r.feel).toLowerCase() : '', r.rpe ? `effort ${Math.round(r.rpe / 10)}/10` : ''].filter(Boolean).join(' · ');
 export const milesOn = (runs, date) => runs.filter(r => r.date === date).reduce((t, r) => t + r.mi, 0);
+// Doubles add up for easy days, but a long run has to be one run: 7 + 7 isn't a 14-miler.
+export const longestOn = (runs, date) => Math.max(0, ...runs.filter(r => r.date === date).map(r => r.mi));
+export const doneMiles = (runs, d) => (d.kind === 'long' ? longestOn(runs, d.date) : milesOn(runs, d.date));
 
-// Marathon prediction: Riegel (t × (26.2 / d)^1.06) on runs of 5+ mi from the last 8 weeks,
+// Marathon prediction: Riegel (t × (26.2 / d)^1.07) on runs of 5+ mi from the last 8 weeks,
 // treadmill runs +2% (no wind or hills), median of the best three so one fast day can't carry it.
+// Riegel alone runs ~10 min fast for most recreational marathoners (Vickers & Vertosick 2016), and
+// more so on lower mileage, so it adds up to 4% when you average under 50 mi a week.
 export function predict(runs, ref = today()) {
   const from = addDays(ref, -56);
   const eq = runs.filter(r => r.date >= from && r.date <= ref && r.mi >= 5 && r.sec)
-    .map(r => ({ ...r, eq: r.sec * Math.pow(MARATHON / r.mi, 1.06) * (r.tread ? 1.02 : 1) }))
+    .map(r => ({ ...r, eq: r.sec * Math.pow(MARATHON / r.mi, 1.07) * (r.tread ? 1.02 : 1) }))
     .sort((a, b) => a.eq - b.eq);
   if (!eq.length) return null;
-  const top = eq.slice(0, 3);
-  return { sec: top[Math.floor((top.length - 1) / 2)].eq, basis: top };
+  const top = eq.slice(0, 3), wk = weekly(runs), mon = weekStart(ref);
+  const avgWk = Array.from({ length: 8 }, (_, k) => wk.get(addDays(mon, -7 * (k + 1))) || 0).reduce((a, b) => a + b, 0) / 8;
+  const vol = Math.min(0.04, Math.max(0, ((50 - avgWk) / 10) * 0.02));
+  return { sec: top[Math.floor((top.length - 1) / 2)].eq * (1 + vol), basis: top, avgWk, vol };
 }
-// Suggested goal: prediction less ~1.5% for the taper, to the nearest 5 minutes.
-export const suggestGoal = pred => Math.round((pred * 0.985) / 300) * 300;
+// Suggested goal: the prediction to the nearest 5 minutes.
+export const suggestGoal = pred => Math.round(pred / 300) * 300;
 
 export function zones(goalSec, raceMi = 26.2) {
   const mp = goalSec / (raceMi > 26 ? MARATHON : raceMi);
   return {
     mp,
     list: [
-      ['recovery', 'Recovery', mp + 90, mp + 120, 'Day after hard efforts. Slower is fine.'],
-      ['easy', 'Easy', mp + 60, mp + 90, 'Conversational. Most of your miles.'],
-      ['long', 'Long run', mp + 45, mp + 75, 'Steady, still able to talk.'],
+      // Bands don't overlap, slowest to fastest. Long runs and medium-long runs share the steady band.
+      ['recovery', 'Recovery', mp + 105, mp + 135, 'Day after hard efforts. Slower is fine.'],
+      ['easy', 'Easy', mp + 70, mp + 100, 'Conversational. Most of your miles.'],
+      ['long', 'Long / medium', mp + 40, mp + 65, 'Steady, still able to talk.'],
       ['mp', 'Marathon pace', mp - 5, mp + 5, 'Goal race effort.'],
       ['tempo', 'Tempo', mp - 25, mp - 15, 'Comfortably hard, ~1 hr race effort.'],
       ['interval', 'Intervals', mp - 50, mp - 40, '5K-ish effort, full recovery jogs.'],
@@ -139,7 +147,7 @@ export function buildPlan(cfg, runs, ref = today()) {
       else if (off === 2) days.push(day(date, 'easy', Math.max(3, rest * share[2]), 'Easy', 'Easy miles. Add 4-6 strides at the end.', P('easy')));
       else if (off === 3) { const mi = Math.max(4, rest * share[3]), [t, d, p] = quality(w, mi); days.push(day(date, 'quality', mi, t, d, p)); }
       else if (off === 4) days.push(day(date, 'easy', Math.max(3, rest * share[4]), 'Recovery', 'Truly easy after the workout.', P('recovery')));
-      else days.push(day(date, 'medium', Math.max(4, rest * share[5]), 'Medium long', 'Steady easy run, a bit longer.', P('easy')));
+      else days.push(day(date, 'medium', Math.max(4, rest * share[5]), 'Medium long', 'Steady, a little quicker than easy and a bit longer.', P('long')));
     }
     weeks.push({ start, w, phase: PHASE[w] || (w % 3 === 0 && w !== nWeeks ? 'Cutback' : 'Build'), days, mi: days.filter(d => d.kind !== 'race').reduce((t, d) => t + d.mi, 0) });
   }
@@ -181,7 +189,8 @@ export function ranAs(runs, date, z) {
   if (!mi) return null;
   const slow = k => zone(z, k)[3], best = Math.min(Infinity, ...rs.filter(r => r.mi >= 3 && r.sec).map(r => r.sec / r.mi));
   const tempo = best <= slow('tempo') + 10;
-  if (mi >= 16 || (mi >= 13 && !tempo)) return { kind: 'long', label: 'Long', mi };
+  const one = Math.max(...rs.map(r => r.mi));
+  if (one >= 16 || (one >= 13 && !tempo)) return { kind: 'long', label: 'Long', mi };
   if (tempo) return { kind: 'quality', label: 'Tempo', mi };
   if (best <= slow('mp') + 5) return { kind: 'quality', label: 'MP', mi };
   return { kind: 'easy', label: 'Easy', mi };
@@ -229,9 +238,10 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
   const set = (d, patch, why) => { Object.assign(d, patch, range(patch.kind || d.kind, patch.mi ?? d.mi), { adj: why }); changes.push([d.date, why]); };
   const yesterday = addDays(ref, -1), twoAgo = addDays(ref, -2);
   for (const missed of [twoAgo, yesterday].map(at).filter(Boolean)) {
-    if (missed.date < cfg.planStart || missed.adj || act(missed.date) >= missed.lo * 0.75) continue;
+    const got = d => (missed.kind === 'long' ? longestOn(runs, d) : act(d));
+    if (missed.date < cfg.planStart || missed.adj || got(missed.date) >= missed.lo * 0.75) continue;
     const later = Array.from({ length: daysBetween(missed.date, ref) }, (_, k) => addDays(missed.date, k + 1));
-    if (later.some(d => act(d) >= missed.lo * 0.9 && act(d) >= 4)) { missed.adj = 'Done on a different day.'; continue; }
+    if (later.some(d => got(d) >= missed.lo * 0.9 && got(d) >= 4)) { missed.adj = 'Done on a different day.'; continue; }
     if (missed.kind === 'long') {
       const slot = [ref, addDays(ref, 1)].map(at).find(x => x && x.kind !== 'race' && x.kind !== 'long' && toRace(x.date) > 6);
       if (slot && !act(slot.date)) {
