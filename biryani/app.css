@@ -101,6 +101,10 @@ button.add { border: 0; background: none; color: var(--accent); width: 36px; hei
 .sumfoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .chip { background: none; border: 0; padding: 4px 2px; font-size: 15px; font-weight: 700; color: var(--f); display: inline-flex; align-items: center; gap: 6px; }
 .chip .ico { width: 20px; height: 20px; }
+.weekline { width: 100%; margin-top: 8px; border: 0; background: none; padding: 4px 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; color: var(--ink); font-weight: 400; }
+.weekline b { color: var(--ink); font-weight: 700; } .weekline .ico { width: 16px; height: 16px; }
+.wsum { font-size: 15px; margin: 4px 0 10px; }
+ul.weekdays .wdiff { font-variant-numeric: tabular-nums; } ul.weekdays .wdiff.over { color: var(--warn); } ul.weekdays .wdiff.under { color: var(--ok); }
 .goalline { font-size: 14px; color: var(--muted); text-align: right; } .goalline b { color: var(--ink); font-weight: 700; }
 
 /* ---- meal card ---- */

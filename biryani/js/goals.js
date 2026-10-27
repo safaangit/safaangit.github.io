@@ -52,6 +52,34 @@ export function goalsFor(s, gday, override) {
   return { type: active ? 'active' : 'rest', label: active ? dayLabel(gday) || 'Active day' : 'Rest day', auto: true, ...g, eatBack: back, exKcal: Math.round(net) };
 }
 
+// Weekly budget: what you ate vs goal on the earlier days of this week (Mon-Sun) is spread over
+// the days left. Gaps under 300 kcal are tracking noise and ignored. Paying back an overage is
+// capped at 250 kcal a day and skips protected days (long run, workout, the day after a long run,
+// race week); whatever doesn't fit by Sunday is let go, and every Monday starts clean.
+// prior: [{ eaten, goal }] for earlier days; rest: [{ date, protect }] from `date` to Sunday.
+export const WEEK = { dead: 300, cap: 250 };
+export function weekAdjust(prior, rest, date) {
+  const logged = prior.filter(d => d.eaten >= d.goal * 0.5); // half-logged days would read as a huge "under"
+  const balance = Math.round(logged.reduce((t, d) => t + d.eaten - d.goal, 0));
+  const out = { balance, logged: logged.length, adj: 0, protect: '', small: Math.abs(balance) < WEEK.dead };
+  if (out.small) return out;
+  const me = rest.find(d => d.date === date);
+  if (balance > 0 && me?.protect) { out.protect = me.protect; return out; }
+  // Over: only unprotected days pay it back. Under: any day left can eat it.
+  const n = balance > 0 ? rest.filter(d => !d.protect).length : rest.length;
+  if (!n) return out;
+  out.adj = Math.sign(-balance) * Math.round(Math.min(WEEK.cap, Math.abs(balance) / n) / 10) * 10;
+  return out;
+}
+// Applies a week adjustment to a day's goals. Cuts come from fat (down to 20% of calories) and
+// carbs, never protein; extra calories go mostly to carbs, like exercise fuel.
+export function withWeek(g, adj) {
+  if (!adj) return g;
+  const kcal = g.kcal + adj;
+  const df = adj < 0 ? -Math.min(Math.max(0, g.f - (kcal * 0.2) / 9), (-adj * 0.4) / 9) : (adj * 0.15) / 9;
+  return { ...g, kcal, c: Math.max(0, g.c + (adj - df * 9) / 4), f: g.f + df, weekAdj: adj };
+}
+
 // Mifflin-St Jeor BMR.
 export function bmr({ sex, age, heightIn, weightLb }) {
   const kg = weightLb / 2.2046, cm = heightIn * 2.54;
