@@ -5,6 +5,7 @@ import { today, monthOf, local } from './db.js';
 import * as sync from './sync.js';
 import * as T from './training.js';
 import { bars, line, bindCharts } from './charts.js';
+import * as L from './lifts.js';
 
 const KIND = { easy: 'Easy', medium: 'Medium', quality: 'Workout', long: 'Long', race: 'Race', rest: 'Rest', recovery: 'Recover' };
 const r1 = v => Math.round(v * 10) / 10;
@@ -245,7 +246,7 @@ async function openDay(s, date, ui) {
   const d = T.planFor(plan, date), done = runs.filter(r => r.date === date), lf = lifts.filter(l => l.date === date), t = today();
   const ran = date <= t && d && d.kind !== 'race' ? T.ranAs(runs, date, plan.z) : null;
   const diff = ran && d.kind !== 'rest' && ran.label !== calLabel(d) ? `You ran ${ran.label.toLowerCase()} (${r1(ran.mi)} mi); the plan had ${calLabel(d).toLowerCase()}.` : ran && d.kind === 'rest' ? `Planned rest; you ran ${r1(ran.mi)} mi.` : '';
-  const tags = cfg.lifts || {};
+  const tags = cfg.lifts || {}, bests = await Promise.all(lf.map(l => L.forSession(l.id)));
   const legsBefore = lifts.some(l => l.date === T.addDays(date, -1) && (tags[l.id] || []).includes('Legs'));
   const hint = !d ? '' : (legsBefore && (d.kind === 'quality' || d.kind === 'long') ? 'Legs yesterday, so start this one easy and see how they feel. ' : '') + T.liftHint(plan, date);
   // Swap targets: other days of the same week that haven't happened yet.
@@ -260,7 +261,8 @@ async function openDay(s, date, ui) {
     <h4>Garmin</h4>${done.length ? `<ul class="entries runs">${done.map(r => `<li><div class="grow"><div class="r1"><span class="name">${ui.esc(r.name || 'Run')}</span><span class="kc">${r1(r.mi)} mi</span></div>
       <div class="r2"><span class="sub">${r.tread ? 'treadmill' : 'outdoor'}</span><span class="macros">${r.sec ? T.fmtPace(r.sec / r.mi) + '/mi' : ''}${r.hr ? ` · ${r.hr} bpm` : ''}</span></div>
       ${T.feelText(r) || r.gear?.length ? `<div class="r3">${[T.feelText(r), shoeName(gear, r.gear)].filter(Boolean).map(ui.esc).join(' · ')}</div>` : ''}</div></li>`).join('')}</ul>` : ''}
-    ${lf.map(l => `<div class="liftrow"><div class="r1"><span class="name">${ui.esc(l.name || 'Strength')}</span><span class="muted">${l.min} min${l.hr ? ` · ${l.hr} bpm` : ''}</span></div>
+    ${lf.map((l, i) => `<div class="liftrow"><div class="r1"><span class="name">${ui.esc(l.name || 'Strength')}</span><span class="muted">${l.min} min${l.hr ? ` · ${l.hr} bpm` : ''}</span></div>
+      ${bests[i] ? `<div class="sub">Best lift: ${ui.esc(bests[i].name)} ${ui.esc(L.setText(bests[i]))}</div>` : ''}
       <div class="wkruns lifttags" data-id="${l.id}">${T.LIFTS.map(k => `<button data-t="${k}" class="${(tags[l.id] || []).includes(k) ? 'on' : ''}">${k}</button>`).join('')}</div></div>`).join('')}
     ${!done.length && !lf.length ? `<p class="muted small">${date > t ? 'Not yet.' : 'Nothing from Garmin.'}</p>` : ''}
     ${canMove ? `<h4>Change this day</h4><p class="muted small">Tap a day to swap with it.</p>

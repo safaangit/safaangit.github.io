@@ -1,10 +1,10 @@
 // Network-first for the app shell so updates show up on the next open; the cache is only an offline fallback.
-const CACHE = 'biryani-v21';
+const CACHE = 'biryani-v22';
 // Food library files (/foods/, tools/branded_foods.js): cache-first and kept across app updates.
 // Rename when the library is rebuilt.
 const FOODS = 'biryani-foods-2026-04';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/sc-voice.png', 'icons/sc-add.png', 'icons/sc-scan.png',
-  'js/app.js', 'js/db.js', 'js/nutrition.js', 'js/food.js', 'js/scan.js', 'js/sync.js', 'js/goals.js', 'js/charts.js', 'js/voice.js', 'js/training.js', 'js/trainview.js', 'ideas.json', 'eatout.json', 'generic.json'];
+  'js/app.js', 'js/db.js', 'js/nutrition.js', 'js/food.js', 'js/scan.js', 'js/sync.js', 'js/goals.js', 'js/charts.js', 'js/voice.js', 'js/training.js', 'js/trainview.js', 'js/lifts.js', 'ideas.json', 'eatout.json', 'generic.json'];
 const LIBS = /cdn\.jsdelivr\.net\/npm\/(@zxing|tesseract)|cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\//;
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));

@@ -10,6 +10,7 @@ import { weekStart, daysBetween } from './training.js';
 import { bars, line, ema, bindCharts } from './charts.js';
 import * as voice from './voice.js';
 import * as train from './trainview.js';
+import * as lifts from './lifts.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -153,7 +154,7 @@ async function entriesFor(date) {
 }
 // Garmin's day plus exercise you added by hand (basketball, anything not on the watch).
 function withManual(gday, date, manual) {
-  const mine = manual.filter(x => x.date === date).map(x => ({ ...x, manual: true, distance: (x.mi || 0) * 1609.34, type: x.run ? 'running' : 'other' }));
+  const mine = manual.filter(x => x.date === date).map(x => ({ ...x, manual: true, distance: (x.mi || 0) * 1609.34, type: x.run ? 'running' : x.lift ? 'strength_training' : 'other' }));
   return { ...(gday || {}), activities: [...(gday?.activities || []), ...mine] };
 }
 // base: skip the weekly budget (it is built from the base goals of the week's other days).
@@ -357,6 +358,8 @@ async function viewToday() {
 
   const acts = g.activities || [];
   const burned = acts.reduce((t, a) => t + (a.kcal || 0), 0);
+  // Strength sessions get one line for the day's best lift (lifts.js).
+  const best = new Map(await Promise.all(acts.filter(a => actKind(a) === 'strength').map(async a => [a.id, await lifts.forSession(a.id)])));
   const garmin = `<section class="card">
     <header><h3>Exercise</h3><span class="hkcal">${r0(burned)} kcal</span><button class="add" id="addEx" aria-label="Add exercise">${ico('plusc')}</button></header>
     ${gday ? `<div class="stats">
@@ -364,7 +367,7 @@ async function viewToday() {
       ${stat('HRV', gday.hrv, gday.hrvStatus?.toLowerCase(), 'hrv')}${stat('Rest HR', gday.rhr, '', 'heart')}${stat('Readiness', gday.readiness, '', 'ready')}</div>` : `<p class="muted small">${sync.configured() ? 'No Garmin data for this day yet.' : 'Connect Garmin in Settings.'}</p>`}
     ${acts.length ? `<ul class="entries acts">${acts.map(a => `<li class="act ${actKind(a)}" ${a.manual ? `data-ex="${a.id}"` : ''}><span class="aicon">${ACT_ICON[actKind(a)]}</span><div class="grow"><div class="name">${esc(a.name)}</div><div class="qty">${[
       a.distance ? r1(a.distance / 1609.34) + ' mi' : '', a.duration ? Math.round(a.duration / 60) + ' min' : a.min ? a.min + ' min' : '',
-      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div></div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul>` : ''}</section>`;
+      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div>${best.has(a.id) ? lifts.rowLine(s, a, best.get(a.id), esc) : ''}</div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul>` : ''}</section>`;
 
   return `
   <section class="card summary">
@@ -453,6 +456,11 @@ bind.today = root => {
   const tc = $('#trainCard', root); if (tc) tc.onclick = () => { state.tab = 'training'; render(); };
   $('#addEx', root).onclick = () => openExercise();
   $$('li[data-ex]', root).forEach(li => (li.onclick = () => openExercise(li.dataset.ex)));
+  $$('.bestlift', root).forEach(x => (x.onclick = async ev => {
+    ev.stopPropagation();
+    const a = (await dayContext(state.date, true)).g.activities.find(a => String(a.id) === x.dataset.lift);
+    if (a) lifts.open(state.s, a, state.date, ui);
+  }));
   $('#weight', root).onchange = async e => {
     const v = parseFloat(e.target.value);
     if (v > 0) {
@@ -469,15 +477,19 @@ function openExercise(id) {
     const b = sheet(`<form id="ex" class="form">
       <label>Name<input name="name" value="${esc(x.name)}" required></label>
       <label class="check"><input type="checkbox" name="run" ${x.run ? 'checked' : ''}> Counts as a run</label>
+      <label class="check"><input type="checkbox" name="lift" ${x.lift ? 'checked' : ''}> Lifting (no watch session)</label>
       <div class="grid3"><label>Miles<input name="mi" type="number" min="0" step="0.01" inputmode="decimal" value="${x.mi ?? ''}"></label>
       <label>Minutes<input name="min" type="number" min="0" inputmode="numeric" value="${x.min ?? ''}"></label>
       <label>kcal<input name="kcal" type="number" min="0" inputmode="numeric" value="${x.kcal ?? ''}"></label></div>
       <p class="muted small">Garmin activities show up on their own after the nightly sync; use this for anything not on your watch.</p>
       <div class="actions">${id ? '<button type="button" class="danger" id="del">Delete</button>' : ''}<button class="primary">Save</button></div></form>`, { title: id ? 'Edit exercise' : 'Add exercise' });
+    const run = $('[name=run]', b), lift = $('[name=lift]', b);
+    run.onchange = () => { if (run.checked) lift.checked = false; };
+    lift.onchange = () => { if (lift.checked) { run.checked = false; if (/^run$/i.test($('[name=name]', b).value)) $('[name=name]', b).value = 'Lifting'; } };
     $('#ex', b).onsubmit = async ev => {
       ev.preventDefault();
       const f = new FormData(ev.target);
-      await db.put('exercises', { ...x, date: x.date || state.date, name: f.get('name'), run: f.get('run') === 'on', mi: Math.max(0, +f.get('mi') || 0), min: Math.max(0, +f.get('min') || 0), kcal: Math.max(0, +f.get('kcal') || 0) });
+      await db.put('exercises', { ...x, date: x.date || state.date, name: f.get('name'), run: f.get('run') === 'on', lift: f.get('run') !== 'on' && f.get('lift') === 'on', mi: Math.max(0, +f.get('mi') || 0), min: Math.max(0, +f.get('min') || 0), kcal: Math.max(0, +f.get('kcal') || 0) });
       closeSheet(); render();
     };
     if (id) $('#del', b).onclick = async () => { await db.remove('exercises', id); closeSheet(); render(); };
