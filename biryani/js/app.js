@@ -943,12 +943,13 @@ function openVoice({ autostart = true } = {}) {
     mic.textContent = on ? '■ Done' : '🎤 Start talking'; mic.classList.toggle('on', on);
     $('#vhint', b).hidden = !on && vstate.rows.length > 0;
   };
-  const startListening = () => {
+  const startListening = (auto = false) => {
     const before = ta.value.trim() ? ta.value.trim().replace(/[,\s]*$/, ', ') : '';
     setMic(true);
     rec = voice.listen({
       onText: t => { ta.value = before + t; vstate.text = ta.value; },
-      onEnd: (_, err) => { rec = null; setMic(false); if (err) toast('Mic blocked: allow microphone access for this site'); match(); },
+      // Opened from a shortcut, the phone may want a tap before the mic starts; that's not a blocked mic.
+      onEnd: (_, err) => { rec = null; setMic(false); if (err) toast(auto ? 'Tap Start talking to begin' : 'Mic blocked: allow microphone access for this site'); match(); },
     });
   };
   if (mic) mic.onclick = () => (rec ? rec.stop() : startListening());
@@ -957,7 +958,7 @@ function openVoice({ autostart = true } = {}) {
   ta.oninput = () => { vstate.text = ta.value; clearTimeout(typingT); typingT = setTimeout(match, 900); };
   $('.sheet-wrap')._cleanup = () => rec?.stop();
   draw();
-  if (autostart && mic && !vstate.text) startListening();
+  if (autostart && mic && !vstate.text) startListening(true);
 }
 // ---------- Barcode ----------
 function openScanner(meal, pick) {
@@ -1821,4 +1822,14 @@ document.addEventListener('visibilitychange', () => {
   scheduleSync(500);
 });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
-render().then(() => scheduleSync(300));
+// Home-screen shortcuts (long-press the icon, or a Quick Tap / side-button action) open ?do=voice|add|scan.
+async function launchAction() {
+  const u = new URL(location.href), act = u.searchParams.get('do');
+  if (!act) return;
+  u.searchParams.delete('do'); history.replaceState(null, '', u.pathname + u.search + u.hash);
+  if (state.tab !== 'today' || state.date !== today()) { state.tab = 'today'; state.date = today(); await render(); }
+  if (act === 'voice') openVoice();
+  else if (act === 'add') openAdd(defaultMeal());
+  else if (act === 'scan') openScanner(defaultMeal());
+}
+render().then(() => { launchAction(); scheduleSync(300); });

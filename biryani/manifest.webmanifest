@@ -7,8 +7,60 @@
   "background_color": "#0c0f14",
   "theme_color": "#c2410c",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Say what you ate",
+      "short_name": "Voice log",
+      "description": "Opens straight into voice logging",
+      "url": "./?do=voice",
+      "icons": [
+        {
+          "src": "icons/sc-voice.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Search foods",
+      "short_name": "Add food",
+      "url": "./?do=add",
+      "icons": [
+        {
+          "src": "icons/sc-add.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Scan barcode",
+      "short_name": "Scan",
+      "url": "./?do=scan",
+      "icons": [
+        {
+          "src": "icons/sc-scan.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }
