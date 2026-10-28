@@ -52,7 +52,7 @@ const ICONS = {
 };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
 
-const state = { date: today(), tab: local.get('tab', 'today'), s: null, sel: null };
+const state = { date: today(), today: today(), tab: local.get('tab', 'today'), s: null, sel: null };
 
 // ---------- shell ----------
 async function render() {
@@ -151,11 +151,15 @@ const logName = date => 'log/' + monthOf(date);
 async function entriesFor(date) {
   return (await db.all(logName(date))).filter(e => e.date === date).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 }
+// Garmin's day plus exercise you added by hand (basketball, anything not on the watch).
+function withManual(gday, date, manual) {
+  const mine = manual.filter(x => x.date === date).map(x => ({ ...x, manual: true, distance: (x.mi || 0) * 1609.34, type: x.run ? 'running' : 'other' }));
+  return { ...(gday || {}), activities: [...(gday?.activities || []), ...mine] };
+}
 // base: skip the weekly budget (it is built from the base goals of the week's other days).
 async function dayContext(date, base = false) {
   const [gday, dayRec, manual] = await Promise.all([sync.garminDay(date).catch(() => null), db.get('days', date), db.all('exercises')]);
-  const mine = manual.filter(x => x.date === date).map(x => ({ ...x, manual: true, distance: (x.mi || 0) * 1609.34, type: x.run ? 'running' : 'other' }));
-  const g = { ...(gday || {}), activities: [...(gday?.activities || []), ...mine] };
+  const g = withManual(gday, date, manual);
   const goals = goalsFor(state.s, g, dayRec?.dayType);
   const week = base ? null : await weekBudget(date, goals).catch(() => null);
   return { gday, g, dayRec, week, goals: withWeek(goals, week?.adj) };
@@ -616,7 +620,7 @@ async function openWeek() {
     : wk.protect ? `Nothing comes off today because it's a ${wk.protect}. Fuel it fully.` : 'No days left this week to spread it over, so it\'s let go.';
   sheet(`<p class="wsum">This week (from ${day(wk.start)}): <b>${sgn(wk.balance)} kcal</b> ${wk.balance >= 0 ? 'over' : 'under'} your goals so far. ${now}</p>
     <ul class="entries card weekdays">${rows || '<li class="empty small">Today is the first day of the week.</li>'}</ul>
-    <p class="hint">Today's goal: <b>${r0(goals.kcal)}</b> kcal · ${macroLine(goals)}</p>
+    <p class="hint">Today's goal: <b>${r0(goals.kcal)}</b> kcal · ${macroLine({ c: r0(goals.c), p: r0(goals.p), f: r0(goals.f) })}</p>
     <p class="muted small">How it works: the week runs Monday to Sunday and starts clean every Monday. Gaps under 300 kcal are ignored. Bigger ones are spread over the days left, at most 250 kcal a day. Overs are never taken from a long run, workout, day after a long run, or race week. Anything left on Sunday is let go. Turn it off in Settings → Daily goals.</p>`, { title: 'Weekly budget' });
 }
 
@@ -644,7 +648,7 @@ async function openFits() {
         if (!best || score > best.score) best = { f, q, n, k, score, unit: pv.unit };
         continue;
       }
-      if (k > rem.kcal + 40 || n.f > Math.max(rem.f, 0) + 4 || n.c > Math.max(rem.c, 0) + 8) continue;
+      if (k > rem.kcal + 40 || n.f > Math.max(rem.f, 0) + 4 || (s.netCarbs ? netC(n) : n.c) > Math.max(rem.c, 0) + 8) continue;
       // Reward filling protein and using the calories; penalize going over any macro.
       // Aim at a meal-sized chunk (≤700 kcal, ≤50 g protein) so a big budget doesn't just suggest doubles.
       const tk = Math.min(rem.kcal, 700), tp = Math.min(rem.p, 50);
@@ -784,7 +788,7 @@ function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
 function openFoodEditor(f, { meal, pick, entry, barcode, prefill } = {}) {
   const su = f?.units?.find(u => u.label.startsWith('serving')) || f?.units?.[0];
   const per = prefill?.n || (f ? N.scale(f.n, su?.mult || 1) : {});
-  const servingLabel = prefill?.servingLabel || su?.label?.replace(/^serving \((.*)\)$/, '$1') || '1 serving';
+  const servingLabel = prefill?.servingLabel || (su ? unitText(su.label) : '') || '1 serving';
   const servingG = prefill?.servingG ?? (su && f?.units?.some(u => u.label === 'g') ? r1(su.mult * 100) : '');
   const v = k => (per[k] == null ? '' : r1(per[k]));
   const b = sheet(`<form id="fe" class="form">
@@ -1537,12 +1541,12 @@ async function trendData() {
   const months = [...new Set(dates.map(monthOf))];
   const logs = (await Promise.all(months.map(m => db.all('log/' + m)))).flat();
   const garmin = Object.assign({}, ...(await Promise.all(months.map(m => sync.garminMonth(m).catch(() => ({ days: {} }))))).map(g => g.days || {}));
-  const [weights, daysRec] = await Promise.all([db.all('weights'), db.all('days')]);
+  const [weights, daysRec, manual] = await Promise.all([db.all('weights'), db.all('days'), db.all('exercises')]);
   const wBy = new Map(weights.map(w => [w.date, w.lb])), dtBy = new Map(daysRec.map(d => [d.id, d.dayType]));
   const rows = dates.map(d => {
     const t = N.entryTotals(logs.filter(e => e.date === d), s.caloriesFromMacros), gd = garmin[d];
     const runMi = (gd?.activities || []).filter(a => /run|track/.test(a.type || '')).reduce((x, a) => x + (a.distance || 0) / 1609.34, 0);
-    return { date: d, ...t, goal: goalsFor(s, gd, dtBy.get(d)), weight: wBy.get(d) ?? gd?.weightLb, steps: gd?.steps || 0, sleep: gd?.sleepSec ? gd.sleepSec / 3600 : NaN, runMi };
+    return { date: d, ...t, goal: goalsFor(s, withManual(gd, d, manual), dtBy.get(d)), weight: wBy.get(d) ?? gd?.weightLb, steps: gd?.steps || 0, sleep: gd?.sleepSec ? gd.sleepSec / 3600 : NaN, runMi };
   });
   // 3m / 6m read as weeks, like Garmin's longer views.
   const weekly = range > 28;
@@ -1792,6 +1796,11 @@ function defaultMeal() {
 }
 db.onChange(() => scheduleSync());
 addEventListener('online', () => scheduleSync(500));
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') runSync(); else scheduleSync(500); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') return runSync();
+  // Left open overnight: a diary that was on "Today" moves to the new day instead of logging into yesterday.
+  if (state.today !== today()) { if (state.date === state.today) state.date = today(); state.today = today(); render(); }
+  scheduleSync(500);
+});
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
 render().then(() => scheduleSync(300));
