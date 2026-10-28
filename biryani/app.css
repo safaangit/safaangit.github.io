@@ -416,6 +416,11 @@ p.halal { background: var(--tile); padding: 8px 10px; border-radius: 8px; }
 .deal-p { font-size: 14px; font-weight: 500; color: var(--f); margin-top: 2px; }
 .deals h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 ul.list li.ad { cursor: default; padding: 11px 14px !important; display: block; }
+.prepnag { display: flex; align-items: center; gap: 8px; margin: 10px 12px 2px; padding: 10px 6px 10px 12px; border: 1.5px dashed var(--accent); border-radius: 12px; background: color-mix(in srgb, var(--accent) 9%, var(--card)); }
+.prepnag .t { font-weight: 500; font-size: 16px; }
+.prepnag .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.prepnag .prepbtn.primary { width: auto; border: 0; border-radius: 10px; padding: 9px 16px; font-size: 15px; background: var(--accent); color: var(--accent-ink); }
+.prepnag .iconbtn { color: var(--muted); padding: 6px; font-size: 15px; }
 .prepbtn { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; padding: 13px 14px; text-align: left; font-size: 16px; color: var(--ink); }
 .prepbtn .ico { color: var(--accent); width: 22px; height: 22px; }
 .prepbtn .small { color: var(--muted); white-space: nowrap; }

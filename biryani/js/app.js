@@ -325,7 +325,13 @@ async function viewToday() {
     wk.adj ? ` · today <b>${sgn(wk.adj)}</b>` : wk.protect ? ` · not from today (${wk.protect})` : ''}</span>${ico('next')}</button>`;
 
   const single = s.meals.length === 1, sel = state.sel;
-  const preps = (await prepStatus()).map(x => `<button class="prepbtn" data-prep="${x.id}">${ico('plusc')}<span class="grow">${esc(x.name)}</span><span class="small">${x.left > 0 ? `${x.left} of ${x.total} left` : 'all eaten'} · ${kcalOf(x.n)} kcal</span></button>`).join('');
+  // A meal prep that isn't logged yet gets a banner at the top of the list, so a short day is obvious;
+  // once it's in, a quiet row below the list adds another portion.
+  const prepList = await prepStatus(date), isToday = date === today();
+  const prepNag = prepList.filter(x => x.missing).map(x => `<div class="prepnag"><div class="grow"><div class="t">${esc(x.name)} not logged ${isToday ? 'yet today' : 'this day'}</div>
+      <div class="sub">+${kcalOf(x.n)} kcal · ${macroLine(x.n)}</div></div><button class="primary prepbtn" data-prep="${x.id}">Add</button><button class="iconbtn prepskip" data-prep="${x.id}" aria-label="Not ${isToday ? 'today' : 'this day'}">✕</button></div>`).join('');
+  const preps = prepList.filter(x => !x.missing).map(x => `<button class="prepbtn" data-prep="${x.id}">${ico('plusc')}<span class="grow">${esc(x.name)}</span><span class="small">${
+    [x.logged ? '✓ logged' : '', x.total > 1 ? (x.left > 0 ? `${x.left} of ${x.total} left` : 'all eaten') : '', `${kcalOf(x.n)} kcal`].filter(Boolean).join(' · ')}</span></button>`).join('');
   const byMeal = s.meals.map((m, mi) => {
     const list = entries.filter(e => single || (e.meal ?? 0) === mi);
     const t = N.entryTotals(list, s.caloriesFromMacros), tc = s.netCarbs ? netC(t) : t.c;
@@ -336,6 +342,7 @@ async function viewToday() {
     const mt = (k, v, goal, label) => `<div class="${k}"><b class="${single && isOver(v, goal) ? 'over' : ''}">${r0(v)}${single ? ' / ' + r0(goal) : ''}</b><span>${label}</span></div>`;
     return `<section class="card meal"><header><h3>${esc(single && /^food$/i.test(m) ? (date === today() ? 'Today meals' : 'Meals') : m)}</h3>
       ${list.length && !sel ? '<button class="link selBtn">Select</button>' : ''}</header>${stripe}
+    ${sel || mi !== 0 ? '' : prepNag}
     <ul class="entries ${sel ? 'selecting' : ''}">${list.map(e => {
       const n = N.scale(e.n, e.qty * e.mult);
       return `<li data-id="${e.id}" class="${sel?.has(e.id) ? 'picked' : ''}">${sel ? '<span class="box"></span>' : ''}<div class="grow">${row2(esc(e.name), n, esc([e.brand, qtyText(e.qty, e.unit)].filter(Boolean).join(', ')))}</div></li>`;
@@ -397,6 +404,10 @@ bind.today = root => {
   // Tap the macros or the calorie bar to flip all four between eaten and left, like Macros.
   $$('#kcalBtn, #macroBtn', root).forEach(x => (x.onclick = () => { local.set('kcalView', local.get('kcalView', 'eaten') === 'left' ? 'eaten' : 'left'); render(); }));
   $$('.voiceBtn', root).forEach(b => (b.onclick = () => openVoice()));
+  $$('.prepskip', root).forEach(b => (b.onclick = () => {
+    const all = local.get('prepSkip', {}), keep = Object.fromEntries(Object.entries(all).filter(([d]) => d >= addDays(today(), -14)));
+    keep[state.date] = [...(keep[state.date] || []), b.dataset.prep]; local.set('prepSkip', keep); render();
+  }));
   $$('.prepbtn', root).forEach(b => (b.onclick = async () => {
     const f = (await recipeFoods()).find(x => x.id === b.dataset.prep); if (!f) return;
     await logEntry({ name: f.name, recipeId: f.recipeId, qty: 1, unit: f.units[0].label, mult: 1, n: f.n, meal: 0 });
@@ -668,15 +679,22 @@ async function openFits() {
   $$('li.food', b).forEach(li => (li.onclick = () => { const x = top[+li.dataset.i]; openPortion(x.f, { meal: 0, qty: x.q }); }));
 }
 
-// Meal preps with how many portions are left since the prep's week started.
-async function prepStatus() {
+// Meal preps for a day: portions left since the prep's week started, whether one is logged on
+// that day, and whether to flag it (a prep still in use: started this week or eaten in the last
+// few days, with portions left, and not waved off for that day).
+async function prepStatus(date = today()) {
   const preps = (await recipeFoods()).filter(r => r.tag === 'prep');
   if (!preps.length) return [];
-  const logs = (await Promise.all([...new Set([monthOf(today()), monthOf(addDays(today(), -10))])].map(m => db.all('log/' + m)))).flat();
+  const logs = (await Promise.all([...new Set([monthOf(date), monthOf(addDays(date, -10)), monthOf(today())])].map(m => db.all('log/' + m)))).flat();
+  const skipped = local.get('prepSkip', {})[date] || [];
   return preps.map(p => {
     const since = p.recipe.weekStart || '0000', total = Math.round(+p.recipe.servings || 1);
-    const used = logs.filter(e => e.recipeId === p.id && e.date >= since).reduce((t, e) => t + (+e.qty || 0) * (+e.mult || 1), 0);
-    return { id: p.id, name: p.name, n: p.n, total, left: Math.max(0, Math.round((total - used) * 10) / 10) };
+    const mine = logs.filter(e => e.recipeId === p.id);
+    const used = mine.filter(e => e.date >= since).reduce((t, e) => t + (+e.qty || 0) * (+e.mult || 1), 0);
+    const left = Math.max(0, Math.round((total - used) * 10) / 10);
+    const logged = mine.some(e => e.date === date);
+    const inUse = (since <= date && since >= addDays(date, -6)) || mine.some(e => e.date < date && e.date >= addDays(date, -3));
+    return { id: p.id, name: p.name, n: p.n, total, left, logged, missing: !logged && inUse && (total <= 1 || left > 0) && !skipped.includes(p.id) };
   });
 }
 
