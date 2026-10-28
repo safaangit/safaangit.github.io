@@ -113,7 +113,23 @@ export async function garminMonth(ym, { fresh = false } = {}) {
   }
   d ??= { days: {} };
   gcache.set(ym, d);
+  await fillPartialBmr(ym, d);
   return d;
+}
+// Garmin's resting burn for a day still in progress only covers the hours so far (1820 kcal by
+// evening vs 2265 for a whole day), which makes that day's exercise look bigger until the next
+// morning's sync. Days well under your usual figure get the usual one (last month's if this one is new).
+const median = v => v.sort((a, b) => a - b)[v.length >> 1];
+async function fillPartialBmr(ym, m) {
+  const bmrs = m => Object.values(m.days || {}).map(d => d.bmrKcal).filter(x => x > 0);
+  let v = bmrs(m);
+  if (v.length < 3) {
+    const [y, mo] = ym.split('-').map(Number), prev = mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
+    v = v.concat(bmrs(gcache.get(prev) || (await kv.get('g:' + prev)) || {}));
+  }
+  if (v.length < 3) return;
+  const usual = median(v);
+  for (const d of Object.values(m.days)) if (d.bmrKcal && d.bmrKcal < usual * 0.95) d.bmrKcal = usual;
 }
 export async function garminDay(date, opts) { return (await garminMonth(date.slice(0, 7), opts)).days?.[date]; }
 // data/garmin/gear.json = { gear: [{ uuid, name, type, status, maxM, distance m, activities }] }, cached like a month.
