@@ -279,7 +279,7 @@ async function lastUses() {
 const keysOf = f => [f.source === 'mine' && !f._quick ? f.id : null, f.recipeId, f._key, 'n:' + (f.name || '').toLowerCase()].filter(Boolean);
 const lastOf = (f, uses) => keysOf(f).map(k => uses?.get(k)).find(Boolean);
 // Servings you count rather than weigh (a bar, a pouch, 7 dumplings) start at 1 serving.
-const COUNTED = /\b(bars?|pieces?|pcs?|pouch(es)?|cans?|bottles?|eggs?|rolls?|cookies?|slices?|packets?|packs?|packages?|pkgs?|containers?|cartons?|scoops?|sandwich(es)?|knots?|bags?|dumplings?|tortillas?|wraps?|patt(y|ies)|links?|sticks?|cones?|buns?|bagels?|muffins?|bowls?|trays?|box(es)?|meals?|ea|each|pints?)\b/i;
+const COUNTED = /\b(bars?|wedges?|pieces?|pcs?|pouch(es)?|cans?|bottles?|eggs?|rolls?|cookies?|slices?|packets?|packs?|packages?|pkgs?|containers?|cartons?|scoops?|sandwich(es)?|knots?|bags?|dumplings?|tortillas?|wraps?|patt(y|ies)|links?|sticks?|cones?|buns?|bagels?|muffins?|bowls?|trays?|box(es)?|meals?|ea|each|pints?)\b/i;
 // Amount a food starts at: what you logged last time (like Macros), else grams for anything
 // you weigh, else one serving.
 function startAmount(f, last) {
@@ -471,7 +471,7 @@ function openExercise(id) {
 
 // ---------- Add food ----------
 // Full-screen search, laid out like Macros: search bar with scan, then My foods / My recipes / Library tabs.
-function openAdd(meal, { pick } = {}) {
+function openAdd(meal, { pick, query } = {}) {
   const tab0 = local.get('addTab', 'mine') === 'library' ? 'mine' : local.get('addTab', 'mine');
   const b = sheet(`
     <div class="sbar">
@@ -487,7 +487,7 @@ function openAdd(meal, { pick } = {}) {
   const q = $('#q', b), out = $('#results', b);
   let tab = tab0, list = [], lastSections = [];
   let editing = null; // Set of list indexes while cleaning up recents
-  let data = null, libQ = '', libRes = null, libSeq = 0;
+  let data = null, libQ = '', libRes = null, libSeq = 0, libMore = false;
   // Ticked foods, kept while you search for the next one; "Add N" logs them all at their usual amounts.
   const sel = new Map(), selKey = f => keysOf(f)[0] + '|' + (f.srcId || '');
   const words = () => food.tokens(q.value).filter(w => !food.STOP.has(w));
@@ -553,17 +553,19 @@ function openAdd(meal, { pick } = {}) {
     } else {
       if (!typed) { out.innerHTML = '<p class="muted pad">Type a food or brand to search USDA and Open Food Facts.</p>'; return; }
       if (libQ !== q.value.trim()) return runLib();
-      if (!libRes) { out.innerHTML = '<p class="muted pad">Searching USDA and Open Food Facts…</p>'; return; }
-      show([{ title: 'Library', items: libRes }], libRes.length ? '' : '<p class="muted pad">No library matches. Try fewer words, scan the barcode, or snap the label.</p>');
+      if (!libRes) { out.innerHTML = '<p class="muted pad">Searching…</p>'; return; }
+      show([{ title: 'Library', items: libRes }], libMore ? '<p class="muted small pad">Checking Open Food Facts too…</p>'
+        : libRes.length ? '' : '<p class="muted pad">No library matches. Try fewer words, scan the barcode, or snap the label.</p>');
       if (food.usdaThrottled && !local.get('usdaKey')) out.insertAdjacentHTML('afterbegin', '<p class="warn small">USDA demo key is rate-limited. Add your free key in Settings for more branded results.</p>');
     }
   };
   const runLib = async () => {
     const v = q.value.trim(); if (v.length < 2) return;
-    const my = ++libSeq; libQ = v; libRes = null; draw();
-    const res = await food.search(v).catch(() => ({ remote: [] }));
+    const my = ++libSeq; libQ = v; libRes = null; libMore = true; draw();
+    // Foods on the phone show right away; Open Food Facts results slot in when they arrive.
+    const res = await food.search(v, { onLocal: r => { if (my === libSeq) { libRes = r.remote; draw(); } } }).catch(() => ({ remote: libRes || [] }));
     if (my !== libSeq) return;
-    libRes = res.remote; draw();
+    libRes = res.remote; libMore = false; draw();
   };
   const setTab = t => {
     tab = t; editing = null;
@@ -576,7 +578,9 @@ function openAdd(meal, { pick } = {}) {
   (async () => {
     const [recent, pantry, recipes, uses] = await Promise.all([recentFoods(), food.mine(), recipeFoods(), lastUses()]);
     data = { recent, pantry, recipes, uses };
-    draw();
+    // Opened with words already typed (a voice item it couldn't match): straight to the Library unless one of yours fits.
+    if (query) { q.value = query; [...recent, ...pantry].some(hit) ? draw() : setTab('library'); }
+    else draw();
   })();
   if (addN) addN.onclick = () => logMany([...sel.values()].map(({ f, amt }) => ({ f, qty: amt.qty, unit: amt.unit.label, mult: amt.unit.mult })), meal);
   let t;
@@ -885,7 +889,7 @@ function openVoice({ autostart = true } = {}) {
     $$('.vrow', b).forEach(li => {
       const r = rows[+li.dataset.i];
       $('.rm', li).onclick = () => { rows.splice(+li.dataset.i, 1); draw(); };
-      $('.chg', li).onclick = () => { rec?.stop(); openAdd(0, { pick: (base, full) => {
+      $('.chg', li).onclick = () => { rec?.stop(); openAdd(0, { query: r.text, pick: (base, full) => {
         r.food = full; r.src = 'yours'; r.amount = { qty: base.qty, unit: base.unit, mult: base.mult };
         openVoice({ autostart: false });
       } }); };
