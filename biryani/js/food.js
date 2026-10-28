@@ -7,9 +7,9 @@ const usdaKey = () => local.get('usdaKey', '') || 'DEMO_KEY';
 const timeout = (ms) => AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined;
 // Answers are kept for the session: the free USDA demo key allows only ~30 lookups an hour.
 const cached = new Map();
-async function getJSON(url) {
+async function getJSON(url, ms = 12000) {
   if (cached.has(url)) return cached.get(url);
-  const r = await fetch(url, { signal: timeout(12000) });
+  const r = await fetch(url, { signal: timeout(ms) });
   if (!r.ok) throw new Error(`${r.status} ${new URL(url).host}`);
   const d = await r.json();
   cached.set(url, d);
@@ -54,7 +54,7 @@ async function offBarcode(code) {
 async function offSearch(q) {
   const qs = encodeURIComponent(q);
   try {
-    const d = await getJSON(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${qs}&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`);
+    const d = await getJSON(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${qs}&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`, 8000);
     return (d.products || []).map(fromOFF).filter(Boolean);
   } catch {}
   try { // newer search service; may refuse cross-origin calls
@@ -121,6 +121,53 @@ async function genericSearch(q, brands) {
   const list = await generic();
   return list.filter(f => coverage(q, f, brands) >= 0.66).map(f => ({ f, s: score(q, f, brands) }))
     .sort((a, b) => b.s - a.s).slice(0, 15).map(x => x.f);
+}
+
+// ---- Branded library ----
+// ~400k US packaged foods from USDA Branded (tools/branded_foods.js), published next to the app as
+// small files by word prefix. A search downloads the one file for its rarest word; the service
+// worker keeps every file it has fetched, so repeat searches are instant and work offline.
+const LIB = new URL('/foods/', location.href).href; // safaangit.github.io/foods/ next to /biryani/
+const libFiles = new Map();
+const libJSON = p => {
+  if (!libFiles.has(p)) libFiles.set(p, fetch(LIB + p, { signal: timeout(10000) }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .catch(() => { libFiles.delete(p); return null; }));
+  return libFiles.get(p);
+};
+// Words the library doesn't file foods under (see STOP in tools/branded_foods.js).
+const LIB_SKIP = new Set(['for', 'by', 'inc', 'llc', 'co', 'company', 'corp', 'corporation', 'foods', 'brands', 'us', 'usa', 'organic', 'flavored', 'flavor', 'natural', 'naturally', 'all', 'premium', 'style', 'assorted', 'artificially', 'gourmet', 'new', 'made', 'real', 'pure', 'fine', 'quality', 'select', 'brand']);
+// The file holding a word: big prefixes are split into longer ones ("ch" → "chi" → "chic"), and
+// "xx_" holds foods whose word is exactly the prefix.
+function libKey(P, w) {
+  if (w.length < 2 || /^\d+$/.test(w) || LIB_SKIP.has(w)) return null;
+  for (let k = w.slice(0, 2); ; k = w.slice(0, k.length + 1)) {
+    if (P[k] != null) return k;
+    if (k.length >= w.length) return P[k + '_'] != null ? k + '_' : null;
+    if (k.length >= 6) return null;
+  }
+}
+function fromLib([gtin, name, brand, kcal, p, c, f, fib, sug, na, sv, svg]) {
+  return {
+    name, brand, barcode: /^\d/.test(gtin) ? gtin : undefined, n: clean({ kcal, p, c, f, fib, sug, na }),
+    units: gramUnits(svg > 0 ? [{ label: `serving (${sv})`, mult: svg / 100 }] : []),
+    source: 'usda-b', srcLabel: 'USDA Branded', srcId: gtin,
+  };
+}
+async function brandedSearch(q) {
+  const idx = await libJSON('index.json');
+  if (!idx) return [];
+  const P = idx.prefixes, keys = [...new Set(foodWords(q).map(w => libKey(P, w)).filter(Boolean))].sort((a, b) => P[a] - P[b]);
+  if (!keys.length || P[keys[0]] > 1500) return []; // only very common words ("chocolate"): leave it to the other sources
+  const rows = await libJSON(`w/${keys[0]}.json`);
+  if (!rows) return [];
+  return rows.map(fromLib).filter(f => coverage(q, f) >= 0.66).map(f => ({ f, s: score(q, f) }))
+    .sort((a, b) => b.s - a.s).slice(0, 25).map(x => x.f);
+}
+async function libBarcode(code) {
+  const c = String(code).replace(/\D/g, '').replace(/^0+/, '');
+  if (c.length < 6) return [];
+  const rows = await libJSON(`b/${c.slice(-3).padStart(3, '0')}.json`);
+  return (rows || []).filter(r => sameCode(r[0], c)).map(fromLib);
 }
 
 // ---- Ranking ----
@@ -202,33 +249,40 @@ export async function mine() {
   return foods;
 }
 
-// Barcode: your pantry first; otherwise every candidate from OFF + USDA.
+// Barcode: your pantry first, then the branded library on the phone; otherwise OFF + USDA online.
 export async function byBarcode(code) {
   const own = (await mine()).filter(f => codeVariants(code).some(v => sameCode(v, f.barcode)));
   if (own.length) return { own, found: own };
-  const [off, usda] = await Promise.all([offBarcode(code), usdaBarcode(code)]);
+  const lib = await libBarcode(code);
+  if (lib.length) return { own: [], found: lib };
+  const [off, usda] = await Promise.all([offBarcode(code), local.get('usdaKey', '') ? usdaBarcode(code) : []]);
   const found = [...usda, ...off].map(f => ({ ...f, barcode: f.barcode || code }));
   found.sort((a, b) => score('', b) - score('', a));
   return { own: [], found };
 }
 
-// Text: generic USDA data is the most accurate for whole foods (bundled, plus the live API when
-// you've added your own key); brands come from USDA Branded + OFF.
-export async function search(q, { recipes = [] } = {}) {
+// Text: generic USDA data is the most accurate for whole foods, the branded library covers US
+// packaged foods, and Open Food Facts fills gaps online. What's on the phone comes back first
+// (onLocal) so the list shows instantly; the live USDA API only runs when you've added your own key.
+export async function search(q, { recipes = [], onLocal } = {}) {
   const ql = q.trim(), pantry = await mine();
-  const [api, br, off, bundled] = await Promise.all([
-    local.get('usdaKey', '') ? usdaSearch(ql, 'Foundation,SR Legacy,Survey (FNDDS)') : [], // saves the demo key's ~10/hour for brands
-    usdaSearch(ql, 'Branded'),
-    offSearch(ql),
-    genericSearch(ql),
-  ]);
-  const gen = [...bundled, ...api];
-  const brands = brandWords([...pantry, ...br, ...off], [...gen, ...pantry]);
-  const own = [...pantry, ...recipes.map(r => ({ ...r, source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : r.tag === 'prep' ? 'Meal prep' : 'Recipe' }))]
-    .filter(f => relevance(ql, f, brands) >= 0.99);
-  const remote = dedupe([...gen, ...br, ...off]).map(f => ({ f, s: score(ql, f, brands) })).sort((a, b) => b.s - a.s).map(x => x.f);
-  own.sort((a, b) => score(ql, b, brands) - score(ql, a, brands));
-  return { own, remote: remote.slice(0, 30), brands };
+  const recs = recipes.map(r => ({ ...r, source: 'recipe', srcLabel: r.tag === 'creami' ? 'Creami' : r.tag === 'prep' ? 'Meal prep' : 'Recipe' }));
+  const key = local.get('usdaKey', '');
+  const online = Promise.all([offSearch(ql), key ? usdaSearch(ql, 'Foundation,SR Legacy,Survey (FNDDS)') : [], key ? usdaSearch(ql, 'Branded') : []]);
+  const rank = (gen, branded) => {
+    const brands = brandWords([...pantry, ...branded], [...gen, ...pantry]);
+    const own = [...pantry, ...recs].filter(f => relevance(ql, f, brands) >= 0.99);
+    // Same food under several barcodes (sizes, multipacks) shows once.
+    const seen = new Set(), same = f => `${tokens(f.name).join(' ')}|${tokens(f.brand).join(' ')}|${Math.round(f.n?.kcal || 0)}`;
+    const remote = dedupe([...gen, ...branded]).map(f => ({ f, s: score(ql, f, brands) })).sort((a, b) => b.s - a.s).map(x => x.f)
+      .filter(f => !seen.has(same(f)) && seen.add(same(f)));
+    own.sort((a, b) => score(ql, b, brands) - score(ql, a, brands));
+    return { own, remote: remote.slice(0, 30), brands };
+  };
+  const [bundled, lib] = await Promise.all([genericSearch(ql), brandedSearch(ql)]);
+  onLocal?.(rank(bundled, lib));
+  const [off, api, br] = await online;
+  return rank([...bundled, ...api], [...lib, ...br, ...off]);
 }
 
 // Per-serving preview for list rows.

@@ -10,7 +10,7 @@ const UNIT = [
   [/^(serving|servings|portion|portions)$/, 'serving'], [/^(slice|slices)$/, 'slice'], [/^(scoop|scoops)$/, 'scoop'],
   [/^(piece|pieces|pc|pcs)$/, 'piece'], [/^(pint|pints)$/, 'pint'], [/^(bar|bars)$/, 'bar'], [/^(can|cans)$/, 'can'],
   [/^(packet|packets|pack|packs|package|packages|pouch|pouches)$/, 'packet'], [/^(container|containers|cartons?)$/, 'container'],
-  [/^(bowl|bowls)$/, 'bowl'], [/^(bottle|bottles)$/, 'bottle'], [/^(handful|handfuls)$/, 'handful'],
+  [/^(bowl|bowls)$/, 'bowl'], [/^(wedge|wedges)$/, 'wedge'], [/^(bottle|bottles)$/, 'bottle'], [/^(handful|handfuls)$/, 'handful'],
 ];
 const unitOf = w => UNIT.find(([re]) => re.test(w))?.[1];
 const numOf = w => (/^\d+(\.\d+)?$/.test(w) ? +w : /^\d+\/\d+$/.test(w) ? w.split('/')[0] / w.split('/')[1] : NUMS[w]);
