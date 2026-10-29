@@ -20,4 +20,8 @@
 ["051933232457","Barbecue vienna sausages","Hargis House",183,8.33,5,13.3,0,3.33,850,"3 sausages, 60 g",60],
 ["051933356368","Premium chunk white chicken in water","Hargis House",107,23.2,1.79,1.79,0,0,446,"56 g",56],
 ["051933346642","Corned beef hash","Hargis House",178,9.32,9.32,11,0.8,0.42,415,"1 cup, 236 g",236],
-["051933103009","Chili with beans","Hargis House",132,6.77,12.8,4.89,3,1.5,436,"1 cup, 266 g",266]]
+["051933103009","Chili with beans","Hargis House",132,6.77,12.8,4.89,3,1.5,436,"1 cup, 266 g",266],
+["0812234027865","Hargow shrimp dumpling","Icook Seafood",142,4.42,25.7,2.65,0.89,2.65,434,"1 portion, 113 g",113,"o"],
+["8801047627500","Shrimp hargow","Don Won",142.86,4.29,24.29,3.33,2.86,1.43,519,"7 pieces, 210 g",210,"o"],
+["5021973125533","White chocolate flapjack","Hargotts",363.49,4.58,49.17,16.67,null,24.17,null,"",0,"o"],
+["0079551230082","Hargow","Doll Dim Sum",163.46,2.88,31.73,2.88,0.96,0.96,462,"8 pieces, 104 g",104,"o"]]

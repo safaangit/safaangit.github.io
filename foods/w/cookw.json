@@ -22,4 +22,15 @@
 ["186337000316","Hatch tomatillo salsa, hatch tomatillo","Cookwell &",33,0,6.67,0,0,3.33,233,"2 tbsp, 30 g",30],
 ["186337000224","Green chile stew two-step mix, green chile stew","Cookwell &",36,0.8,7.2,0.4,0.8,3.2,368,"1/2 c, 125 g",125],
 ["186337000163","Tomato basil soup, tomato basil","Cookwell &",78,1.22,4.49,6.12,0.8,2.86,196,"1 c, 245 g",245],
-["186337000125","Cheese enchilada soup, cheese enchilada","Cookwell &",53,1.22,8.98,1.63,0.8,2.86,290,"1 c, 245 g",245]]
+["186337000125","Cheese enchilada soup, cheese enchilada","Cookwell &",53,1.22,8.98,1.63,0.8,2.86,290,"1 c, 245 g",245],
+["0041618500643","Toasted sesame oil","Cookwell",800,0,0,93.33,null,null,0,"1 portion, 15 g",15,"o"],
+["0041618500674","Cookwell, extra virgin olive oil, garlic","Sovena Usa Inc.",857,0,0,100,null,null,0,"14 g (1 tbsp), 14 g",14,"o"],
+["0041618500735","Cookwell, canola oil, extra virgin olive oil blend","Sovena Usa Inc.",857,0,0,100,null,null,0,"14 g (1 tbsp), 14 g",14,"o"],
+["0186337000514","Escabeche style salsa","Cookwell & Company",33,0,6.67,0,0,3.33,400,"2 tbsp, 30 g",30,"o"],
+["0186337000859","Garlic & molasses marinade","Cookwell & Company",233.33,0,33.33,13.33,0,26.67,733,"15 g (1 tbsp), 15 g",15,"o"],
+["0091037609816","Birria taco starter","Cookwell & Company",28,0.8,4,1.2,0.8,1.6,160,"1 portion, 125 g",125,"o"],
+["0186337000002","Two step mix chili - spicy","Cookwell & Company",36,1.6,7.2,0.8,1.6,2.4,328,"12 cup, 125 g",125,"o"],
+["0091037609823","Carne guisada starter","Cookwell & Company",72,2.4,14.4,0.8,3.2,5.6,248,"12 cup, 125 g",125,"o"],
+["0091037609946","Texas moppin bbq sauce","Cookwell And Company",133.33,3.33,30,0,null,26.67,null,"1 portion, 30 g",30,"o"],
+["0091037609915","Creamy serrano","Cookwell & Company",300,0,0,30,null,null,700,"1 tsp, 5 g",5,"o"],
+["0091037609939","Mayan charred habanero and onion mexican table sauce","Cookwell & Company",300,0,0,30,0,0,700,"1 tsp, 5 g",5,"o"]]

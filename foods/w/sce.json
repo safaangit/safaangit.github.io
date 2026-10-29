@@ -1,4 +1,12 @@
 [["079947000060","All-fruit smoothie, mango strawberry raspberry","Scenic Fruit",50,0.71,12.9,0,2.9,8.57,0,"1 cup, 140 g",140],
 ["079947000046","All-fruit smoothie","Scenic Fruit",57,0.71,15,0.93,2.1,8.57,1,"1 cup, 140 g",140],
 ["869039000319","Large oregon brooks dried prunes","Scenery Farms",107,1.37,27.4,0,2.7,24.7,1,"6 prunes, 73 g",73],
-["041415094147","Honey-scented pumpkin pie, honey","Publix",33,0.83,8.33,0,2.5,3.33,4,"1/2 cup, 120 g",120]]
+["041415094147","Honey-scented pumpkin pie, honey","Publix",33,0.83,8.33,0,2.5,3.33,4,"1/2 cup, 120 g",120],
+["0079947000022","All-fruit smoothie, pineapple mango banana","Scenic Fruit",71,0.71,17.86,0,2.1,12.14,0,"1 cup, 140 g",140,"o"],
+["0079947000084","All-fruit smoothie strawberry banana","Scenic Fruit",57,0.71,14.29,0,2.1,7.14,0,"1 cup, 140 g",140,"o"],
+["0011642030010","Scented gum","",333.33,0,100,0,null,100,0,"",0,"o"],
+["0096619215669","Scented kitchen bin bags - 60l","",866.67,0,0,93.33,null,null,0,"",0,"o"],
+["8008730005632","Funghi porcini","La Sceleira",214,7,29.5,3.7,7,0,0,"",0,"o"],
+["9310012045380","Mf sce cur sausages 500gm","Masterfoods",51.63,0.8,9.12,0.96,null,2.96,354,"1 portion, 125 g",125,"o"],
+["8033520552966","Caesar salad","Cuor Di Scelta",89.63,5.78,4.07,5.41,null,1.26,null,"",0,"o"],
+["9555869601048","Popiah udang","Scentful",130,3.27,14.4,6.27,null,2.53,210,"",0,"o"]]

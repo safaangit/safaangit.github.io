@@ -16,4 +16,11 @@
 ["737870214731","Bar, cookie dough","Life Extension",429,28.6,38.1,23.8,7.1,2.38,107,"1 bar, 42 g",42],
 ["693413106010","Energy shake, chocolate","Extend Shake",344,46.9,37.5,3.12,15.6,3.12,359,"1 packet, 32 g",32],
 ["693413106119","Control hunger powder drink, strawberry","Extend Shake",344,46.9,37.5,6.25,15.6,3.12,359,"1 packet, 32 g",32],
-["693413100513","Anytime bars, peanut butter","Extend Nutrition",375,30,50,7.5,12.5,0,500,"1 bar, 40 g",40]]
+["693413100513","Anytime bars, peanut butter","Extend Nutrition",375,30,50,7.5,12.5,0,500,"1 bar, 40 g",40],
+["0693413100674","Extend nutrition, anytime bar, cookies & cream","Clinical Products Ltd.",333,23.81,52.38,10.71,9.5,0,338,"42 g (1 bar), 42 g",42,"o"],
+["0693413106065","Extend nutrition, anytime shake mixes, creamy vanilla","Clinical Products Ltd.",344,46.88,37.5,4.69,15.6,3.12,381,"32 g (1 packet), 32 g",32,"o"],
+["0181030000243","Extend bcaa","",0,0,0,0,0,0,1720,"",0,"o"],
+["0842595110944","Extend whey protein","Xtend",110,25,2,0,null,1,null,"32 g",32.4,"o"],
+["0737870200857","Extra virgin olive oil do what","Life Extension",889,0,0,100,null,null,null,"1 tbsp, 14 g",13.5,"o"],
+["0693413106232","Extend nutrition","",392.86,35.71,42.86,10.71,10.71,7.14,536,"",0,"o"],
+["0737870252771","Healthy aging powder","Life Extension",0,0,0,0,null,null,null,"1 scoop, 7 g",7,"o"]]

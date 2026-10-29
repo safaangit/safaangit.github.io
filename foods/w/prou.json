@@ -10,4 +10,16 @@
 ["011110502476","2% reduced fat milk","Colorado Proud",50,3.33,5,2.08,0,4.58,50,"8 oza, 240 ml",240],
 ["883712000410","Parmesan basil romano","Kentucky Proud",240,8,42,1,2,12,720,"1 slice, 50 g",50],
 ["868904000317","Mad sweet heat sliced candied jalapenos, mad sweet heat","Ohio Proud",179,0,46.4,0,0,46.4,0,"28 g",28],
-["821000011038","Fresh linguica sausage, fresh linguica","Colorado Proud",146,12.5,0.89,14.2,0,1.79,536,"112 g",112]]
+["821000011038","Fresh linguica sausage, fresh linguica","Colorado Proud",146,12.5,0.89,14.2,0,1.79,536,"112 g",112],
+["0883712000687","Bread","Kentucky Proud",250,5.36,44.64,8.04,3.6,10.71,182,"56 g (1 slice), 56 g",56,"o"],
+["0853303007029","Spring water","Proud Source",0,0,0,0,0,0,0,"16oz, 454 g",453.6,"o"],
+["0853303007005","Proud source spring water","",0,0,0,0,null,0,0,"",0,"o"],
+["0850008915192","Proudly pure","",466.67,13.33,40,30,10,20,367,"",0,"o"],
+["0853303007265","Spring water","Proud Source",0,0,0,0,0,0,0,"",0,"o"],
+["85968742000349","Lemon poppy seed keto cookies","Proudly Pure",375,9.38,43.8,28.1,21.9,12.5,281,"1/2 package, 32 g",32,"o"],
+["0120411043639","Proud 99","",337,37.9,31.1,8.7,10.9,2.3,null,"29 g",29,"o"],
+["0853303007296","Proud source spring water","",0,0,0,0,0,0,0,"",0,"o"],
+["0401080154018","Peanut proud peanut butter","Peanut Proud",562.5,21.88,21.88,46.88,6.25,12.5,469,"",0,"o"],
+["0814343029198","Medium cheddar cheese","Proudly Cheese Wisconsin",429,21.4,3.57,35.7,0,0,679,"1 portion, 28 g",28,"o"],
+["0814343028566","Creamy gouda","Proudly Wisconsin Cheese",393,25,3.57,28.6,0,0,714,"1 serving, 28 g",28,"o"],
+["0647697601518","Pineapple serrano brisket beef jerky","Proud American Company",158.74,28.22,3.53,3.53,null,3.53,176,"28 g",28.3,"o"]]

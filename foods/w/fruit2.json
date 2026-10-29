@@ -28,4 +28,6 @@
 ["019063000926","Berry twists sparkling water beverage, raspberry lemon","Fruit2o",0,0,0.2,0,null,null,0,"1.06 pt, 510 ml",510],
 ["019063000964","Island twists, sparkling water beverage, orange, mango","Fruit2o",0,0,0.2,0,null,null,0,"1.06 pt, 510 ml",510],
 ["019063001015","Sparkling water beverage with other natural flavors, strawberry lime","Fruit2o",0,0,0.2,0,null,null,0,"1.06 pt, 510 ml",510],
-["019063012677","Purified water beverage, raspberry","Fruit2o",0,0,0,0,null,null,14,"1.25 pt, 600 ml",600]]
+["019063012677","Purified water beverage, raspberry","Fruit2o",0,0,0,0,null,null,14,"1.25 pt, 600 ml",600],
+["0019063233010","Grape","Fruit2o",0,0,1,0,0,0,75,"",0,"o"],
+["0019063003279","Fruit2o","Fruit2o",0,0,0.21,0,null,0,null,"",0,"o"]]

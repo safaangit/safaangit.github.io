@@ -5,4 +5,17 @@
 ["722175380267","Angus beef fajitas","Chef's Requested",88,15.9,0,2.65,0,0,257,"113 g",113],
 ["722175382162","Chicken for fajitas","Chef's Requested",106,17.7,2.65,2.21,0.2,0,540,"113 g",113],
 ["722175912185","Angus beef filets","Chef's Requested",196,16.1,0,15.2,0.2,0,402,"1 filet, 112 g",112],
-["722175383725","Chicken breast filets, lemon pepper","Chef's Requested",124,18.8,2.35,4.12,0.3,0.59,341,"1 chicken filet, 170 g",170]]
+["722175383725","Chicken breast filets, lemon pepper","Chef's Requested",124,18.8,2.35,4.12,0.3,0.59,341,"1 chicken filet, 170 g",170],
+["0722175918231","Chicken tender filet","Chef's Requested",204,16.9,2.82,13.38,0,1.41,494,"142 g (1 filet), 142 g",142,"o"],
+["0051000060174","Healthy request healthy request","Campbell's",75,1.67,15.83,0.83,2.5,4.17,347,"amount per serving, 120 g",120,"o"],
+["0051000195685","Healthy request harvest tomato with basil soup","Campbells",45.83,1.25,9.58,0.21,0.83,5,171,"",0,"o"],
+["0042743124063","Requeson","",206.9,10.34,8.62,13.79,null,3.45,259,"",0,"o"],
+["0727242003926","Requeson","",142.86,10.71,7.14,10.71,0,7.14,221,"",0,"o"],
+["0071263601068","Requeson","",169.81,11.32,7.55,9.43,0,3.77,57,"",0,"o"],
+["0860008988720","Chocolate chip cookie dough protein bar","Request Bar",354,18.5,52.3,15.4,4.62,6.15,138,"1.0 portion, 65 g",65,"o"],
+["09031700","Requeijo sanmariana","",87,3,0.5,8.1,null,0.5,null,"30 g",30,"o"],
+["7898969576246","Requeijão cremoso","Porto Novo",221.15,11.35,4.42,19.23,0,0,288,"",0,"o"],
+["0763441980620","Requeson","Mama Lycha",317,24.6,3.52,21.1,0,0,1130,"1 portion, 28 g",28.4,"o"],
+["4068264015112","Requeijão ovelha","Pleno Sabor",109,7.8,5.2,6.3,null,2.5,319,"1 embalagem, 250 g",250,"o"],
+["0826766250332","Two turkey sandwich","Reqdymeals",239.22,16.47,22.35,9.8,2.35,2.35,710,"1 sandwich, 255 g",255,"o"],
+["7896625213757","Requeijão cremoso light zero","Vigor",143,11,4,9.2,null,null,null,"",0,"o"]]

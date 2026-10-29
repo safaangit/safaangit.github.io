@@ -76,4 +76,16 @@
 ["081867550044","Ginger & teriyaki sesame seed dressing","Kozlowski Farms",83,3.33,16.7,0,0,13.3,667,"2 tbsp, 30 g",30],
 ["081867200185","Old fashioned pumpkin butter","Kozlowski Farms",184,0,47.4,0,0,47.4,0,"1 tbsp, 19 g",19],
 ["081867120056","Pineapple preserve","Kozlowski Farms",250,0,60,0,0,60,0,"1 tbsp, 20 g",20],
-["081867020103","Pecan crumb top pie, three berry","Kozlowski Farms",290,2.17,48.6,10.1,2.2,31.2,101,"1 slice, 138 g",138]]
+["081867020103","Pecan crumb top pie, three berry","Kozlowski Farms",290,2.17,48.6,10.1,2.2,31.2,101,"1 slice, 138 g",138],
+["0081867100133","Old fashioned blueberry jam","Kozlowski Farms",225,0,60,0,0,55,0,"20 g (1 tbsp), 20 g",20,"o"],
+["0081867500025","Red raspberry vinegar","Kozlowski Farms",67,0,13.33,0,0,6.67,0,"15 g (1 tbsp), 15 g",15,"o"],
+["0850086000643","Mild yellow mustard powder","Kozlik's Canadian Mustard",400,21.25,27.5,20,12.5,2.5,0,"8 g (1 tbsp), 8 g",8,"o"],
+["0850086000230","Kozliks sweet smoky brown yellow dijon natural","",300,0,40,20,null,20,300,"",0,"o"],
+["4620004251237","Kozinak peanut","",530,19,39,33,0,30,0,"",0,"o"],
+["0073491511027","Vanilla pudding","Kozy Shack",108,3.08,19.2,1.92,0,16.2,123,"1 portion, 130 g",130,"o"],
+["6976791280935","Kozed mango","Kozed",360,7.33,81.3,0,null,null,117,"1 bag, 75 g",75,"o"],
+["8906064701230","Cornflakes mixture","Kozhi Koden's",586,17.9,39.3,39.3,3.57,0.71,1560,"1 portion, 28 g",28,"o"],
+["0830238002589","Apple pie","Kozlowski",254,2.2,44.1,8.82,1.1,27.6,110,"1 slice, 91 g",90.7,"o"],
+["6976791281505","Peelable white peach gummy candy","Kozed",333,3.33,76.7,0,0,60,100,"7 pieces, 30 g",30,"o"],
+["6976791281512","Peelable grapefruit","Kozed",333.33,3.33,80,0,0,60,67,"1 portion, 30 g",30,"o"],
+["0830238002596","Pie","Kozlowski Farms",264.58,2.2,46.3,8.82,2.2,27.56,33,"1 slice, 91 g",90.7,"o"]]

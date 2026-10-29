@@ -2,4 +2,16 @@
 ["856979006006","Artisanal ice cream","Laa Mode",242,3.3,28.6,14.3,1.1,25.3,44,"0.5 cup, 91 g",91],
 ["736795300130","Smoked rope string cheese","Laack's Finest",282,28.2,3.52,17.6,0,0,599,"28 g",28.4],
 ["856979006136","Wired coffee ice cream with chocolate chips","Laa Mode",271,2.35,25.9,16.5,1.2,23.5,35,"1 bar, 85 g",85],
-["789180000214","Corn tortillas","Laabuela",167,2.78,36.1,1.39,2.8,0,181,"1 tortilla, 36 g",36]]
+["789180000214","Corn tortillas","Laabuela",167,2.78,36.1,1.39,2.8,0,181,"1 tortilla, 36 g",36],
+["8850643070432","Laab-namtok seasoning mix","",200,6.67,40,0,6.67,6.67,9000,"",0,"o"],
+["0721557542682","Laab-namtok seasoning mix","Dragonfly",200,6.67,40,0,6.67,6.67,9000,"",0,"o"],
+["0736795421187","Jalapeño cheddar cheese curds","Laack’s Finest",387,24.6,3.52,31.7,0,0,634,"1 portion, 28 g",28.4,"o"],
+["0736795421163","Garlic & herb cheddar cheese curds","Laack’s Finest",387,24.6,0,31.7,0,0,634,"1 portion, 28 g",28.4,"o"],
+["8853061009008","Laab-namtok seasoning","Sunfat",171,0,42.9,0,0,0,2570,"1 portion, 7 g",7,"o"],
+["0736795520040","Mozzarella whips","Laack’s Finest",286,28.6,3.57,17.9,0,0,607,"1 serving, 28 g",28,"o"],
+["0736795423099","Pepper string cheese","Laack Cheese Co.",286,28.6,3.57,17.9,0,0,607,"1 stick, 28 g",28,"o"],
+["0200141413510","Garlic parmesan cheddar","Laack’s Finest",388,24.7,3.53,31.7,0,0,635,"1 portion, 28 g",28.3,"o"],
+["0736795422108","Mozzarella whips","Laack's Finest",282.2,28.22,3.53,17.64,null,null,600,"1 portion, 28 g",28.3,"o"],
+["0736795421207","Chili cheddar cheese curds","Laack's Finest",387.32,24.65,0,31.69,null,null,634,"1 portion, 28 g",28.4,"o"],
+["0736795421255","Horseradish cheddar cheese curds","Laack's Finest",388.02,24.69,3.53,31.75,null,null,635,"1 portion, 28 g",28.3,"o"],
+["0736795421224","Tomato basil cheddar cheese curds","Laack's Finest",388.02,24.69,0,31.75,null,null,635,"1 portion, 28 g",28.3,"o"]]

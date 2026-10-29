@@ -100,4 +100,13 @@
 ["076740101253","Assorted milk and dark chocolates, peanut cluster, chocolate nut…","Whitman's Sampler",424,6.06,57.6,21.2,3,48.5,197,"about 3.5 pieces, 33 g",33],
 ["076740101017","Assorted milk and dark chocolates sampler, caramel, vanilla creme…","Whitman's",417,2.78,66.7,16.7,2.8,52.8,125,"2 pieces, 36 g",36],
 ["076740072744","Assorted fine chocolates, assorted","Whitman's",457,4.35,71.7,17.4,2.2,58.7,163,"3 pieces, 46 g",46],
-["076740102519","Assorted milk and dark chocolates, assorted","Whitman's",462,7.69,57.7,23.1,3.8,46.2,173,"2 pieces, 26 g",26]]
+["076740102519","Assorted milk and dark chocolates, assorted","Whitman's",462,7.69,57.7,23.1,3.8,46.2,173,"2 pieces, 26 g",26],
+["0076740070856","Assorted chocolates","Whitman's",457,4.35,63.04,21.74,2.2,47.83,122,"46 g (3 pieces), 46 g",46,"o"],
+["0076740072577","Assorted premium chocolates","Whitman's Candies Inc.",467,4.44,64.44,22.22,2.2,51.11,170,"45 g, 45 g",45,"o"],
+["0076740102359","Whitman’s sampler assorted milk and dark chocolates","",416.67,2.78,66.67,16.67,2.78,52.78,125,"",0,"o"],
+["0076740101079","Whitman's assorted chocolate","",416.67,2.78,66.67,16.67,2.78,52.78,125,"",0,"o"],
+["0076740113232","Pecon crown","Whitmans",480,4,52,28,null,40,140,"1 portion, 25 g",25,"o"],
+["0076740076803","Sampler assorted","Whitman's",444,7.41,55.6,22.2,3.7,48.1,185,"2 piece, 27 g",27,"o"],
+["0076740113867","S’mores","Whitman’s",400,5,65,15,0,45,100,"1 piece, 20 g",20,"o"],
+["0076740113881","Caramel s’mores","Whitmans",450,5,65,17.5,0,45,150,"1 piece, 20 g",20,"o"],
+["0076740117070","Assorted milk and dark chocolate","Whitman’s",457,5.71,54.3,25.7,2.86,45.7,null,"2 pieces, 35 g",35,"o"]]

@@ -125,7 +125,7 @@ async function genericSearch(q, brands) {
 
 // ---- Branded library ----
 // ~400k US packaged foods from USDA Branded (tools/branded_foods.js), published next to the app as
-// small files by word prefix. A search downloads the one file for its rarest word; the service
+// small files by word prefix. A search downloads the files for its words; the service
 // worker keeps every file it has fetched, so repeat searches are instant and work offline.
 const LIB = new URL('/foods/', location.href).href; // safaangit.github.io/foods/ next to /biryani/
 const libFiles = new Map();
@@ -146,20 +146,21 @@ function libKey(P, w) {
     if (k.length >= 6) return null;
   }
 }
-function fromLib([gtin, name, brand, kcal, p, c, f, fib, sug, na, sv, svg]) {
+function fromLib([gtin, name, brand, kcal, p, c, f, fib, sug, na, sv, svg, src]) {
   return {
     name, brand, barcode: /^\d/.test(gtin) ? gtin : undefined, n: clean({ kcal, p, c, f, fib, sug, na }),
     units: gramUnits(svg > 0 ? [{ label: `serving (${sv})`, mult: svg / 100 }] : []),
-    source: 'usda-b', srcLabel: 'USDA Branded', srcId: gtin,
+    ...(src === 'o' ? { source: 'off', srcLabel: 'Open Food Facts' } : { source: 'usda-b', srcLabel: 'USDA Branded' }), srcId: gtin,
   };
 }
 async function brandedSearch(q) {
   const idx = await libJSON('index.json');
   if (!idx) return [];
   const P = idx.prefixes, keys = [...new Set(foodWords(q).map(w => libKey(P, w)).filter(Boolean))].sort((a, b) => P[a] - P[b]);
-  if (!keys.length || P[keys[0]] > 1500) return []; // only very common words ("chocolate"): leave it to the other sources
-  const rows = await libJSON(`w/${keys[0]}.json`);
-  if (!rows) return [];
+  // A food is filed under its brand and first two name words, so read each word's file (the smallest
+  // three); very common words ("chocolate") are left to the other sources.
+  const files = await Promise.all(keys.filter(k => P[k] <= 1500).slice(0, 3).map(k => libJSON(`w/${k}.json`)));
+  const seen = new Set(), rows = files.flat().filter(r => r && !seen.has(r[0]) && seen.add(r[0]));
   return rows.map(fromLib).filter(f => coverage(q, f) >= 0.66).map(f => ({ f, s: score(q, f) }))
     .sort((a, b) => b.s - a.s).slice(0, 25).map(x => x.f);
 }
@@ -233,7 +234,8 @@ export function score(q, f, brands) {
   const c = check(f.n);
   const complete = ['kcal', 'p', 'c', 'f'].every(k => f.n?.[k] != null) ? 1 : 0.7;
   const rel = relevance(q, f, brands), staple = f.pop && rel >= 1 ? 0.3 : 0; // shrimp, chicken breast, rice, eggs…
-  return (rel + staple) * (SRC_W[f.source] || 0.6) * (c.ok ? 1 : 0.6) * complete * (HARAM.test(`${f.full || f.name} ${f.brand || ''}`) ? 0.3 : 1);
+  const cov = q ? coverage(q, f, brands) : 1; // a missing word ("greek" in "great value greek yogurt") costs twice
+  return (rel + staple) * cov * (SRC_W[f.source] || 0.6) * (c.ok ? 1 : 0.6) * complete * (HARAM.test(`${f.full || f.name} ${f.brand || ''}`) ? 0.3 : 1);
 }
 function dedupe(list) {
   const seen = new Map();

@@ -10,4 +10,6 @@
 ["015109001551","Extra virgin olive oil","Italica",867,0,0,93.3,null,null,0,"1 tbsp, 15 ml",15],
 ["0015109010041","Mediterranean avocado oil","Italica",867,0,0,93.3,null,null,0,"1 tbsp, 15 ml",15],
 ["031142780451","Italico cheese, italico","Belgioioso",357,21.4,3.57,25,0,0,1000,"1 \" cube, 28 g",28],
-["070118003156","Queen olives","Italica",167,0,6.67,13.3,6.7,0,1200,"3 olives, 15 g",15]]
+["070118003156","Queen olives","Italica",167,0,6.67,13.3,6.7,0,1200,"3 olives, 15 g",15],
+["0015109001117","Extra virgin olive oil","Italica",130,0,0,14,null,0,0,"15 g",15,"o"],
+["0070118004122","Green salad olives","Italica",140.22,0,0,14.67,null,null,800,"1 portion, 15 g",15,"o"]]

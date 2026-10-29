@@ -1,4 +1,16 @@
 [["0740169018873","Steak house old fashioned sauce","Peter Luger",200,0,46.7,0,0,46.7,833,"1 tablespoon, 15 ml",15],
 ["0740169520000","Peter luger steak house creamed spinach, 14 oz","Peter Luger",55,0,6.36,2.27,1.8,0,382,"1/2 cup, 110 g",110],
 ["850024943476","Caramel filled premium milk chocolate truffles, caramel","Lugano",571,7.14,53.6,35.7,3.6,50,71,"2 pieces, 28 g",28],
-["0028364120226","Sweet luganiga sausage","Premio",321,21.4,1.79,25,0,1.79,786,"2 oz. pan fried, 56 g",56]]
+["0028364120226","Sweet luganiga sausage","Premio",321,21.4,1.79,25,0,1.79,786,"2 oz. pan fried, 56 g",56],
+["0740169220061","Steak house old fashioned sauce","Peter Luger",200,0,46.67,0,null,46.67,833,"",0,"o"],
+["0883350002203","Déluge purified water","",0,0,0,0,0,0,0,"",0,"o"],
+["0852546005007","Lugol’s iodine","",0,0,0,0,0,0,0,"",0,"o"],
+["0860009428232","Pistachio white chocolate truffles","Lugano",567,5.33,56.7,33.3,0,56.7,120,"2 units., 30 g",30,"o"],
+["0860009428270","Truffles","Lugano",550,5,55,32.5,2.5,55,73,"3 units., 40 g",40,"o"],
+["0860009428287","Lugano","Lugano",550,5,57.5,32.5,2.5,55,88,"3 units., 40 g",40,"o"],
+["0860009428294","Dark chocolate creme filled premium dark chocolate","Lugano Brazil",525,5,52.5,35,5,50,15,"3 units., 40 g",40,"o"],
+["0860010729489","Caramel filled milk chocolate truffled","Lugano",550,5,57.5,32.5,2,55,80,"3 truffles, 40 g",40,"o"],
+["0860011927563","Premium milk chocolate truffles","Lugano",536,3.57,57.1,32.1,3.57,57.1,79,"2 units, 28 g",28,"o"],
+["8936172875882","Chocolate dipped mango","Ohla By Lugia",425,5,72.5,12.5,5,60,38,"1 portion, 40 g",40,"o"],
+["0740169120255","Bratwurst","Peter Luger",362.83,13.27,1.77,28.32,null,null,628,"",0,"o"],
+["0869728851684","Chocolate - pie & marshmallow","Lugero",480,8,60,24,4,40,0,"1 bar, 25 g",25,"o"]]

@@ -30,4 +30,16 @@
 ["070578000153","Whole milk","Creamland",62,3.33,5,3.33,0,4.58,50,"1 cup, 240 ml",240],
 ["070578000399","2% reduced fat milk","Creamland",54,3.33,5,2.08,0,5,54,"1 cup, 240 ml",240],
 ["856461008358","Cookies & creamless plant-based drink, cookies & creamless","Owyn",51,5.63,2.82,1.97,1.4,1.13,76,"12 fl oz, 355 ml",355],
-["856461008785","Cookies & creamless protein shake, cookies & creamless","Owyn",52,6.06,2.73,2.12,1.5,1.21,76,"11.15 fl oz, 330 ml",330]]
+["856461008785","Cookies & creamless protein shake, cookies & creamless","Owyn",52,6.06,2.73,2.12,1.5,1.21,76,"11.15 fl oz, 330 ml",330],
+["0705105541051","Creamline yogurt, lemon","Maple Hill Creamery",88,4.12,10,4.12,0,9.41,60,"170 g (1 container), 170 g",170,"o"],
+["0705105542652","Creamline yogurt","Maple Hill Creamery",88,4.12,10,4.12,0,9.41,60,"170 g (1 container), 170 g",170,"o"],
+["0070578004236","Creamland green chile dip","",166.67,3.33,6.67,16.67,null,3.33,450,"",0,"o"],
+["0856461008648","Cookie & creamless","Owyn",54.55,6.06,2.42,2.12,0.91,1.21,82,"1 serving, 330 g",330,"o"],
+["0746104144027","Farm creamline milk grade a","",150,8,11,9,0,11,110,"",0,"o"],
+["0070578007107","Creamland low fat cottage cheese","",79.65,10.62,5.31,2.21,0,4.42,389,"",0,"o"],
+["0797734435078","Creamline whole milk","Llc",62.5,3.33,5,3.33,0,4.58,50,"",0,"o"],
+["0070578002560","4% milkfat small curd cottage cheese","Creamland",97.3,10.6,5.31,4.42,null,4.42,389,"0.5 cup, 113 g",113,"o"],
+["0746104100016","Creamline milk - whole milk","Ronnybrook Farm Dairy",60,3.2,4.4,3.6,0,4.4,48,"8 fl oz, 250 g",250,"o"],
+["0051497406554","Chocolate creamline milk","Sinagra Family Dairy",110,3.97,11,5.73,null,10.6,66,"1 portion, 227 g",226.8,"o"],
+["0644216907588","Creamline milk","Red Ridge Creamery",64,3.7,6,3.25,null,6,45,"",0,"o"],
+["9060045810171","Semi-skimmed milk","Creamline",47,3.4,4.9,1.6,null,4.9,null,"100 g",100,"o"]]

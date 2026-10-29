@@ -10,4 +10,8 @@
 ["070026010123","Whole milk","Hygeia",62,3.33,5,3.33,null,4.58,50,"1 cup, 240 ml",240],
 ["070026010925","Fat free milk","Hygeia",38,3.33,5.42,0,null,5,54,"1 cup, 240 ml",240],
 ["070026010406","2% reduced fat milk","Hygeia",54,3.33,5,2.08,0,5,54,"",0],
-["070026010697","1% lowfat milk","Hygeia",46,3.33,5.42,1.04,null,5,54,"1 cup, 240 ml",240]]
+["070026010697","1% lowfat milk","Hygeia",46,3.33,5.42,1.04,null,5,54,"1 cup, 240 ml",240],
+["0762023118611","Codfish bits bacalao","Hygrade",161,41.07,0,0,0,0,5914,"56 g (2 oz), 56 g",56,"o"],
+["0065504497657","Mini hoagie","Hygaard",350,15,39,15,1,5,null,"142 g",142,"o"],
+["0083453000865","Filled cake bites - apple","Hygge Bakeries",371,2.86,62.9,12.9,null,45.7,214,"1 cake, 35 g",35,"o"],
+["7350109960020","Cocoa classic organic cocoa mix","Hygge!",392,7.6,63.7,8.8,null,58.2,null,"",0,"o"]]

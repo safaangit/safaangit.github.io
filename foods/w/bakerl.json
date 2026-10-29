@@ -16,4 +16,10 @@
 ["852160006312","The brioche rolls","Bakerly",343,8.57,54.3,10,0,14.3,357,"1 roll, 35 g",35],
 ["852160006015","Chocolate authentic french recipe croissants, chocolate","Bakerly",400,6.67,46.7,20,2.2,13.3,378,"1 croissant, 45 g",45],
 ["852160006008","Mini brioches, chocolate chunk","Bakerly",375,7.5,50,15,2.5,17.5,375,"1 mini brioche, 40 g",40],
-["850004281833","French pancakes to-go!, french","Bakerly",400,5.71,54.3,17.1,1.4,18.6,229,"2 pancakes, 70 g",70]]
+["850004281833","French pancakes to-go!, french","Bakerly",400,5.71,54.3,17.1,1.4,18.6,229,"2 pancakes, 70 g",70],
+["0850004281970","6 french pancakes to-go!","Bakerly",371,5.71,51.4,17.1,0,17.1,271,"1 pancake, 35 g",35,"o"],
+["0850038905132","Peanut butter and grape filled crepes to-go","Bakerly",406,9.38,53.1,18.8,3.12,25,344,"1 crêpe, 32 g",32,"o"],
+["0850038905149","Crepe to-go","Bakerly",406,9.38,53.1,18.8,3.12,25,344,"1 crepe, 32 g",32,"o"],
+["0850038905095","Brioche burger bun","Bakerly",340,10,54,10,2,10,420,"1 bun, 50 g",50,"o"],
+["0850038905323","Crepes to go, blueberry","Bakerly",375,6.25,68.8,9.38,0,28.1,312,"1 crêpe, 32 g",32,"o"],
+["0850038905613","Sriracha burger buns","Bakerly",340,6,62,7,2,12,640,"1 bun, 50 g",50,"o"]]

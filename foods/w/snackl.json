@@ -5,4 +5,12 @@
 ["860005537839","Cinnamon churro plant crisps, cinnamon churro","Snacklins",357,0,60.7,16.1,0,0,196,"28 g",28],
 ["860005537860","Sea salt & vinegar plant crisps, sea salt & vinegar","Snacklins",357,0,60.7,16.1,0,3.57,857,"28 g",28],
 ["860288001041","Nacho plant crisps, nacho","Snacklins",346,3.85,57.7,15.4,0,0,423,"26 g",26],
-["860288001089","Nacho plant crisps, nacho","Snacklins",357,3.57,57.1,16.1,0,0,446,"28 g",28]]
+["860288001089","Nacho plant crisps, nacho","Snacklins",357,3.57,57.1,16.1,0,0,446,"28 g",28],
+["0860288001065","Barbeque","Snacklins",357,0,57.1,16.1,null,null,339,"1 serving, 28 g",28,"o"],
+["0860005537815","Teriyaki","Snacklins",357.14,0,57.14,16.07,0,3.57,357,"",0,"o"],
+["0860005537822","Churro","Snacklins",346.15,0,61.54,15.38,0,0,192,"",0,"o"],
+["0040839000307","Popcorn süss","Snackline",394,6.5,79,3.7,null,30,10,"100 g",100,"o"],
+["0850046485046","Chips","Snacklins",429,0,57.1,21.4,0,0,607,"1 portion, 28 g",28,"o"],
+["0850046485060","Crisps","Snacklins",462,0,61.5,23.1,0,null,null,"1 portion, 26 g",26,"o"],
+["0720379001803","Organic dried apricots","Snacklife",250,2.5,62.5,0,7.5,52.5,0,"5 apricots, 40 g",40,"o"],
+["0850069803285","Pistachio baklava","Snacklava",520,10,54,30,4,22,0,"3 pieces, 50 g",50,"o"]]
