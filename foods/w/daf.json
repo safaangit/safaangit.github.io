@@ -25,4 +25,14 @@
 ["0024024207214","Guava nectar, guava","Dafruta",56,0,14,0,1.6,12.4,0,"8.45 oz., 250 ml",250],
 ["0024024207412","Guava nectar, guava","Dafruta",58,0.42,14.6,0,1.7,12.9,0,"8 fl oz, 240 ml",240],
 ["0024024161103","Apple, mango and carrot juice beverage blend, apple; mango; carrot","Dafruta",42,0,10.4,0,0,10.4,0,"8 fl oz, 240 ml",240],
-["024024000402","Passion fruit juice concentrate, passion fruit","Dafruta",17,0,6.67,0,3.3,3.33,0,"1 fl oz, 30 ml",30]]
+["024024000402","Passion fruit juice concentrate, passion fruit","Dafruta",17,0,6.67,0,3.3,3.33,0,"1 fl oz, 30 ml",30],
+["0024024009702","Dafruta, concentrate passion fruit juice","Liberty Imports",17,0,3.33,0,0,3.33,23,"30 ml (1 fl oz), 30 g",30,"o"],
+["0480702002753","Pavé d’affinois","Coop",257,16,1,21,null,null,null,"100 g",100,"o"],
+["13079943","Pavé d’affinois mini","Pavé D’affinois",343,15,1,31,null,1,null,"30 g",30,"o"],
+["0746395182098","Triple cream cheese","Fromager D’affinois",428.57,10.71,0,39.29,0,0,536,"1 serving, 28 g",28,"o"],
+["0078969123566","Fall crisp caramel apple with sprinkles","Daffy",360,2.35,83.53,10.59,null,51.76,112,"85 g",85,"o"],
+["2056137007427","Le fromager","Fromager D’affinois",357,14.3,0,32.1,0,0,571,"1 portion, 28 g",28,"o"],
+["0212716410640","Fromage daffinois truffle we wedge","Safeway",357,17.9,3.57,32.1,null,null,571,"1 portion, 28 g",28,"o"],
+["0046395182098","Fromager d'affinois excellence","Fromager D'affinois",428.57,14.29,0,39.29,null,null,536,"1 portion, 28 g",28,"o"],
+["7310960053538","Chicken teriyaki","Dafgårds",144,7.2,20,3.6,null,7.2,null,"",0,"o"],
+["2454816302267","Le fromager d'affinois ail & fines herbes","Fromager D'affinois",335,15,1.9,30,null,1.3,null,"100 g",100,"o"]]

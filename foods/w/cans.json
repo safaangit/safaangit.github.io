@@ -3,4 +3,15 @@
 ["0078000026658","Mini cans soda","Dr Pepper",41,0,11.3,0,null,10.9,16,"1 can, 221 ml",221],
 ["0049000019384","Sprite cans, 12 fl oz, 24 pack, lemon; lime","Sprite",39,0,10.7,0,null,10.7,18,"1 can, 355 ml",355],
 ["0049000075298","Fresca cans, 7.5 fl oz, 6 pack, grapefruit; citrus","Fresca",0,0,0.45,0,null,null,11,"1 can, 222 ml",222],
-["00049000002447","Fresca cans, 12 fl oz, 24 pack","Fresca",0,0,0,0,null,null,10,"1 can, 355 ml",355]]
+["00049000002447","Fresca cans, 12 fl oz, 24 pack","Fresca",0,0,0,0,null,null,10,"1 can, 355 ml",355],
+["0012000171857","Diet cans","Pepsi",3.33,0,0,0,null,0,null,"",0,"o"],
+["0049000058468","Drink cans","Coca-Cola",39.44,0,10.99,0,null,10.99,null,"",0,"o"],
+["0076406021000","Tropical cans","Jumex",41.79,0,10.15,0,0,10.15,null,"",0,"o"],
+["0070328850465","Mccormick cans","Old Bay",0,0,0,0,0,0,10000,"",0,"o"],
+["4048500263897","Montana cans spraypaint","",321.43,3.57,82.14,0,null,67.86,0,"",0,"o"],
+["0856920005744","Mini cans variety pack","Goodpop",400,0,93.33,0,0,80,0,"",0,"o"],
+["0856920005706","Mini cans variety pack- orange and fruit punch","Goodpop",40,0,10,0,null,9,0,"1 can, 222 g",221.8,"o"],
+["0856920005669","Mini cans variety pack","Goodpop",30,0,7,0,null,5,0,"1 can (7.5 fl oz), 222 g",221.8,"o"],
+["0856920005683","Mini cans variety pack- orange and fruit punch","Goodpop",22.5,0,5.41,0,null,4.06,2,"1 can, 222 g",221.8,"o"],
+["3254474012268","Cans of corn","Green Gisnt",77,2.4,12.6,1.2,3,6.2,157,"100 g",100,"o"],
+["0990312175520","Sardines with rosemary and fennel pepper","Nice Cans",367,16.7,2.5,31.7,0,2.5,300,"120 g",120,"o"]]

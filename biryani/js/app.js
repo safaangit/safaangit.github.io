@@ -622,7 +622,8 @@ function openAdd(meal, { pick, query } = {}) {
   q.focus(); // keyboard up right away, like Macros
   $('#scanBtn', b).onclick = () => openScanner(meal, pick);
   $('#labelBtn', b).onclick = () => openLabel({ meal, pick });
-  $('#newBtn', b).onclick = () => openFoodEditor(null, { meal, pick });
+  // Whatever you searched for becomes the new food's name.
+  $('#newBtn', b).onclick = () => { const t = q.value.trim(); openFoodEditor(null, { meal, pick, name: t && t.charAt(0).toUpperCase() + t.slice(1) }); };
   if (!pick) { $('#quickBtn', b).onclick = () => openQuick(meal); $('#voiceBtn', b).onclick = () => openVoice(); }
 }
 
@@ -815,7 +816,7 @@ function openPortion(f, { meal = 0, entry, pick, qty: qStart } = {}) {
 }
 
 // Food editor works per serving, like reading a label; stores per 100 g when grams are known.
-function openFoodEditor(f, { meal, pick, entry, barcode, prefill } = {}) {
+function openFoodEditor(f, { meal, pick, entry, barcode, prefill, name } = {}) {
   const su = f?.units?.find(u => u.label.startsWith('serving')) || f?.units?.[0];
   const per = prefill?.n || (f ? N.scale(f.n, su?.mult || 1) : {});
   const servingLabel = prefill?.servingLabel || (su ? unitText(su.label) : '') || '1 serving';
@@ -823,7 +824,7 @@ function openFoodEditor(f, { meal, pick, entry, barcode, prefill } = {}) {
   const v = k => (per[k] == null ? '' : r1(per[k]));
   const b = sheet(`<form id="fe" class="form">
     ${prefill?.notes ? `<p class="warn small">${esc(prefill.notes)}</p>` : ''}
-    <label>Name<input name="name" required value="${esc(prefill?.name || f?.name || '')}"></label>
+    <label>Name<input name="name" required value="${esc(prefill?.name || f?.name || name || '')}"></label>
     <div class="grid2"><label>Brand<input name="brand" value="${esc(prefill?.brand || f?.brand || '')}"></label><label>Barcode<input name="barcode" inputmode="numeric" value="${esc(barcode || f?.barcode || '')}"></label></div>
     <div class="grid2"><label>Serving<input name="sl" value="${esc(servingLabel)}"></label><label>Serving grams<input name="sg" type="number" min="0" step="any" inputmode="decimal" value="${servingG}" placeholder="optional"></label></div>
     <h4>Per serving</h4>
@@ -841,7 +842,14 @@ function openFoodEditor(f, { meal, pick, entry, barcode, prefill } = {}) {
       `<p class="warn small">${c.missingKcal ? 'No calories entered.' : `Label says ${c.listed} kcal but the macros add up to ${c.est}.`} <button type="button" id="useEst">Use ${c.est}</button></p>`;
     const u = $('#useEst', b); if (u) u.onclick = () => { form.kcal.value = c.est; chk(); };
   };
-  form.oninput = chk; chk();
+  // Calories fill in from the macros (4/4/9) until you type your own; clearing the box hands it back.
+  let autoK = !form.kcal.value;
+  form.oninput = e => {
+    if (e.target === form.kcal) autoK = !form.kcal.value;
+    else if (autoK && ['c', 'p', 'f', 'fib'].includes(e.target.name)) form.kcal.value = Math.round(N.macroKcal(read().n)) || '';
+    chk();
+  };
+  chk();
   const del = $('#delFood', b);
   if (del) del.onclick = async () => { await db.remove('foods', f.id); closeSheet(); render(); };
   form.onsubmit = async e => {

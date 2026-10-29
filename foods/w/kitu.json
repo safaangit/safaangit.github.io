@@ -12,4 +12,7 @@
 ["810083070254","Coconut mocha flavored enhanced coffee, coconut mocha","Kitu",25,2.78,1.11,1.11,0.8,0.28,50,"1 bottle, 360 ml",360],
 ["810083070278","Sweet cream flavored enhanced coffee, sweet cream","Kitu",22,2.78,0.83,0.97,0.6,0.28,53,"1 bottle, 360 ml",360],
 ["860000663748","Pumpkin pie latte flavored enhanced coffee, pumpkin pie latte","Kitu",19,2.78,0.83,0.69,0,0.28,22,"1 bottle, 360 ml",360],
-["860001336085","Mocha flavored enhanced coffee beverage, mocha","Kitu",22,2.78,1.11,0.83,0.6,0.28,3,"12 fl oz, 360 ml",360]]
+["860001336085","Mocha flavored enhanced coffee beverage, mocha","Kitu",22,2.78,1.11,0.83,0.6,0.28,3,"12 fl oz, 360 ml",360],
+["0860545000312","Kitu vanilla protein + mct oil super creamer","Super Coffee Creamer",106,7.05,0,7.05,0,0,null,"1 serving, 14 g",14.2,"o"],
+["0850083070933","Super coffee","Kitu Life",42.27,7.04,2.25,0.85,1.41,0.28,42,"1 bottle (12 fl oz), 355 g",354.9,"o"],
+["0010083071190","Super coffee","Kitu Life",42.27,7.04,1.97,0.85,1.13,0.28,39,"1 bottle (12 fl oz), 355 g",354.9,"o"]]

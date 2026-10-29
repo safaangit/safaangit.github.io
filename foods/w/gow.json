@@ -1,4 +1,14 @@
 [["636628051041","Spicy mayo, spicy","Gowasabi Sushi",204,3.39,40.7,3.39,0,20.4,1660,"2 tablespoons, 29 g",29.5],
 ["636628059627","Spicy salmon roll, spicy salmon","Gowas@bi Sushi",165,8.27,16.9,6.77,0.4,1.88,184,"1 roll, 266 g",266],
 ["720379506223","White fudge protein puffs cookies & cream, white fudge","Gowild",529,35.3,35.3,26.5,0,20.6,132,"1 package, 34 g",34],
-["636628056985","Poke salmon","Gowas@bi Sushi",124,6.34,17.4,2.75,0.3,2.2,138,"1 roll, 363 g",363]]
+["636628056985","Poke salmon","Gowas@bi Sushi",124,6.34,17.4,2.75,0.3,2.2,138,"1 roll, 363 g",363],
+["0636628058101","Seattle roll","Gowasabi Sushi",158,2.78,31.1,2.78,0.93,4.18,9280,"1 package, 215 g",215.5,"o"],
+["0636628041066","Vegetable lo mein","Gowas@bi Sushi",129,4.7,20.6,2.35,1.18,2.94,447,"170 g",170.1,"o"],
+["0636628075061","Shrimp crunch kimbap","Gowas@bi Sushi",178.74,4.35,31.88,2.9,0.48,2.9,266,"1 roll, 207 g",207,"o"],
+["0636628053045","Nigiri tuna & salmon","Gowas@bi Sushi",167.55,14.55,17.64,3.09,null,1.76,159,"",0,"o"],
+["5060117143392","Butterscotch slice","Harry Gow",422,2.2,47.8,22.6,0.6,34.2,null,"",0,"o"],
+["0636628075023","Cooked tuna kimbap","Gowas@bi Sushi",120.77,7.25,22.22,0.24,0.48,2.42,164,"1 roll, 207 g",207,"o"],
+["0636628057074","Dragon roll","Gowasabi",160.45,4.85,26.87,4.1,1.49,4.48,340,"",0,"o"],
+["0636628059122","Noho roll","Gowasabi",151.08,5.4,21.58,4.32,1.8,null,331,"",0,"o"],
+["0636628053335","Tuna summer roll","Gowas@bisushi",84.66,7.05,9.88,2.12,2.12,2.82,141,"",0,"o"],
+["0636628053472","Crunch spicy tuna roll","Gowas@bi Sushi",171.47,13.23,22.05,4.41,null,2.45,206,"",0,"o"]]

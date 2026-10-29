@@ -31,4 +31,14 @@
 ["047900000631","Green iced tea, lemon","Luzianne",0,0,18.5,0,null,null,0,"1 cup, 5 g",5.4],
 ["047900000624","Half and half iced tea & lemonade","Luzianne",0,0,19.2,0,null,null,0,"1 k-cup pod, 5 g",5.2],
 ["047900361312","Sweet small-batch brewed tea, sweet","Luzianne",31,0,7.5,0,null,7.5,0,"360 ml",360],
-["047900313199","Decaffeinated iced tea","Luzianne",0,0,0,0,null,null,0,"1 tea bag (makes 4 servings - 8 fl oz each), 6 g",6]]
+["047900313199","Decaffeinated iced tea","Luzianne",0,0,0,0,null,null,0,"1 tea bag (makes 4 servings - 8 fl oz each), 6 g",6],
+["0047900303015","Iced tea","Luzianne",0,0,0,0,0,0,0,"7 g",7,"o"],
+["0047900314011","Luzianne, pour-n-stir, liquid iced tea concentrate, sweet tea","Reily Foods Company",0,0,0.42,0,null,0,0,"8 ml (0.125 pouch (makes).), 8 g",8,"o"],
+["0047900314035","Luzianne, water enhancer","Reily Foods Company",0,0,0.42,0,null,0,0,"8 ml (0.125 pouch), 8 g",8,"o"],
+["0047900361213","Luzianne sweet tea","",380.95,0,100,0,null,100,0,"",0,"o"],
+["10263433","Luzerne germée","Germ'attitude",29,3.28,0.91,0.7,1.9,null,null,"10 g",10,"o"],
+["0047900361251","Luzianne peach sweet tea with ginger","",384.62,0,100,0,null,100,0,"",0,"o"],
+["0047900362210","Authentic sweet tea","Luzianne Tea",30,0,7.8,0,null,7.6,0,"1 bottle, 500 g",500,"o"],
+["0199874314525","Arepas doña luz","Productos Doña Luz",86.5,2.03,16.8,0.93,1.43,0.4,3,"",0,"o"],
+["7501184200123","Tostada with sesame seeds","Luzma",466.67,6.67,53.33,30,6.67,3.33,667,"1 portion, 30 g",30,"o"],
+["2168403007151","Emmi luzerner rahmkäse bio","",0,0,0,0,null,0,0,"",0,"o"]]

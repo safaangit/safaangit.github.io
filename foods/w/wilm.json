@@ -16,4 +16,12 @@
 ["634660205613","Whole milk mozzarella cheese","Wilmot Farms",286,25,0,25,0,0,607,"28 g",28],
 ["634660609060","Swiss cheese, swiss","Wilmot Farms",393,28.6,3.57,32.1,0,0,179,"28 g",28],
 ["634660609084","Provolone cheese, provolone","Wilmot Farms",357,25,3.57,25,0,0,893,"28 g",28],
-["050233036734","Brisket, chuck & short rib blend smash patties, chuck & short rib…","Wilmar Meat",298,15.8,0,24.6,0,0,61,"1 patty, 57 g",57]]
+["050233036734","Brisket, chuck & short rib blend smash patties, chuck & short rib…","Wilmar Meat",298,15.8,0,24.6,0,0,61,"1 patty, 57 g",57],
+["0050233600546","Organic ground beef","Wilmar Meat Co.",186,16.4,0,13.3,0,0,0,"113 g",113,"o"],
+["0050233600010","Wilmar","",312.5,15.18,0,26.79,null,null,67,"",0,"o"],
+["0050233600393","Wilmar meat","",312.5,15.18,0,26.79,0,0,67,"",0,"o"],
+["0050233602564","80/20 ground beef","Wilmar Meat",247,16.8,0,19.4,null,null,66,"1 serving, 113 g",113.4,"o"],
+["0050233600454","93% lean ground beef","Wilmar Meat",152,20.5,0,7.14,null,null,63,"1 portion, 112 g",112,"o"],
+["0050233601031","93% lean 7% fat ground beef","Wilmer Meat",150,20.3,0,7.05,null,null,62,"1 portion, 113 g",113.4,"o"],
+["0050233000063","96/4 ground beef","Wilmer Meat Co",123,21.2,0,3.97,null,null,null,"1 portion, 113 g",113.4,"o"],
+["0634660050459","Cheese party tray","Wilmot Farms",388.01,24.69,3.53,31.75,null,null,635,"1.0oz, 28 g",28.3,"o"]]

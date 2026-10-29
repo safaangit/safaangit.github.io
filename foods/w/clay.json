@@ -51,4 +51,17 @@
 ["070422297500","4% small curd cottage cheese","Cass-Clay",97,10.6,4.42,4.42,0,3.54,416,"1/2 cup, 113 g",113],
 ["0647086010679","100% organic ground beef","Clayton's Organic Beef",152,20.5,0,7.14,0,0,67,"112 g",112],
 ["850012238355","Spicy everything salt, spicy","Red Clay",0,0,0,0,100,0,4000,"1/4 tsp, 1 g",1],
-["00896040001004","Red clay gourmet classic sharp cheddar pimiento cheese","Redclay",130,3,1,12,0,1,160,"30 g",30]]
+["00896040001004","Red clay gourmet classic sharp cheddar pimiento cheese","Redclay",130,3,1,12,0,1,160,"30 g",30],
+["0070422290228","2% lowfat cottage cheese","Cass-Clay",79.65,11.5,4.42,2.21,0,3.54,425,"",0,"o"],
+["0070422317406","1% lowfat cottage cheese","Cass-Clay",79.65,11.5,4.42,0.88,0,3.54,434,"",0,"o"],
+["0070422236004","Sour cream","Cass Clay",200,3.33,6.67,16.7,null,6.67,67,"2 tbsp, 30 g",30,"o"],
+["0070422022201","Cass clay butter","",714.29,0,0,78.57,null,0,643,"",0,"o"],
+["0070422376182","French onion sour cream dip","Cass-Clay",200,3.33,10,16.67,0,6.67,733,"",0,"o"],
+["0850012238034","Verde hot sauce","Red Clay",0,0,0,0,0,0,2000,"",0,"o"],
+["0070422407503","Chocolate skim milk","Cass-Clay",59.32,3.81,10.17,0,null,9.75,81,"",0,"o"],
+["0860074001125","Taco stromboli","Claysburg Pizza",302,15.1,27.1,14.6,1.01,4.02,704,"0.5 stromboli, 199 g",199,"o"],
+["0070422287303","Fat free cottage cheese","Cass Clay",79.6,10.6,5.31,2.21,null,3.54,425,"0.5 cup, 113 g",113,"o"],
+["4712453001171","Clay oven sesame rolls","King's Cook",363,6.67,46.7,16.7,null,2.22,396,"1 piece, 90 g",90,"o"],
+["5055274840017","Vanilla slice","Clayton Park Bakery",198,3.4,27.5,9.9,0.5,25,null,"",0,"o"],
+["5055274815077","Beef & vegetable pasty","Clayton Park Bakery",241,6.1,24.7,13.4,null,0.9,360,"",0,"o"],
+["5055274822204","Floured rolls","Clayton Park Bakery",287.76,7.2,56.4,3.4,null,1.8,null,"",0,"o"]]

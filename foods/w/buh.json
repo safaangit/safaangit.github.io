@@ -1,4 +1,16 @@
 [["071285166071","Whole wheat flour","Stone-Buhr",300,13.3,66.7,1.67,10,0,0,"0.25 cup, 30 g",30],
 ["084587001155","Havarti cheese, havarti","Buholzer Brothers",393,21.4,3.57,32.1,0,0,536,"about 1 inch cube, 28 g",28],
 ["071285144024","All-purpose unbleached flour","Stone-Buhr",355,9.68,74.2,0,3.2,3.23,0,"0.25 cup, 31 g",31],
-["071285155020","Unbleached white bread flour","Stone-Buhr",325,12.5,72.5,0,2.5,0,0,"0.25 cup, 40 g",40]]
+["071285155020","Unbleached white bread flour","Stone-Buhr",325,12.5,72.5,0,2.5,0,0,"0.25 cup, 40 g",40],
+["0071285155037","Unbleached white bread flour","Stone-Buhr",333,10,76.7,0,3.33,0,0,"30 g",30,"o"],
+["0858087006848","Buhu fit","",533.33,20,40,33.33,null,4.44,267,"",0,"o"],
+["0084587001216","Havarti cheese","Buholzer Brothers",647,35.3,5.88,52.9,0,0,882,"1 slice, 17 g",17,"o"],
+["2423360000032542336","Buhja cracker mix","",466.67,16.67,60,20,6.67,6.67,600,"",0,"o"],
+["0281310203996","Soft french bread","Buhlers",294,11.8,57.4,2.21,2.94,1.47,544,"1 portion, 68 g",68,"o"],
+["0084587001230","Muenster cheese","Buholzer Brothers",435,26.1,4.35,34.8,0,0,652,"1 slice, 23 g",23,"o"],
+["0246798402248","Smoky roasted mushrooms","Buhlers",94.12,2.35,4.71,7.06,1.18,1.18,329,"1 serving, 85 g",85,"o"],
+["0245841502706","Rosemary potato","Buhlers",100,2.86,21.43,0,2.86,1.43,357,"1 i, 70 g",70,"o"],
+["0247581004403","Brussels sprouts","Buhlers",70.55,3.53,8.23,2.35,3.53,2.35,76,"1 portion, 85 g",85,"o"],
+["0249871203114","Beatable blend","Buhlers",25.77,1.03,5.15,0,2.06,2.06,21,"1 cup, 97 g",97,"o"],
+["0084587001520","Smoked gouda","Buholzer Brothers",357.14,21.43,3.57,28.57,0,0,536,"1 inch cube, 28 g",28,"o"],
+["0084587001476","Dill havarti","Buholzer Brothers",392.86,21.43,3.57,32.14,null,null,536,"1 inch cube, 28 g",28,"o"]]

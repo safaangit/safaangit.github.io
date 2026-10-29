@@ -5,4 +5,17 @@
 ["033604002637","Grade a jumbo eggs","Sauder's Quality Eggs",143,12.7,0,9.52,null,null,143,"1 egg, 63 g",63],
 ["033604004280","Fresh hard-cooked peeled eggs","Sauder's Eggs",136,13.6,0,9.09,null,null,136,"1 egg, 44 g",44],
 ["033604004327","Fresh hard-boiled peeled organic eggs","Sauder's",136,13.6,0,9.09,0,0,136,"1 egg, 44 g",44],
-["03360484","2 hard-cooked red beet eggs perfect peeled","Sauder's Eggs",159,13.6,9.09,7.95,0,9.09,80,"1 egg, 44 g",44]]
+["03360484","2 hard-cooked red beet eggs perfect peeled","Sauder's Eggs",159,13.6,9.09,7.95,0,9.09,80,"1 egg, 44 g",44],
+["0033604535555","12 grade a medium eggs","Sauder's Eggs",136,13.6,0,9.09,null,null,136,"1 egg, 44 g",44,"o"],
+["0033604535265","Large eggs","Sauder's",140,12,0,10,0,0,140,"57 g",56.7,"o"],
+["0033604005232","Hard boiled eggs","Sauder’s Eggs",136,13.6,0,9.09,0,0,136,"44 g",44,"o"],
+["0033604005256","Buffalo style eggs","Sauder's Eggs",159.09,11.36,6.82,7.95,0,0,477,"",0,"o"],
+["0859664006077","Sauders eggs","",140,12,0,10,0,0,140,"",0,"o"],
+["0033604005249","Red beet eggs","Sauder's Quality Eggs",159.09,13.64,9.09,7.95,0,9.09,80,"",0,"o"],
+["03360477","Hard-boiled fresh eggs perfect peeled","Sauder's",136.36,13.64,0,9.09,0,0,136,"",0,"o"],
+["0033604005164","Sauder's cage-free eggs","Sauder's",140,12,0,10,null,null,140,"1 egg, 50 g",50,"o"],
+["0033604535487","Sauder's eggs","",142.86,12.7,0,9.52,0,0,143,"",0,"o"],
+["0810084615621","Candied jalapeños","Sauders",111,2.22,26.7,0,null,26.7,244,"1 portion, 45 g",45,"o"],
+["0810084615959","Pickled eggs","Sauders",157.89,5.26,23.68,5.26,null,23.68,355,"1 egg, 38 g",38,"o"],
+["7891575285922","Granola artesanal","Quinoa Comida Saudavel",388.89,8.67,51.11,18.44,8.44,11.11,120,"1 cup, 45 g",45,"o"],
+["0810084615669","Sauerkraut","Sauders",26.32,1.75,5.26,0,1.75,3.51,702,"0.25 cup, 57 g",57,"o"]]

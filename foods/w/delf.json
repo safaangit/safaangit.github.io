@@ -2,4 +2,10 @@
 ["195893768936","Margherita pizza, margherita","Pizzeria Delfina",201,7.94,28.6,6.35,1.6,0.53,1080,"0.333 pizza, 189 g",189],
 ["862692000122","Iced coffee","Delforte",25,1.54,3.08,0.77,0.3,1.85,26,"11 oza, 325 ml",325],
 ["862692000108","Iced coffee, mocha indulgence","Delforte",25,1.54,3.08,0.77,0.3,1.85,26,"11 oza, 325 ml",325],
-["195893842391","4 formaggi pizza, 4 formaggi","Pizzeria Delfina",223,9.64,27.4,8.12,1.5,0.51,1180,"0.333 pizza, 197 g",197]]
+["195893842391","4 formaggi pizza, 4 formaggi","Pizzeria Delfina",223,9.64,27.4,8.12,1.5,0.51,1180,"0.333 pizza, 197 g",197],
+["0195893663941","Funghi pizza","Pizzeria Delfina",228,7.76,23.7,10.8,1.29,0.43,905,"0.333 pizza, 232 g",232,"o"],
+["0195893953226","Broccoli raab pizza","Pizzeria Delfina",193,7.11,27.9,6.09,1.52,0,1160,"0.333 pizza, 197 g",197,"o"],
+["0195893140183","Pizza napoletana","Pizzeria Delfina",183.43,5.92,32.54,3.55,1.78,0.59,1290,"0.333 pizza, 169 g",169,"o"],
+["4262576430025","Knödelfein kaspress knödel","",207,11.5,14.1,11.6,null,2.5,1,"",0,"o"],
+["0195893607860","Gnocchi","Pizzeria Delfina",91.91,2.57,19.85,0,1.1,0.37,290,"0.5 bag, 272 g",272,"o"],
+["0679508081806","Delfrescopure","",33.7,1.31,5.62,0.25,1.2,4.8,3,"",0,"o"]]

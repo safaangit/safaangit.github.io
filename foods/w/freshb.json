@@ -3,4 +3,6 @@
 ["852793005218","Sparkling beverage","Freshbe",17,0,4.23,0,null,4.06,0,"1 bottle, 591 ml",591],
 ["852793005072","Sparkling beverage, peach","Freshbe",46,0,11.2,0,null,11,0,"1 bottled, 591 ml",591],
 ["852793005195","Sparkling beverage, cosmo","Freshbe",46,0,11.5,0,null,11,0,"1 bottle, 591 ml",591],
-["856543002717","Fresh fruit juice, apple","Freshbev Craft Juicery",46,0,11.7,0,0.4,10,4,"8 oza, 240 ml",240]]
+["856543002717","Fresh fruit juice, apple","Freshbev Craft Juicery",46,0,11.7,0,0.4,10,4,"8 oza, 240 ml",240],
+["0856543002731","Freshbev craft juicery, fresh juice, massachusetts cranberry","Freshbev Llc",46,0,11.67,0,0,6.25,2,"240 ml (8 fl oz), 240 g",240,"o"],
+["0856543002755","Deep beet","Freshbev Llc",41.67,0.83,10.42,0,0.42,6.67,35,"",0,"o"]]

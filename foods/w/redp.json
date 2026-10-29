@@ -60,4 +60,8 @@
 ["30072940812013","Redpack diced tomatoes, 102oz can - cs of 6","Redpack",21,0.83,4.13,0,0,2.48,149,"1/2 cup, 121 g",121],
 ["30072940812044","Redpack chopped tomatoes in puree, 102oz can - case of 6","Redpack",21,0.83,4.13,0,0,2.48,157,"1/2 cup, 121 g",121],
 ["30072940813003","Redpack stewed tomatoes, 102oz can - cs of 6","Redpack",28,0.81,6.5,0,0,4.88,203,"1/2 cup, 123 g",123],
-["30072940814000","Redpack crushed tomatoes, 105oz can - case of 6","Redpack",49,1.64,9.84,0,0,4.92,148,"1/4 cup, 61 g",61]]
+["30072940814000","Redpack crushed tomatoes, 105oz can - case of 6","Redpack",49,1.64,9.84,0,0,4.92,148,"1/4 cup, 61 g",61],
+["0073800001072","Soda, redpop","Faygo",42,0,10.42,0,null,10.42,11,"355 ml (1 can), 355 g",355,"o"],
+["0073800004608","Faygo redpop","Faygo",38.89,0,10,0,0,10,null,"",0,"o"],
+["0073800009306","Faygo redpop","Faygo",41.41,0,10.58,0,null,10.58,10,"23 oz, 652 g",652,"o"],
+["0079621005671","Redpepper pitmaster sausage","Wright Brand",297.62,14.29,2.38,26.19,1.19,0,750,"1 link, 84 g",84,"o"]]

@@ -15,4 +15,7 @@
 ["076067001113","Rich & creamy fudge, vanilla walnut","Claeys",438,2.5,85,12.5,0,67.5,225,"40 g",40],
 ["076067007160","Gourmet peanut brittle, peanut","Claeys",425,7.5,72.5,15,2.5,60,650,"1 1/2 onz, 40 g",40],
 ["076067006859","Old fashioned hard candies","Claeys",400,0,100,0,null,86.7,0,"3 pieces, 15 g",15],
-["076067006804","Old fashioned hard candies, watermelon","Claeys",400,0,100,0,null,86.7,0,"3 pieces, 15 g",15]]
+["076067006804","Old fashioned hard candies, watermelon","Claeys",400,0,100,0,null,86.7,0,"3 pieces, 15 g",15],
+["0076067006255","Claeys old fashion hard candies","",400,0,100,0,0,86.67,0,"",0,"o"],
+["0007606700670","Old fashioned fat free hard candies licorice","Claeys",400,0,100,0,null,86.7,null,"3 piece, 15 g",15,"o"],
+["07600067","Old fashioned hard candies licorice","Claeys",400,0,100,0,null,86.7,null,"4 piece, 15 g",15,"o"]]

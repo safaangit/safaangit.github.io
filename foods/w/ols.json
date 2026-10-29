@@ -25,4 +25,16 @@
 ["079879408071","Angel food cake, angel food","Olson's Baking",222,2.22,53.3,0,0,35.6,822,"45 g",45],
 ["079879403953","Pumpkin mini-muffins","Olson's Baking",348,4.35,43.5,17.4,0,21.7,348,"1 muffin, 23 g",23],
 ["079879400662","Sliced pound cake","Olson's Baking Company",325,5,42.5,17.5,0,0,700,"1 slice, 40 g",40],
-["079879200903","Corn bread, corn","Olson's Baking",348,4.55,51.5,13.6,1.5,27.3,273,"1 slice, 66 g",66]]
+["079879200903","Corn bread, corn","Olson's Baking",348,4.55,51.5,13.6,1.5,27.3,273,"1 slice, 66 g",66],
+["0079879301921","Olson's baking company, chocolate iced chocolate cake","Olson's Baking Company Llc",352,4.23,52.11,15.49,2.8,39.44,268,"1 slice, 71 g",71,"o"],
+["0079879400488","Angel food mini-cakes","Olson's Baking Company",234,2.13,48.94,3.19,0,29.79,541,"47 g, 47 g",47,"o"],
+["0079879407647","Coconut cream cake sliced","Olson's Baking Company",311,4.44,33.33,17.78,0,24.44,406,"45 g (1 slice), 45 g",45,"o"],
+["0041585039474","Melford olson honey pure honey","",304.76,0,80.95,0,null,80.95,null,"",0,"o"],
+["07383670","Potato lefse","Mrs. Olson's",240,8,48,4,4,4,600,"",0,"o"],
+["0079879400228","Banana créme cake","Olson’s Baking Company",400,6.67,46.7,20,0,24.4,578,"1 portion, 45 g",45,"o"],
+["0079879400297","Cinnamon swirl creme cake","Olson's Baking Company",333.33,4.44,42.22,15.56,0,22.22,144,"",0,"o"],
+["7041013161114","Sandwich toffesmak 6stk hennig-olsen","Hennig-Olsen Is As",293,5.2,45,9.9,null,26.1,148,"62 g",62,"o"],
+["07020946","Big deal","Hennig Olsen",306,4.5,35.1,16.1,null,28.4,null,"200 g",200,"o"],
+["7041013203111","Oreo fløteis med oreo-biter","Hennig Olsen",395,3,34,27,0.84,28,79,"60 g",60,"o"],
+["7041018008803","Hennig olsen krone-is","Hennig-Olsen Is",305,4.1,36,16,null,27,76,"",0,"o"],
+["0079879308067","Hot honey hatch chile cornbread","Olson's Baking Company",360,6,52,14,2,26,660,"0.125 cake, 50 g",50,"o"]]

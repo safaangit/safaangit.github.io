@@ -62,4 +62,13 @@
 ["041420126567","Assorted fruit mix chewy candies, assorted fruit","Lemonhead",355,0,87.1,0,null,71,81,"20 pieces, 31 g",31],
 ["041420247903","Lemon flavored the original candy, lemon","Lemonhead",357,0,100,0,null,78.6,0,"10 pieces, 14 g",14],
 ["041420063008","Tropical assorted fruit flavor chewy candies, tropical","Lemonhead",364,0,90.9,0,0,72.7,68,"1 box, 22 g",22],
-["854517622350","Lemonheads wrapped candy, lemonheads","The Penny Candy Store",400,0,100,0,0,73.3,0,"2 pieces, 15 g",15]]
+["854517622350","Lemonheads wrapped candy, lemonheads","The Penny Candy Store",400,0,100,0,0,73.3,0,"2 pieces, 15 g",15],
+["0041420052156","Lemon candy","Lemonhead",400,0,100,0,null,73.33,0,"2 pieces, 15 g",15,"o"],
+["0041420122217","Lemonhead","",357.14,0,100,0,null,78.57,0,"",0,"o"],
+["13191818","Lemonhead","",357.14,0,100,0,0,78.57,0,"",0,"o"],
+["0041420084911","Lemonhead ropes","Ferrara Candy Company",357,3.57,82.1,0,null,53.6,214,"2 ropes, 28 g",28,"o"],
+["0041420084959","Lemonhead ropes","Lemonhead",343.75,3.13,84.38,0,0,53.13,219,"1 portion, 32 g",32,"o"],
+["0041420084898","Lemonhead ropes","Ferrara",353,2.94,82.4,0,null,52.9,221,"2 ropes, 34 g",34,"o"],
+["0041420081422","Lemonhead","Ferrara Candy Company",400,0,93.3,0,null,80,0,"12 portion, 15 g",15,"o"],
+["0041420089121","Lemonhead freeze dried candy","Freeze Dried Lemonheads",400,0,100,0,null,76.67,null,"1 portion, 30 g",30,"o"],
+["0041420082511","Lemon candies","Lemonhead",357.14,0,92.86,0,null,71.43,0,"2 pieces, 14 g",14,"o"]]

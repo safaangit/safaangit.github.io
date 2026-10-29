@@ -15,4 +15,16 @@
 ["762907130135","Strawberry fruit filling topping glaze & dip, strawberry","Cornaby's",184,0,44.7,0,0,36.8,0,"2 t, 38 g",38],
 ["762907819030","Raspberry chipotle, raspberry","Cornaby's",147,0,41.2,0,5.9,35.3,47,"2 t, 34 g",34],
 ["762907823006","Berry blush peach spreadable fruit, berry blush peach","Cornaby's",167,0,46.7,0,0,40,0,"1 t, 15 g",15],
-["762907819092","Campire candy candied jalpenos, campire candy","Cornaby's",188,0,93.8,0,0,93.8,219,"1 tablespoons, 16 g",16]]
+["762907819092","Campire candy candied jalpenos, campire candy","Cornaby's",188,0,93.8,0,0,93.8,219,"1 tablespoons, 16 g",16],
+["4003586005687","Funnyfrisch cornados","Funny-Frisch",511,6.1,52,30,1.73,6.3,1120,"",0,"o"],
+["0762907000018","Cornabys ez gel instant glutenfree nongmo food thickener","",333.33,0,66.67,0,0,0,200,"",0,"o"],
+["0000441018603","Geschnetzeltes","Cornatur",100,14,1.7,2.6,7.1,0.6,null,"100 g",100,"o"],
+["0000441118593","Gehacktes","Cornatur",105,15,0.5,3.1,7.5,0.5,null,"100 g",100,"o"],
+["0000441218563","Escalope nature","Cornatur",96,14,1.1,2.7,5.4,0.5,null,"55 g",55,"o"],
+["0000441318543","Aufschnitt mit peperoni","Migros Cornatur",171,15,3.1,9.8,5.4,null,null,"100 g",100,"o"],
+["0000441518553","Bratwurst","Cornatur",192,11,5.2,13,5.1,0.5,null,"90 g",90,"o"],
+["0000444418574","Tranche vege. poivre","Cornatur",163,12,5.3,8.6,8.1,2.3,null,"97 g",97,"o"],
+["0000452418594","Cornatur hack","Migros",92,13,2.3,1.7,7.5,0.5,null,"80 g",80,"o"],
+["0000463318604","Émincé cornatur","Migros",98,14,2.4,2.6,4.7,0.5,null,"100 g",100,"o"],
+["01062496","Hot dog","Cornatur Migros",203,14,3.1,14,4.4,0.5,394,"90 g",90,"o"],
+["0050000119684","Smoothie","Cornation",92.83,2.11,14.77,2.95,0,4.22,63,"1 carton, 237 g",237,"o"]]

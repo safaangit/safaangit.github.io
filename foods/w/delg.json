@@ -25,4 +25,16 @@
 ["074908360269","Aunt mary ann's sunday marinara ultra-premium pasta sauce, aunt…","La Famiglia Delgrosso",58,0.83,5.83,3.33,1.7,4.17,417,"1/2 cup, 120 g",120],
 ["074908326210","Joe joe's sloppy joe sauce, joe joe's sloppy joe","La Famiglia Delgrosso",78,1.56,17.2,0,3.1,12.5,469,"1/4 cup, 64 g",64],
 ["074908360306","Chef john's tomato basil masterpiece ultra-premium pasta sauce…","La Famiglia Delgrosso",42,0.83,5.83,2.08,1.7,4.17,317,"1/2 cup, 120 g",120],
-["074908360542","Pappy fred's old style pizza sauce ultra-premium pizza sauce, pappy…","La Famiglia Delgrosso",58,1.67,5,0,1.7,3.33,417,"1/4 cup, 60 g",60]]
+["074908360542","Pappy fred's old style pizza sauce ultra-premium pizza sauce, pappy…","La Famiglia Delgrosso",58,1.67,5,0,1.7,3.33,417,"1/4 cup, 60 g",60],
+["0074908360122","Three cheese","Delgrosso",64.5,2.42,8.87,2.02,2.42,5.65,293,"0.5 cup, 124 g",124,"o"],
+["0746242350564","Light mermelada mora","Delga-C",80,0,20,0,6.67,0,33,"1 cucharada, 15 g",15,"o"],
+["0074908380014","Alfredo sauce","Delgrosso",116.67,1.67,3.33,10,0,1.67,617,"0.25 cup, 60 g",60,"o"],
+["0074908380021","Roasted garlic alfredo sauce","Delgrosso",117,1.67,5,10,0,0,800,"0.25 cup, 60 g",60,"o"],
+["0007490836021","New york style pizza sauce","Delgrosso",57.4,1.64,9.84,0.82,1.64,6.56,426,"0.25 cup, 61 g",61,"o"],
+["0746242350465","Aderezo bajo en grasa sabor a mayonesa","Delga-C",66.67,0,6.67,6.67,0,0,667,"",0,"o"],
+["0746242364004","Tortilla strips light","Delga-C",400,12,60,12,0,0,400,"25 g",25,"o"],
+["7503022581210","Tortillas delgaditas","Tortiregias",176,2.67,34.67,1.6,5.33,0,8,"3 pieces, 38 g",37.5,"o"],
+["7503044527098","Tortillas delgaditas de amaranto","La Nonna",300,7.89,53.16,7.37,3.16,0.53,63,"",0,"o"],
+["7503023807814","Papas delgadas congeladas","Mccain",267.38,4,60.85,5.36,0.99,0.99,3600,"100 g",100,"o"],
+["8437114631332","Anchoas del cantábrico","Delgado",157,28.2,2.8,3.6,null,0.6,null,"100 g",100,"o"],
+["8033520554724","Ditali rigati","Delgrano",353,12,74.3,1.4,2.3,1.5,null,"100 g",100,"o"]]

@@ -1,1 +1,5 @@
-[["794367000352","Organic peanut butter powder","Honeyville",400,30,30,10,10,30,400,"2 tbsp, 10 g",10]]
+[["794367000352","Organic peanut butter powder","Honeyville",400,30,30,10,10,30,400,"2 tbsp, 10 g",10],
+["03880197","Raw honey","Honeyville",300,0,85,0,null,80,0,"20 g (1 tbsp), 20 g",20,"o"],
+["0794367140539","Almond flour","Honeyville Farms",667,20,20,53.3,20,6.67,67,"1 serving, 15 g",15,"o"],
+["0038801720025","Peach jam","Honeyville",250,0,65,0,null,65,null,"1 portion, 20 g",20,"o"],
+["0038801000021","Honey","Honeyville",333.33,0,66.67,0,null,66.67,null,"1 portion, 6 g",6,"o"]]

@@ -21,4 +21,8 @@
 ["00041200033627","O-ke-doke popcorn, cheese popcorn, 0.625 oz bag","Okedoke",588,5.88,47.1,35.3,5.9,5.88,1180,"amount per serving, 17 g",17],
 ["00041200033610","O-ke-doke popcorn, hot cheese popcorn, 0.625 oz bag","Okedoke",588,5.88,47.1,41.2,5.9,5.88,1470,"amount per serving, 17 g",17],
 ["041200018303","Original corn puffs, original","O-Ke-Doke",600,6.67,50,40,0,0,700,"about 2 cups, 30 g",30],
-["041200104754","Popcorn, white cheddar","O-Ke-Doke",500,10.7,46.4,32.1,7.1,7.14,1140,"28 g",28]]
+["041200104754","Popcorn, white cheddar","O-Ke-Doke",500,10.7,46.4,32.1,7.1,7.14,1140,"28 g",28],
+["0041200018308","O-ke-doke, corn puffs, original","Jays",567,3.33,53.33,36.67,3.3,0,711,"30 g (2.5 cup), 30 g",30,"o"],
+["8600101523686","Gurman kečap blagi","",70,1.2,16,0.14,1.8,14,1,"",0,"o"],
+["4710008218722","Artificial stewed ribs noodles","Dai Shi Ke",463.16,7.37,48.42,26.32,1.05,1.05,1753,"1 portion, 95 g",95,"o"],
+["8685063163019","Keçi̇ yoğurdu","özlenenköy",83,5,5,3.8,null,3,null,"100 g",100,"o"]]

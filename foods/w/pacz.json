@@ -21,4 +21,11 @@
 ["813224009540","Apple paczki donuts, apple","Ct Bakery",314,4.76,43.8,13.3,1.9,12.4,371,"1 donut, 105 g",105],
 ["813224009557","Blueberry paczki donuts, blueberry","Ct Bakery",314,4.76,43.8,13.3,1,12.4,371,"1donut, 105 g",105],
 ["850030090621","Strawberry paczki delicious donuts, strawberry","Stan's Donuts",348,0,57.6,10.9,1.1,22.8,630,"1 donut, 92 g",92],
-["00737410261300","Paczki, blueberry","Bake Crafters",281,5.26,40.4,12.3,1.8,14,421,"2 oz, 1/2 paczki, 57 g",57]]
+["00737410261300","Paczki, blueberry","Bake Crafters",281,5.26,40.4,12.3,1.8,14,421,"2 oz, 1/2 paczki, 57 g",57],
+["0813224006495","Paczki donuts","",314.29,4.76,43.81,13.33,0.95,14.29,324,"",0,"o"],
+["0813224009410","Paczki","",315.24,5.71,42.86,14.29,1.9,12.38,381,"",0,"o"],
+["0850030090522","Paczki","",329.27,6.1,50,12.2,1.22,18.29,659,"",0,"o"],
+["0020337764154","Paczki glazed bavarian creme","Clyde's Donuts",304.69,3.91,39.06,14.84,0.78,19.53,273,"1 donut, 128 g",128,"o"],
+["0041735236319","Apple paczki cinnamon sugar, four pack md","Market32",307,3.57,37.9,15.7,1.43,13.6,371,"1 paczki, 140 g",140,"o"],
+["0248279005009","Paczki","Stop And Shop",314,4.76,43.8,13.3,0.95,12.4,371,"1 donut, 105 g",105,"o"],
+["0248278005000","Paczki","Ct Bakery",314,4.76,43.8,13.3,0.95,12.4,371,"1 donut, 105 g",105,"o"]]

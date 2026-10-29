@@ -10,4 +10,8 @@
 ["856146004156","Very vanilla cupcake","American Gra-Frutti",409,5.11,73.2,11.9,1.7,46,307,"59 g",58.7],
 ["856146004125","Chocolate cupcake","American Gra-Frutti",386,8.57,67.1,12.9,2.9,40,229,"1 serving, 70 g",70],
 ["705105613765","Chocolate chip cupcake","American Gra-Frutti",371,2.86,54.3,17.1,1.4,35.7,229,"1 serving, 70 g",70],
-["705105525464","Mia's muffins, apple cinnamon","American Gra-Frutti",282,2.82,42.2,11.3,1.4,21.1,338,"1 muffin, 71 g",71]]
+["705105525464","Mia's muffins, apple cinnamon","American Gra-Frutti",282,2.82,42.2,11.3,1.4,21.1,338,"1 muffin, 71 g",71],
+["0051817205171","Gra nuts","",650,20,22.5,52.5,7.5,5,450,"",0,"o"],
+["0051817208530","Japanese style roasted peanuts, lemon","Gra Nuts Krunch",467,13.3,46.7,23.3,3.33,10,567,"1 package, 30 g",30,"o"],
+["0761934043579","Rhizome (gra chai)","Sunlee",16.67,0,3.33,0,null,null,367,"6 pieces, 30 g",30,"o"],
+["7300156582881","Fröglädje","Gra",296,15,49.2,11,9.2,2.1,null,"",0,"o"]]

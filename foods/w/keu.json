@@ -1,3 +1,15 @@
 [["611247310854","Keurig kold, flavored water, citrus celebration","Waterful",0,0,0,0,null,null,25,"1 kold pod (8 fl oz prepared), 40 ml",40],
 ["611247310823","Seltzer mix, persian lime","Keurig",0,0,0,0,null,null,24,"1 kold pod (8 fl oz prepared), 41 g",41],
-["099555086720","Keurig brewed, peach iced tea","Snapple",333,6.67,80,0,null,73.3,0,"1 k-cup pack, 15 g",15]]
+["099555086720","Keurig brewed, peach iced tea","Snapple",333,6.67,80,0,null,73.3,0,"1 k-cup pack, 15 g",15],
+["0099555008050","Chai latte","Keurig Brewed",429,7.14,64.29,17.86,0,50,1286,"1 k-cup pod, 14 g",14,"o"],
+["0099555008135","Cafe' caramel","Keurig Brewed",467,6.67,66.67,16.67,0,46.67,1400,"1 k-cup pod, 15 g",15,"o"],
+["0611247373989","Dark k-cup coffee pods donut shop","Keurig",0.88,0,0,0,null,null,null,"1 cup, 227 g",227,"o"],
+["0074471018956","Cafe bustelo","Keurig",19.04,0,0,0,null,null,null,"1 k-cup, 11 g",10.5,"o"],
+["0062151517738","Café infusé sur glace","Van Houtte (Keurig)",6,0.4,1.2,0,null,null,null,"1 cup prepared, 250 g",250,"o"],
+["0611247400968","Cafe escapes chai latte","Keurig",428.57,0,64.29,17.86,0,50,1286,"14 g",14,"o"],
+["0099555000610","Green mountain colombia select k-cup","Keurig",0,0,0,0,null,null,null,"1 pack, 9 g",9,"o"],
+["0611247402344","Iced refreshers pineapple passion fruit","Keurig",29.59,0,7.19,0,null,7.19,0,"1 k-cup (8 fl oz), 237 g",236.6,"o"],
+["8713834132336","Verse loempia met kip","Deka's Keuken",155,7.4,16.6,6.2,2,1.8,1,"200 g",200,"o"],
+["8718989081164","Soja keuken plantaardig","Melkan",153,2.3,1.5,15,1.3,1.4,64,"100 g",100,"o"],
+["8713834133661","Luxe surinaamse kipschotel","Deka's Keuken",147.11,5.33,18.67,4.53,null,null,null,"",0,"o"],
+["0881334006384","Dunkin donuts k cups pumpkin spice coffee","Keurig",2.08,0,0,0,null,null,null,"1 cup (1 cup), 240 g",240,"o"]]
