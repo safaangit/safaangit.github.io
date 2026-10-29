@@ -358,8 +358,9 @@ async function viewToday() {
 
   const acts = g.activities || [];
   const burned = acts.reduce((t, a) => t + (a.kcal || 0), 0);
-  // Strength sessions get one line for the day's best lift (lifts.js).
+  // Strength sessions get one line for the day's best lift; machines and other workouts one for the setting (lifts.js).
   const best = new Map(await Promise.all(acts.filter(a => actKind(a) === 'strength').map(async a => [a.id, await lifts.forSession(a.id)])));
+  const cardio = new Map(await Promise.all(acts.filter(a => actKind(a) !== 'strength' && lifts.needsCardio(a)).map(async a => [a.id, await lifts.forCardio(a.id)])));
   const garmin = `<section class="card">
     <header><h3>Exercise</h3><span class="hkcal">${r0(burned)} kcal</span><button class="add" id="addEx" aria-label="Add exercise">${ico('plusc')}</button></header>
     ${gday ? `<div class="stats">
@@ -367,7 +368,7 @@ async function viewToday() {
       ${stat('HRV', gday.hrv, gday.hrvStatus?.toLowerCase(), 'hrv')}${stat('Rest HR', gday.rhr, '', 'heart')}${stat('Readiness', gday.readiness, '', 'ready')}</div>` : `<p class="muted small">${sync.configured() ? 'No Garmin data for this day yet.' : 'Connect Garmin in Settings.'}</p>`}
     ${acts.length ? `<ul class="entries acts">${acts.map(a => `<li class="act ${actKind(a)}" ${a.manual ? `data-ex="${a.id}"` : ''}><span class="aicon">${ACT_ICON[actKind(a)]}</span><div class="grow"><div class="name">${esc(a.name)}</div><div class="qty">${[
       a.distance ? r1(a.distance / 1609.34) + ' mi' : '', a.duration ? Math.round(a.duration / 60) + ' min' : a.min ? a.min + ' min' : '',
-      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div>${best.has(a.id) ? lifts.rowLine(s, a, best.get(a.id), esc) : ''}</div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul>` : ''}</section>`;
+      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div>${best.has(a.id) ? lifts.rowLine(s, a, best.get(a.id), esc) : cardio.has(a.id) ? lifts.cardioLine(a, cardio.get(a.id), esc) : ''}</div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul>` : ''}</section>`;
 
   return `
   <section class="card summary">
@@ -458,8 +459,8 @@ bind.today = root => {
   $$('li[data-ex]', root).forEach(li => (li.onclick = () => openExercise(li.dataset.ex)));
   $$('.bestlift', root).forEach(x => (x.onclick = async ev => {
     ev.stopPropagation();
-    const a = (await dayContext(state.date, true)).g.activities.find(a => String(a.id) === x.dataset.lift);
-    if (a) lifts.open(state.s, a, state.date, ui);
+    const a = (await dayContext(state.date, true)).g.activities.find(a => String(a.id) === (x.dataset.lift || x.dataset.cardio));
+    if (a) x.dataset.lift ? lifts.open(state.s, a, state.date, ui) : lifts.openCardio(a, state.date, ui);
   }));
   $('#weight', root).onchange = async e => {
     const v = parseFloat(e.target.value);

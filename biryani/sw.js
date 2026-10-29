@@ -1,5 +1,5 @@
 // Network-first for the app shell so updates show up on the next open; the cache is only an offline fallback.
-const CACHE = 'biryani-v23';
+const CACHE = 'biryani-v24';
 // Food library files (/foods/, tools/branded_foods.js): cache-first and kept across app updates.
 // Rename when the library is rebuilt.
 const FOODS = 'biryani-foods-2026-10';

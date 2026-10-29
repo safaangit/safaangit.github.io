@@ -82,3 +82,64 @@ export async function open(s, a, date, ui) {
   if (del) del.onclick = async () => { await db.remove('lifts', id); await saveTags(); ui.closeSheet(); ui.render(); };
   return b;
 }
+
+// ---------- Cardio and everything else ----------
+// Machines and other workouts the watch can't fully describe (stair stepper, bike, elliptical, incline walk,
+// basketball...): what you used, the setting, and distance or floors if the machine shows it.
+// data/fuel/cardio.json: { id (activity id), date, name, setting, mi, floors }. GPS runs and walks already
+// have distance and pace from Garmin, so they get no line.
+const MACHINES = [
+  [/stair/, 'Stair stepper', 'Level 9', 'floors'], [/cycl|bik|ride|spin/, 'Bike', 'Resistance 12', 'mi'],
+  [/ellip/, 'Elliptical', 'Level 8', 'mi'], [/row/, 'Rower', 'Damper 5', 'mi'], [/walk|hik/, 'Incline walk', '12% · 3.5 mph', 'mi'],
+  [/cardio|hiit/, 'Cardio', 'What you did', ''],
+];
+const machineOf = a => MACHINES.find(([re]) => re.test(a.type || '')) || [null, a.name || 'Workout', 'Setting or note', ''];
+const CARDIO_SUGGEST = ['Incline walk', 'Stair stepper', 'Bike', 'Elliptical', 'Rower'];
+export const needsCardio = a => !/run|track|strength|weight/.test(a.type || '') && !(a.distance > 0 && !a.manual);
+export const forCardio = id => db.get('cardio', String(id));
+export const cardioText = r => [r.setting, r.mi ? `${r.mi} mi` : '', r.floors ? `${r.floors} floors` : ''].filter(Boolean).join(' · ');
+
+export function cardioLine(a, rec, esc) {
+  const same = rec && key(rec.name) === key(a.name), txt = rec ? `${same && cardioText(rec) ? '' : esc(rec.name)}${cardioText(rec) ? ` <b>${esc(cardioText(rec))}</b>` : ''}` : `+ ${/cardio|stair|cycl|bik|ellip|row|walk/.test(a.type || '') ? 'Machine & setting' : 'Add detail'}`;
+  return `<button class="bestlift ${rec ? 'set' : ''}" data-cardio="${esc(String(a.id))}">${txt}</button>`;
+}
+
+export async function openCardio(a, date, ui) {
+  const id = String(a.id), rec = await forCardio(id), all = (await db.all('cardio')).filter(r => r.id !== id);
+  const [, defName, hint, unit0] = machineOf(a);
+  const b = ui.sheet(`<p class="muted small">Garmin has your time, heart rate and calories. Add what it can't see.</p>
+    <form id="cd" class="form">
+      <label>What<input name="name" id="cdName" autocomplete="off" value="${ui.esc(rec?.name || (/^(cardio|workout)$/i.test(defName) ? '' : defName))}" placeholder="${ui.esc(defName)}"></label>
+      <div class="chips blsug" id="cdSug"></div>
+      <label>Setting<input name="setting" autocomplete="off" placeholder="${ui.esc(hint)}" value="${ui.esc(rec?.setting || '')}"></label>
+      <div class="grid2"><label>Distance (mi)<input name="mi" type="number" min="0" step="0.01" inputmode="decimal" value="${rec?.mi || ''}"></label>
+      <label>Floors<input name="floors" type="number" min="0" inputmode="numeric" value="${rec?.floors || ''}"></label></div>
+      <div class="blhist" id="cdHist"></div>
+      <div class="actions">${rec ? '<button type="button" class="danger" id="cdDel">Clear</button>' : ''}<button class="primary">Save</button></div></form>`, { title: a.name || 'Workout' });
+  if (unit0 === 'floors') ui.$('[name=floors]', b).closest('label').parentElement.prepend(ui.$('[name=floors]', b).closest('label'));
+  const nameIn = ui.$('#cdName', b);
+  const sug = () => {
+    const seen = new Set(), out = [];
+    for (const n of [...all.sort((x, y) => y.date.localeCompare(x.date)).map(r => r.name), ...CARDIO_SUGGEST]) if (!seen.has(key(n))) { seen.add(key(n)); out.push(n); }
+    ui.$('#cdSug', b).innerHTML = out.slice(0, 7).map(n => `<button type="button" class="${key(n) === key(nameIn.value) ? 'on' : ''}">${ui.esc(n)}</button>`).join('');
+    ui.$$('#cdSug button', b).forEach(x => (x.onclick = () => { nameIn.value = x.textContent; sug(); hist(); }));
+  };
+  // Last time on the same machine, with its minutes, so you can see if you went longer or harder.
+  const hist = () => {
+    const last = all.filter(r => key(r.name) && key(r.name) === key(nameIn.value)).sort((x, y) => y.date.localeCompare(x.date))[0];
+    ui.$('#cdHist', b).innerHTML = last ? `<div>Last: <b>${ui.esc(cardioText(last) || last.name)}</b>${last.min ? ` · ${last.min} min` : ''} · ${fmtDay(last.date)}</div>` : '';
+  };
+  nameIn.oninput = () => { sug(); hist(); };
+  sug(); hist();
+  ui.$('#cd', b).onsubmit = async ev => {
+    ev.preventDefault();
+    const f = new FormData(ev.target), name = String(f.get('name') || '').trim() || defName;
+    const r = { id, date, name, setting: String(f.get('setting') || '').trim(), mi: Math.max(0, +f.get('mi') || 0), floors: Math.max(0, Math.round(+f.get('floors') || 0)),
+      min: Math.round((a.duration || 0) / 60) || a.min || 0 };
+    await db.put('cardio', r);
+    ui.closeSheet(); ui.render(); ui.toast('Saved');
+  };
+  const del = ui.$('#cdDel', b);
+  if (del) del.onclick = async () => { await db.remove('cardio', id); ui.closeSheet(); ui.render(); };
+  return b;
+}
