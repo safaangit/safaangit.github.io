@@ -540,9 +540,11 @@ body.today header.top #sync:not(.warn) { display: none; }
 ul.list.card { margin: 0 0 12px; padding: 0; overflow: hidden; }
 /* calendar: pinned pace chips + folded past weeks */
 .calstick { position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 2; background: var(--card); margin: 0 -10px 4px; padding: 6px 10px 4px; box-shadow: 0 6px 6px -6px rgba(0,0,0,.35); }
-.pchips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-.pchip { font-size: 12px; font-variant-numeric: tabular-nums; padding: 3px 7px; border-radius: 7px; background: color-mix(in srgb, var(--k) 18%, var(--tile)); border-left: 3px solid var(--k); white-space: nowrap; }
-.pchip b { color: var(--k); font-weight: 700; margin-right: 4px; }
+.ptiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+.ptile { min-width: 0; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--k) 16%, var(--tile)); border-left: 3px solid var(--k); line-height: 1.25; }
+.ptile b { display: block; color: var(--k); font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ptile b span { color: var(--k); }
+.ptile > span { display: block; font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 details.pastwks { margin-top: 8px; border-radius: 10px; background: var(--tile); padding: 0 6px; }
 details.pastwks summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 4px; font-size: 14px; font-weight: 500; }
 details.pastwks summary::-webkit-details-marker { display: none; }
