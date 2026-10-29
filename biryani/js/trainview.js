@@ -9,7 +9,8 @@ import * as L from './lifts.js';
 
 const KIND = { easy: 'Easy', medium: 'Medium', quality: 'Workout', long: 'Long', race: 'Race', rest: 'Rest', recovery: 'Recover' };
 const r1 = v => Math.round(v * 10) / 10;
-const paceRange = p => p ? `${T.fmtPace(p[1])}-${T.fmtPace(p[0])}/mi` : '';
+// Fast to slow, the way a watch reads (8:41–9:06/mi).
+const paceRange = p => p ? `${T.fmtPace(p[0])}–${T.fmtPace(p[1])}/mi` : '';
 const miRange = x => !x.mi ? '' : x.kind === 'race' || x.lo === x.hi ? `${x.mi} mi` : `${x.lo}-${x.hi} mi`;
 // Short calendar label and 1-3 intensity pips, so hard days stand out at a glance.
 const SHORT = { Tempo: 'Tempo', Intervals: 'Intervals', 'Marathon pace': 'MP', Sharpener: 'MP', Recovery: 'Recover', Shakeout: 'Shakeout', 'Medium long': 'Medium' };
@@ -131,10 +132,11 @@ function planView(data, s, ui) {
   const pastHtml = done.length ? `<details class="pastwks" id="pastWks" ${local.get('calPastOpen', false) ? 'open' : ''}><summary><span>${done.length} earlier weeks</span><span class="muted">${mon(done[0].start)} – ${mon(T.addDays(done[done.length - 1].start, 6))} · ${Math.round(doneMi)} mi</span></summary>${done.map(wkHtml).join('')}</details>` : '';
   // Target paces for each kind of day, pinned above the calendar while you scroll it.
   const Z = k => plan.z.list.find(x => x[0] === k);
-  const chips = [['easy', 'Recovery', 'recovery'], ['easy', 'Easy', 'easy'], ['long', 'Long &amp; medium', 'long'], ['quality', 'MP', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
-    .map(([k, l, z]) => `<span class="pchip k-${k}"><b>${l}</b>${T.fmtPace(Z(z)[3])}-${T.fmtPace(Z(z)[2])}</span>`).join('');
+  // One tile per pace zone, colored like the calendar days that use it, fast–slow per mile.
+  const chips = [['easy', 'Recovery', 'recovery'], ['easy', 'Easy', 'easy'], ['long', 'Long · <span class="k-medium">Medium</span>', 'long'], ['quality', 'Marathon', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
+    .map(([k, l, z]) => `<div class="ptile k-${k}"><b>${l}</b><span>${T.fmtPace(Z(z)[2])}–${T.fmtPace(Z(z)[3])}</span></div>`).join('');
   return hero(data, ui) + `<section class="card calcard"><h3>Plan to race day</h3>
-    <div class="calstick"><div class="pchips">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
+    <div class="calstick"><div class="ptiles">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
     ${pastHtml}${ahead.map(wkHtml).join('')}
     <p class="muted small">Paces are per mile. Dots show how hard the day is, and any distance in the range counts. Done days show what you actually ran; a purple corner means you lifted. Tap a day to see the workout, swap it with another day, or skip it.</p></section>
   ${todayCardHtml}${notesHtml}
@@ -203,7 +205,7 @@ function race({ cfg, plan, pred, autoGoal }, s, ui) {
   <section class="card"><h3>Fitness check</h3>${pred ? `<p>Your recent runs point to about <b>${T.fmtTime(pred.sec)}</b> for the marathon. ${pred.vol ? `That includes +${Math.round(pred.vol * 100)}% because you've averaged ${Math.round(pred.avgWk)} mi a week; race formulas run fast on lower mileage. ` : ''}${autoGoal ? `Goal: <b>${T.fmtTime(cfg.goalSec)}</b>.` : ''}</p>
     <ul class="entries runs">${pred.basis.map(r => `<li><div class="grow"><div class="r1"><span class="name">${r1(r.mi)} mi in ${T.fmtTime(r.sec)}</span><span class="kc">${T.fmtTime(r.eq)}</span></div><div class="r2"><span class="sub">${mon(r.date)}${r.tread ? ' · treadmill (+2%)' : ''}</span><span class="macros">${T.fmtPace(r.sec / r.mi)}/mi</span></div></div></li>`).join('')}</ul>
     <p class="muted small">Riegel formula on your 3 fastest runs of 5+ mi from the last 8 weeks (the middle one counts). Treadmill runs get +2% for no wind or hills.</p>` : '<p class="muted">Sync a few Garmin runs of 5+ miles to get a prediction.</p>'}</section>
-  <section class="card"><h3>Paces</h3><table class="tbl zones">${z.list.map(([k, l, lo, hi, d]) => `<tr class="k-${k}"><td><b>${l}</b><div class="muted small">${d}</div></td><td>${T.fmtPace(lo)}-${T.fmtPace(hi)}</td></tr>`).join('')}</table></section>
+  <section class="card"><h3>Paces</h3><table class="tbl zones">${z.list.map(([k, l, lo, hi, d]) => `<tr class="k-${k}"><td><b>${l}</b><div class="muted small">${d}</div></td><td>${T.fmtPace(lo)}–${T.fmtPace(hi)}</td></tr>`).join('')}</table></section>
   <section class="card"><h3>Race-day splits</h3><table class="tbl splits">${splits.map(([mi, l]) => `<tr><td>${l}</td><td>${split(mi)}</td></tr>`).join('')}</table>
     <p class="muted small">Even pacing at ${T.fmtPace(z.mp)}/mi. Run the first 3 mi 5-10 s/mi slower, then settle in. Only push after mile 20 if you feel good.</p></section>
   <section class="card"><h3>Fueling</h3><ul class="tips">
