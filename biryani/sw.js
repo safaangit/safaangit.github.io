@@ -1,6 +1,6 @@
 // Network-first for the app shell so updates show up on the next open; the cache is only an offline fallback.
 // Caches are shared by every app on safaangit.github.io (Explore, Hoops), so only biryani-* ones are cleaned up here.
-const CACHE = 'biryani-v27';
+const CACHE = 'biryani-v28';
 // Food library files (/foods/, tools/branded_foods.js): cache-first and kept across app updates.
 // Rename when the library is rebuilt.
 const FOODS = 'biryani-foods-2026-10';

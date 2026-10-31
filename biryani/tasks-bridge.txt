@@ -3,10 +3,12 @@
 //  - keeps two Google Tasks lists, "Baro's To do" and "Baro's Groceries", matching the Tasks tab,
 //    so Google's Tasks widget can show them on your home screen;
 //  - puts tasks with a time on your Google Calendar with the reminder you picked;
-//  - every 5 minutes, sorts things you added from the widget or by voice ("Hey Google, remind me to...")
-//    the same way the app does (within a minute), and hands them to the app next time it opens.
+//  - every minute, sorts things you added from the widget or by voice ("Hey Google, remind me to...")
+//    the same way the app does, and hands them to the app next time it opens.
 // Setup steps are in Baro's: ⚙ → Tasks & quick add → Set up Google Tasks. In short: Services (+) → Google Tasks API,
 // run `setup`, Deploy as a Web app (Execute as: Me, access: Anyone), then run `link` and open its link on your phone.
+// Updating to a new copy of this script: paste it, save, then Deploy → Manage deployments → ✎ → Version: New version → Deploy
+// (the /exec address stays the same).
 // Built from app/js/taskparse.js by tools/build_bridge.mjs; edit those, not the generated app/tasks-bridge.txt.
 
 
@@ -356,9 +358,14 @@ function setup() {
 }
 
 // Run after deploying: logs the link that connects Baro's on your phone (open it there).
+// Run from the editor, getUrl() gives the /dev test address, which only works while signed in to Google on that
+// browser, so the phone can't use it. Paste the Web app URL (ends in /exec, from Deploy → Manage deployments) between
+// the quotes below if that happens, save, and run link again.
+const EXEC_URL = '';
 function link() {
-  const url = ScriptApp.getService().getUrl();
-  if (!url) return Logger.log('Deploy it first: Deploy → New deployment → Web app, then run link again.');
+  let url = EXEC_URL || ScriptApp.getService().getUrl() || '';
+  if (/\/dev$/.test(url)) url = ''; // the /exec address has a different id, so it can't be worked out from /dev
+  if (!url || !/\/exec$/.test(url)) return Logger.log('Copy the Web app URL from Deploy → Manage deployments (it ends in /exec), paste it into EXEC_URL near the top of link(), save, and run link again. Key for Baro\'s: ' + P_.getProperty('KEY'));
   Logger.log('Open this on your phone:\nhttps://safaangit.github.io/biryani/?gb=' + encodeURIComponent(url) + '&gk=' + P_.getProperty('KEY'));
 }
 
@@ -477,20 +484,26 @@ function calendar_(it, eventId, want, tz) {
   return ev.getId();
 }
 
-// Every 5 minutes: clean up things added from the widget or by voice before the app sees them.
+// Every minute: clean up things added from the widget or by voice before the app sees them.
 // "milk" typed into To do moves to Groceries; "call dad tomorrow 5pm" gets a due date and a clean title;
 // a grocery that's already on the list is removed instead of duplicated.
 function tidy() {
   const ids = listIds_(), maps = allMaps_(), known = {};
+  for (const id in maps) if (maps[id].g) known[maps[id].g] = 1;
   // "Hey Google, remind me to..." lands in Google's default "My Tasks" list: move those into Baro's To do.
+  // Only undated ones or ones due by today: a repeating Google task makes its next copy when this one is removed,
+  // and that next copy is dated in the future, so it waits in My Tasks until it's due (no endless copying).
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   try {
+    const open = listTasks_(ids.todo).filter(g => !g.deleted && g.status !== 'completed');
     for (const g of listTasks_('@default')) {
       if (g.deleted || g.status === 'completed' || !g.title) continue;
-      Tasks.Tasks.insert({ title: g.title, notes: g.notes, due: g.due }, ids.todo);
+      if (g.due && g.due.slice(0, 10) > today) continue;
+      if (!open.some(x => x.title === g.title && (x.due || '').slice(0, 10) === (g.due || '').slice(0, 10))) open.push(Tasks.Tasks.insert({ title: g.title, notes: g.notes, due: g.due }, ids.todo));
       Tasks.Tasks.remove('@default', g.id);
     }
   } catch (e) {}
-  for (const id in maps) if (maps[id].g) known[maps[id].g] = 1;
+  dedupeTodo_(ids, known);
   const groc = listTasks_(ids.groc).filter(g => !g.deleted && g.status !== 'completed');
   for (const g of listTasks_(ids.todo)) {
     if (g.deleted || g.status === 'completed' || known[g.id] || !g.title || P_.getProperty('s:' + g.id)) continue;
@@ -521,5 +534,17 @@ function tidy() {
     const name = g.title.split(' ×')[0].split(' · ')[0];
     if (!known[g.id] && seen.some(n => sameItem(n, name))) { Tasks.Tasks.remove(ids.groc, g.id); continue; }
     seen.push(name);
+  }
+}
+
+// Same title more than once in Baro's To do (and not linked to an app task): keep the one due first.
+// This also clears the copies an older version of this script made from a repeating task in My Tasks.
+function dedupeTodo_(ids, known) {
+  const keep = {};
+  const items = listTasks_(ids.todo).filter(g => !g.deleted && g.status !== 'completed' && g.title && !known[g.id])
+    .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
+  for (const g of items) {
+    const k = g.title.trim().toLowerCase();
+    if (keep[k]) { try { Tasks.Tasks.remove(ids.todo, g.id); } catch (e) {} } else keep[k] = 1;
   }
 }
