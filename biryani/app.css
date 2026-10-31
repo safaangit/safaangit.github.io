@@ -640,3 +640,7 @@ label.check.pin input { width: auto; }
 .gbbox p { margin: 6px 0; }
 .gbsteps ol.steps li { margin-bottom: 10px; line-height: 1.45; }
 .gbsteps a { color: var(--accent); word-break: break-all; }
+.adjcard h3 { margin-bottom: 4px; }
+.adjrow { display: flex; gap: 10px; width: 100%; text-align: left; border: 0; background: none; color: var(--ink); padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.35; }
+.adjrow:first-of-type { border-top: 0; }
+.adjrow b { flex: none; width: 52px; color: var(--accent); font-weight: 600; }
