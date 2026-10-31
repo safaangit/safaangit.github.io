@@ -37,7 +37,10 @@ export const doneMiles = (runs, d) => (d.kind === 'long' ? longestOn(runs, d.dat
 // treadmill runs +2% (no wind or hills), median of the best three so one fast day can't carry it.
 // Riegel alone runs ~10 min fast for most recreational marathoners (Vickers & Vertosick 2016), and
 // more so on lower mileage, so it adds up to 4% when you average under 50 mi a week.
-export function predict(runs, ref = today()) {
+// With a race date, it stops at the end of the last build week, so the goal (and every pace) holds
+// still through the taper instead of drifting as the miles drop.
+export function predict(runs, ref = today(), raceDate) {
+  if (raceDate && ref > addDays(weekStart(raceDate), -15)) ref = addDays(weekStart(raceDate), -15);
   const from = addDays(ref, -56);
   const eq = runs.filter(r => r.date >= from && r.date <= ref && r.mi >= 5 && r.sec)
     .map(r => ({ ...r, eq: r.sec * Math.pow(MARATHON / r.mi, 1.07) * (r.tread ? 1.02 : 1) }))
@@ -258,12 +261,48 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
       } else missed.adj = 'Missed. Dropped so hard days don\'t stack.';
     }
   }
+  // Fatigue: resting HR up and recent runs felt bad -> next workout becomes easy.
+  const f = fatigue(runs, gdays, ref);
+  if (f.signals.length >= 2) {
+    const q = all.find(d => d.date >= ref && d.date <= addDays(ref, 3) && d.kind === 'quality' && !act(d.date) && toRace(d.date) > 0);
+    if (q) set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail: 'Easy miles instead of the workout. Bring it back next week if you feel better.', pace: plan.z.list.find(z => z[0] === 'easy').slice(2, 4) }, 'Swapped for easy: ' + f.signals.join(' and ') + '.');
+  }
+  // Harder than planned: a tempo-or-faster run on an easy day, or a long run near race pace (or rated 9-10/10).
+  // The next day turns into a short recovery run, a workout within 2 days turns easy, and a workout on day 3
+  // after a hard long run gets shorter. Checked for every plan day so far, so past changes stay on the calendar.
+  const Z = k => plan.z.list.find(z => z[0] === k), tempoSlow = Z('tempo')[3], mpSlow = Z('mp')[3];
+  const wkday = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'long' });
+  const easyFrom = (q, why, detail) => set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail, pace: Z('easy').slice(2, 4) }, why);
+  // Last week's days aren't in a plan built on Monday, so a hard long run from Saturday is looked up from the runs.
+  const before = Array.from({ length: 3 }, (_, k) => addDays(ref, k - 3)).filter(x => !at(x) && x >= cfg.planStart && longestOn(runs, x) >= 13)
+    .map(date => ({ date, kind: 'long', lo: 13 }));
+  for (const d of [...before, ...all.filter(x => x.date >= cfg.planStart && x.date <= ref && x.kind !== 'race')]) {
+    const longDay = d.kind === 'long';
+    const hard = runs.find(r => r.date === d.date && r.mi >= 3 && r.sec && (longDay
+      ? r.mi >= d.lo * 0.9 && (r.sec / r.mi <= mpSlow + 15 || r.rpe >= 90)
+      : d.kind !== 'quality' && r.sec / r.mi <= tempoSlow + 10));
+    if (!hard) continue;
+    const pace = fmtPace(hard.sec / hard.mi), what = `${wkday(d.date)}'s ${r1(hard.mi)} mi at ${pace}/mi`;
+    d.adj ??= longDay ? `Hard long run (${r1(hard.mi)} mi at ${pace}/mi${hard.rpe ? `, effort ${Math.round(hard.rpe / 10)}/10` : ''}).` : `Ran as a workout (${r1(hard.mi)} mi at ${pace}/mi).`;
+    const after = at(addDays(d.date, 1));
+    if (after && (after.kind === 'easy' || after.kind === 'medium') && !after.adj && toRace(after.date) > 6)
+      set(after, { kind: 'easy', mi: Math.max(3, half(after.mi - 1.5)), title: 'Recovery', detail: 'Short and very easy. Walk breaks are fine.', pace: Z('recovery').slice(2, 4) }, `Shorter and slower: ${what} was hard.`);
+    for (const q of all.filter(x => x.date > d.date && x.date <= addDays(d.date, 3) && x.kind === 'quality' && !x.adj && toRace(x.date) > 2)) {
+      const gap = daysBetween(d.date, q.date), didIt = runs.some(r => r.date === q.date && r.mi >= 3 && r.sec && r.sec / r.mi <= tempoSlow + 10);
+      if (didIt) continue;
+      if (gap <= 2) easyFrom(q, `Swapped for easy: ${what} already counts as a hard day.`, 'Easy miles: you already got a hard run in.');
+      else if (longDay) set(q, { mi: Math.max(4, half(q.mi - 1.5)), title: q.title + ' (shorter)' }, `Shorter: ${what} was close to race effort. Cut the fast part short if your legs feel flat.`);
+    }
+  }
   // Rebalance easy days in the current week.
   const wk = wkOf(ref);
   if (wk && wk.w >= 1) {
-    const done = wk.days.filter(d => d.date < ref && d.date >= cfg.planStart && (d.kind === 'easy' || d.kind === 'medium'));
+    // Every day you've run counts: easy days both ways, runs on rest days as extra, and long runs or
+    // workouts only when they went over (a short one is moved or dropped above, not made up here).
+    const doneDays = wk.days.filter(d => d.date <= ref && d.date >= cfg.planStart && d.kind !== 'race' && (d.date < ref || act(d.date)));
     const left = wk.days.filter(d => d.date >= ref && !act(d.date) && (d.kind === 'easy' || d.kind === 'medium') && !d.adj);
-    let delta = done.reduce((t, d) => t + act(d.date) - d.mi, 0);
+    const over = d => d.kind === 'easy' || d.kind === 'medium' ? act(d.date) - d.mi : d.kind === 'rest' || d.kind === 'recovery' ? act(d.date) : Math.max(0, act(d.date) - d.hi);
+    let delta = doneDays.reduce((t, d) => t + over(d), 0);
     if (left.length && Math.abs(delta) >= 1.5) {
       const share = delta < 0 ? Math.min(1.5, (-delta / 2) / left.length) : -Math.min(2, delta / left.length);
       for (const d of left) {
@@ -271,23 +310,6 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
         if (mi !== d.mi) set(d, { mi }, delta < 0 ? `+${r1(mi - d.mi)} mi: picking up about half of what earlier easy days missed.` : `${r1(mi - d.mi)} mi: you already ran extra this week.`);
       }
     }
-  }
-  // Fatigue: resting HR up and recent runs felt bad -> next workout becomes easy.
-  const f = fatigue(runs, gdays, ref);
-  if (f.signals.length >= 2) {
-    const q = all.find(d => d.date >= ref && d.date <= addDays(ref, 3) && d.kind === 'quality' && !act(d.date) && toRace(d.date) > 0);
-    if (q) set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail: 'Easy miles instead of the workout. Bring it back next week if you feel better.', pace: plan.z.list.find(z => z[0] === 'easy').slice(2, 4) }, 'Swapped for easy: ' + f.signals.join(' and ') + '.');
-  }
-  // A run at tempo pace or faster on an easy day counts as the workout: the next one within 2 days goes easy.
-  const tempoSlow = plan.z.list.find(z => z[0] === 'tempo')[3];
-  for (const d of [yesterday, ref].map(at).filter(Boolean)) {
-    if (d.kind === 'quality' || d.kind === 'long' || d.kind === 'race' || d.date < cfg.planStart) continue;
-    const hard = runs.find(r => r.date === d.date && r.mi >= 3 && r.sec && r.sec / r.mi <= tempoSlow + 10);
-    if (!hard) continue;
-    const day = new Date(d.date + 'T12:00').toLocaleDateString(undefined, { weekday: 'long' }), pace = fmtPace(hard.sec / hard.mi);
-    d.adj ??= `Ran as a workout (${r1(hard.mi)} mi at ${pace}/mi).`;
-    const q = all.find(x => x.date > d.date && x.date <= addDays(d.date, 2) && x.kind === 'quality' && !x.adj && !act(x.date) && toRace(x.date) > 2);
-    if (q) set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail: 'Easy miles: you already got this week\'s hard run in.', pace: plan.z.list.find(z => z[0] === 'easy').slice(2, 4) }, `Swapped for easy: ${day}'s run was at ${pace}/mi, already a workout.`);
   }
   for (const w of plan.weeks) Object.assign(w, { mi: sumBy(w.days.filter(d => d.kind !== 'race'), 'mi'), lo: sumBy(w.days.filter(d => d.kind !== 'race'), 'lo'), hi: sumBy(w.days.filter(d => d.kind !== 'race'), 'hi') });
   return { changes, fatigue: f };

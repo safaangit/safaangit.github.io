@@ -14,7 +14,7 @@ const paceRange = p => p ? `${T.fmtPace(p[0])}–${T.fmtPace(p[1])}/mi` : '';
 const miRange = x => !x.mi ? '' : x.kind === 'race' || x.lo === x.hi ? `${x.mi} mi` : `${x.lo}-${x.hi} mi`;
 // Short calendar label and 1-3 intensity pips, so hard days stand out at a glance.
 const SHORT = { Tempo: 'Tempo', Intervals: 'Intervals', 'Marathon pace': 'MP', Sharpener: 'MP', Recovery: 'Recover', Shakeout: 'Shakeout', 'Medium long': 'Medium' };
-const calLabel = x => x.kind === 'quality' ? SHORT[x.title.replace(/ \(moved\)$/, '')] || 'Workout' : x.kind === 'long' ? 'Long' : SHORT[x.title] || KIND[x.kind];
+const calLabel = x => x.kind === 'quality' ? SHORT[x.title.replace(/ \((moved|shorter)\)$/, '')] || 'Workout' : x.kind === 'long' ? 'Long' : SHORT[x.title] || KIND[x.kind];
 const LEVEL = { recovery: 0, rest: 0, easy: 1, medium: 2, long: 2, quality: 3, race: 3 };
 const shoeName = (gear, ids) => (ids || []).map(id => gear.find(g => g.uuid === id)?.name).filter(Boolean).join(', ');
 const mon = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -28,7 +28,7 @@ async function load(s, ref = today()) {
   const manual = (await db.all('exercises')).filter(x => x.run && x.mi > 0);
   for (const x of manual) (gdays[x.date] ??= { activities: [] }).activities = [...(gdays[x.date].activities || []), { name: x.name, type: 'running', distance: x.mi * 1609.34, duration: (x.min || 0) * 60 }];
   const runs = T.runsFrom(gdays), lifts = T.liftsFrom(gdays);
-  const pred = T.predict(runs, ref);
+  const pred = T.predict(runs, ref, cfg.raceDate);
   const autoGoal = !cfg.goalSec;
   if (autoGoal) cfg.goalSec = pred ? T.suggestGoal(pred.sec) : 4 * 3600;
   const plan = T.buildPlan(cfg, runs, ref);
@@ -97,6 +97,9 @@ function planView(data, s, ui) {
   const todayCardHtml = d ? `<section class="card"><header><h3>Today</h3>${T.milesOn(runs, t) ? `<span class="hkcal">${r1(T.milesOn(runs, t))} mi done</span>` : ''}</header>${workout(d)}
     ${next ? `<h4 class="nexth">Next: ${wkday(next.date)}</h4>${workout(next)}` : ''}</section>` : '';
   const NOTE_ICO = { warn: 'alert', knee: 'knee', fuel: 'pie', info: 'info' };
+  // What the plan changed for the days ahead, so you can see it adapting to what you actually ran.
+  const upcoming = data.adapted.changes.filter(([dt]) => dt >= t).sort((a, b) => a[0].localeCompare(b[0]));
+  const changedHtml = upcoming.length ? `<section class="card adjcard"><h3>Plan adjusted</h3>${upcoming.map(([dt, why]) => `<button class="adjrow" data-d="${dt}"><b>${wkday(dt)} ${+dt.slice(8)}</b><span>${ui.esc(why)}</span></button>`).join('')}</section>` : '';
   const notesHtml = nudges.length ? `<section class="card notes">${nudges.map(([k, txt]) => `<div class="note ${k}">${ui.ico(NOTE_ICO[k])}<span>${ui.esc(txt)}</span></div>`).join('')}</section>` : '';
 
   // Calendar: the 3 weeks you've run, then the plan to race day.
@@ -135,7 +138,7 @@ function planView(data, s, ui) {
   // One tile per pace zone, colored like the calendar days that use it, fast–slow per mile.
   const chips = [['easy', 'Recovery', 'recovery'], ['easy', 'Easy', 'easy'], ['long', 'Long · <span class="k-medium">Medium</span>', 'long'], ['quality', 'Marathon', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
     .map(([k, l, z]) => `<div class="ptile k-${k}"><b>${l}</b><span>${T.fmtPace(Z(z)[2])}–${T.fmtPace(Z(z)[3])}</span></div>`).join('');
-  return hero(data, ui) + `<section class="card calcard"><h3>Plan to race day</h3>
+  return hero(data, ui) + changedHtml + `<section class="card calcard"><h3>Plan to race day</h3>
     <div class="calstick"><div class="ptiles">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
     ${pastHtml}${ahead.map(wkHtml).join('')}
     <p class="muted small">Paces are per mile. Dots show how hard the day is, and any distance in the range counts. Done days show what you actually ran; a purple corner means you lifted. Tap a day to see the workout, swap it with another day, or skip it.</p></section>
@@ -143,7 +146,9 @@ function planView(data, s, ui) {
   <section class="card"><details class="how"><summary><h3>How this plan adjusts</h3></summary><ul class="tips">
     <li><b>Ranges, not exact miles.</b> Anything in the range counts as done. Long runs flex down, not up.</li>
     <li><b>Ran short on an easy day?</b> About half of it gets added to your remaining easy days this week (max +1.5 mi a day). The rest is let go; chasing missed miles is how knees get hurt.</li>
-    <li><b>Ran extra?</b> It comes off your later easy days that week.</li>
+    <li><b>Ran extra?</b> Extra miles on any day (a longer long run, a run on a rest day) come off your later easy days that week, up to 2 mi a day.</li>
+    <li><b>Went harder than planned?</b> A tempo-paced run on an easy day, or a long run near race pace or rated 9-10/10 effort, counts as a hard day. The next day becomes a short recovery run, a workout in the next 2 days turns easy, and after a hard long run the next workout gets shorter.</li>
+    <li><b>Goal and paces</b> update from your runs until the taper starts, then hold still so race pace doesn't move in the last 3 weeks.</li>
     <li><b>Missed the long run?</b> It moves to the next day or two (never in race week). If you ran it on another day, that counts.</li>
     <li><b>Missed a workout?</b> It moves to today if today is easy and not the day before the long run, otherwise it's dropped so hard days don't stack.</li>
     <li><b>Tired?</b> If two signals line up (resting HR up, recent runs rated weak, or easy runs rated hard effort in Garmin), the next workout turns into an easy run.</li>
@@ -225,7 +230,7 @@ export function bind(root, s, ui) {
   ui.$$('#trainSeg button', root).forEach(b => (b.onclick = () => { local.set('trainTab', b.dataset.k); ui.render(); }));
   const edit = ui.$('#raceEdit', root);
   if (edit) edit.onclick = () => openRace(s, ui);
-  ui.$$('.cal[data-d]', root).forEach(c => (c.onclick = () => openDay(s, c.dataset.d, ui)));
+  ui.$$('.cal[data-d], .adjrow[data-d]', root).forEach(c => (c.onclick = () => openDay(s, c.dataset.d, ui)));
   const pw = ui.$('#pastWks', root); if (pw) pw.ontoggle = () => local.set('calPastOpen', pw.open);
   if (picked) bindCharts(root, (id, i, c) => {
     const P = picked, box = c.closest('.card').querySelector('.tipbox');
@@ -267,9 +272,9 @@ async function openDay(s, date, ui) {
       ${bests[i] ? `<div class="sub">Best lift: ${ui.esc(bests[i].name)} ${ui.esc(L.setText(bests[i]))}</div>` : ''}
       <div class="wkruns lifttags" data-id="${l.id}">${T.LIFTS.map(k => `<button data-t="${k}" class="${(tags[l.id] || []).includes(k) ? 'on' : ''}">${k}</button>`).join('')}</div></div>`).join('')}
     ${!done.length && !lf.length ? `<p class="muted small">${date > t ? 'Not yet.' : 'Nothing from Garmin.'}</p>` : ''}
-    ${canMove ? `<h4>Change this day</h4><p class="muted small">Tap a day to swap with it.</p>
+    ${canMove ? `<h4>Change this day</h4>${others.length ? `<p class="muted small">Tap a day to swap with it.</p>
       <div class="wkruns swaps">${others.map(x => `<button data-sw="${x.date}">${wkday(x.date)} · ${x.kind === 'rest' ? 'Rest' : calLabel(x)}</button>`).join('')}</div>
-      <label class="chk"><input type="checkbox" id="swEvery"> Every week until race week</label>
+      <label class="chk"><input type="checkbox" id="swEvery"> Every week until race week</label>` : ''}
       <div class="actions">${d.moved ? '<button id="swUndo">Undo change</button>' : ''}${d.kind !== 'rest' ? '<button id="swSkip">Skip this day</button>' : ''}</div>` : ''}`,
     { title: new Date(date + 'T12:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) });
   const save = async (patch, msg) => { await db.saveSettings({ ...s, training: { ...(s.training || {}), ...patch } }); ui.closeSheet(); ui.toast(msg); ui.render(); };
