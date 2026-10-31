@@ -1,11 +1,12 @@
 // Network-first for the app shell so updates show up on the next open; the cache is only an offline fallback.
+// Caches are shared by every app on this site (Biryani, Explore), so only hoops-* ones are cleaned up here.
 // League data never goes through here: it's fetched fresh from ESPN and cached by the app itself.
-const CACHE = 'hoops-v1';
+const CACHE = 'hoops-v2';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/app.js', 'js/espn.js', 'js/model.js', 'js/charts.js'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
-self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('hoops-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;

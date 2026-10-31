@@ -1,14 +1,15 @@
 // Network-first for the app shell so updates show up on the next open; the cache is only an offline fallback.
-const CACHE = 'biryani-v24';
+// Caches are shared by every app on safaangit.github.io (Explore, Hoops), so only biryani-* ones are cleaned up here.
+const CACHE = 'biryani-v25';
 // Food library files (/foods/, tools/branded_foods.js): cache-first and kept across app updates.
 // Rename when the library is rebuilt.
 const FOODS = 'biryani-foods-2026-10';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/sc-voice.png', 'icons/sc-add.png', 'icons/sc-scan.png',
-  'js/app.js', 'js/db.js', 'js/nutrition.js', 'js/food.js', 'js/scan.js', 'js/sync.js', 'js/goals.js', 'js/charts.js', 'js/voice.js', 'js/training.js', 'js/trainview.js', 'js/lifts.js', 'ideas.json', 'eatout.json', 'generic.json'];
-const LIBS = /cdn\.jsdelivr\.net\/npm\/(@zxing|tesseract)|cdnjs\.cloudflare\.com\/ajax\/libs\/leaflet\//;
+  'js/app.js', 'js/db.js', 'js/nutrition.js', 'js/food.js', 'js/scan.js', 'js/sync.js', 'js/goals.js', 'js/charts.js', 'js/voice.js', 'js/training.js', 'js/trainview.js', 'js/lifts.js', 'generic.json'];
+const LIBS = /cdn\.jsdelivr\.net\/npm\/(@zxing|tesseract)/;
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
-self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== FOODS).map(k => caches.delete(k)))).then(() => self.clients.claim())));
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('biryani-') && k !== CACHE && k !== FOODS).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
