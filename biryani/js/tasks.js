@@ -1,7 +1,8 @@
 // Tasks + groceries: one capture box for everything ("call dad tmrw 5pm, milk, eggs"), sorted on the way in
 // so nothing piles up in an "Unsorted" dump.
 // data/fuel/tasks.json, one record per item:
-//   task:    { id, kind: 'task', t, note?, due?, time?, rep?: {n, unit}, rm?, list: 'todo'|'someday'|'watch', done?: ms, created }
+//   task:    { id, kind: 'task', t, note?, due?, time?, rep?: {n, unit}, rm?, pri?: true (pinned to top), cat (color category),
+//              list: 'todo'|'someday'|'watch'|'ref' (kept, out of the way), done?: ms, created }
 //   grocery: { id, kind: 'grocery', t, qty?, store?, aisle, done?: ms (in cart), gone?: true (bought, kept for Usuals), buys, last?, created }
 // Groceries are never deleted when bought: the record is revived next time, so "pickles" never turns into three rows
 // and the most-bought items show up as one-tap Usuals.
@@ -50,11 +51,14 @@ async function ctx(s) {
 async function addItem(it, s, { mode } = {}) {
   const now = Date.now();
   if (it.kind === 'grocery') return addGrocery(it.text, s);
-  const w = P.parseWhen(it.text);
+  const pr = P.parsePri(it.text);
+  const ref = P.REF_PREFIX.test(pr.text);
+  const w = P.parseWhen(pr.text.replace(P.REF_PREFIX, ''));
   const title = w.title[0].toUpperCase() + w.title.slice(1);
   const dup = (await tasksOf()).find(r => !r.done && P.core(r.t).join(' ') === P.core(title).join(' ') && (r.due || null) === w.due);
   if (dup) return { dup: dup.t };
-  await db.put(FILE, { kind: 'task', t: title, due: w.due, time: w.time, rep: w.rep, list: P.listFor(it.text), created: now, rm: w.time ? 0 : w.due ? 'morning' : null });
+  await db.put(FILE, { kind: 'task', t: title, due: w.due, time: w.time, rep: w.rep, list: ref ? 'ref' : P.listFor(it.text), created: now, rm: w.time ? 0 : w.due ? 'morning' : null,
+    pri: pr.pri || undefined, cat: P.categoryOf(title, s.catLearn) });
   return { task: title, due: w.due };
 }
 async function addGrocery(text, s) {
@@ -116,8 +120,10 @@ function taskRow(r, ui) {
     r.rep ? `<span class="rep">${ui.ico('refresh')}${ui.esc(P.repText(r.rep))}</span>` : '',
     r.note ? `<span class="nt">${ui.ico('note')}</span>` : '',
   ].filter(Boolean).join('');
-  return `<li class="tk ${r.done ? 'done' : ''}" data-id="${r.id}"><button class="tbox" aria-label="${r.done ? 'Mark not done' : 'Done'}">${r.done ? ui.ico('check') : ''}</button>
-    <div class="grow"><div class="name">${ui.esc(r.t)}</div>${sub ? `<div class="tsub">${sub}</div>` : ''}</div></li>`;
+  const c = P.catOf(r.cat || P.categoryOf(r.t));
+  const ref = r.list === 'ref' && r.note ? `<div class="tnote">${ui.esc(r.note.split('\n').slice(0, 2).join(' · '))}</div>` : '';
+  return `<li class="tk ${r.done ? 'done' : ''} ${r.pri ? 'pri' : ''}" data-id="${r.id}" style="--cc:${c.color}"><button class="tbox" aria-label="${r.done ? 'Mark not done' : 'Done'}">${r.done ? ui.ico('check') : ''}</button>
+    <div class="grow"><div class="name">${r.pri ? '<span class="star">★</span>' : ''}${ui.esc(r.t)}</div>${sub || c.k !== 'other' ? `<div class="tsub">${c.k !== 'other' ? `<span class="cat">${ui.esc(c.label)}</span>` : ''}${sub}</div>` : ''}${ref}</div></li>`;
 }
 function groceryRow(r, ui, showStore) {
   return `<li class="tk gr ${r.done ? 'done' : ''}" data-id="${r.id}"><button class="tbox" aria-label="${r.done ? 'Put back' : 'In cart'}">${r.done ? ui.ico('check') : ''}</button>
@@ -145,7 +151,8 @@ export async function view(s, ui) {
 
 function taskView(tasks, ui, t0) {
   const open = tasks.filter(r => !r.done);
-  const todo = open.filter(r => (r.list || 'todo') === 'todo');
+  const top = open.filter(r => r.pri && (r.list || 'todo') === 'todo').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
+  const todo = open.filter(r => (r.list || 'todo') === 'todo' && !r.pri);
   const byDue = (a, b) => (a.due + (a.time || '99')).localeCompare(b.due + (b.time || '99'));
   const over = todo.filter(r => r.due && r.due < t0).sort(byDue);
   const tdy = todo.filter(r => r.due === t0).sort(byDue);
@@ -153,14 +160,15 @@ function taskView(tasks, ui, t0) {
   const later = todo.filter(r => r.due > addDays(t0, 7)).sort(byDue);
   const anytime = todo.filter(r => !r.due).sort((a, b) => (b.created || 0) - (a.created || 0));
   const stale = anytime.filter(r => Date.now() - (r.created || r.u || 0) > STALE_DAYS * DAY);
-  const someday = open.filter(r => r.list === 'someday'), watch = open.filter(r => r.list === 'watch');
+  const someday = open.filter(r => r.list === 'someday'), watch = open.filter(r => r.list === 'watch'), refs = open.filter(r => r.list === 'ref').sort((a, b) => a.t.localeCompare(b.t));
   const doneWk = tasks.filter(r => r.done && Date.now() - r.done < 7 * DAY).sort((a, b) => b.done - a.done);
   const LIMIT = 8;
   const anyRows = (st.showAll ? anytime : anytime.slice(0, LIMIT)).map(r => taskRow(r, ui));
   if (!st.showAll && anytime.length > LIMIT) anyRows.push(`<li class="more" id="anyMore">Show ${anytime.length - LIMIT} more</li>`);
-  const empty = !open.length ? `<section class="card tempty"><h3>All clear</h3><p class="hint">Type or say anything above. Dates like "tmrw 5pm" or "every month on the 1st" get picked up, and groceries go to their own list.</p></section>` : '';
+  const empty = !open.filter(r => r.list !== 'ref').length ? `<section class="card tempty"><h3>All clear</h3><p class="hint">Type or say anything above. Dates like "tmrw 5pm" or "every month on the 1st" get picked up, and groceries go to their own list.</p></section>` : '';
   return empty
     + (stale.length >= 3 ? `<button class="tidy" id="tidy">${ui.ico('zap')}<span class="grow"><b>Tidy up ${stale.length} old items</b><span class="sub">Sitting ${STALE_DAYS}+ days with no date. One tap each.</span></span><span class="chev">›</span></button>` : '')
+    + section('top', '★ Top', top.map(r => taskRow(r, ui)), { cls: 'topsec' })
     + section('over', 'Overdue', over.map(r => taskRow(r, ui)), { cls: 'over', extra: `<button class="link" id="allToday">Move to today</button>` })
     + section('today', 'Today', tdy.map(r => taskRow(r, ui)))
     + section('week', 'Next 7 days', wk.map(r => taskRow(r, ui)))
@@ -168,6 +176,7 @@ function taskView(tasks, ui, t0) {
     + section('any', 'Anytime', anyRows, { count: anytime.length })
     + section('watch', 'Watch & read', watch.map(r => taskRow(r, ui)), { collapsible: true })
     + section('someday', 'Someday', someday.map(r => taskRow(r, ui)), { collapsible: true })
+    + section('ref', 'Reference', refs.map(r => taskRow(r, ui)), { collapsible: true, cls: 'refsec' })
     + section('done', 'Done this week', doneWk.map(r => taskRow(r, ui)), { collapsible: true, cls: 'donesec' });
 }
 
@@ -261,7 +270,7 @@ async function previewHtml(text, s, ui, overrides, mode) {
   const ICON = { task: 'check', grocery: 'cart', food: 'foods' }, LBL = { task: 'Task', grocery: 'Grocery', food: 'Food log' };
   const html = items.map((it, i) => {
     let detail = '';
-    if (it.kind === 'task') { const w = P.parseWhen(it.text); detail = `${ui.esc(w.title)}${w.due ? ` <span class="due">${ui.ico('cal')}${ui.esc(fmtDue(w.due, w.time))}</span>` : ''}${w.rep ? ` <span class="rep">${ui.ico('refresh')}${ui.esc(P.repText(w.rep))}</span>` : ''}`; }
+    if (it.kind === 'task') { const pr = P.parsePri(it.text), w = P.parseWhen(pr.text.replace(P.REF_PREFIX, '')), c = P.catOf(P.categoryOf(w.title, s.catLearn)); detail = `${pr.pri ? '<span class="star">★</span>' : ''}${P.REF_PREFIX.test(pr.text) ? '<span class="muted">Reference · </span>' : ''}${c.k !== 'other' ? `<span class="cdot" style="background:${c.color}"></span>` : ''}${ui.esc(w.title)}${w.due ? ` <span class="due">${ui.ico('cal')}${ui.esc(fmtDue(w.due, w.time))}</span>` : ''}${w.rep ? ` <span class="rep">${ui.ico('refresh')}${ui.esc(P.repText(w.rep))}</span>` : ''}`; }
     else if (it.kind === 'grocery') { const g = P.groceryBits(it.text); detail = `${ui.esc(g.name)}${g.qty ? ` ×${ui.esc(g.qty)}` : ''} <span class="muted">· ${ui.esc(P.AISLES.find(a => a.k === P.aisleOf(g.name, s.aisleLearn))?.label || '')}${g.store ? ' · ' + ui.esc(P.storeLabel(g.store)) : ''}</span>`; }
     else detail = `${ui.esc(it.text)} <span class="muted">· opens the food logger</span>`;
     return `<div class="pv-it"><button class="kind k-${it.kind}" data-i="${i}">${ui.ico(ICON[it.kind])}${LBL[it.kind]}</button><span class="grow">${detail}</span></div>`;
@@ -366,6 +375,8 @@ function editTask(r, s, ui) {
     <div class="grid2"><label>Date<input name="due" type="date" value="${r.due || ''}"></label><label>Time<input name="time" type="time" value="${r.time || ''}"></label></div>
     <div class="grid2"><label>Repeat<select name="rep">${[['', 'Never'], ['1day', 'Daily'], ['1week', 'Weekly'], ['2week', 'Every 2 weeks'], ['1month', 'Monthly'], ['3month', 'Every 3 months'], ['1year', 'Yearly']].map(([v, l]) => `<option value="${v}" ${r.rep && `${r.rep.n}${r.rep.unit}` === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label>Reminder<select name="rm">${REMIND.map(([v, l]) => `<option value="${v ?? ''}" ${String(r.rm ?? '') === String(v ?? '') ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+    <div class="grid2"><label>Category<select name="cat">${P.CATS.map(c => `<option value="${c.k}" ${(r.cat || P.categoryOf(r.t)) === c.k ? 'selected' : ''}>${c.emoji} ${c.label}</option>`).join('')}</select></label>
+    <label class="check pin"><input type="checkbox" name="pri" ${r.pri ? 'checked' : ''}> ★ Keep at top</label></div>
     <label>List<select name="list">${P.LISTS.map(([k, l]) => `<option value="${k}" ${(r.list || 'todo') === k ? 'selected' : ''}>${l}</option>`).join('')}<option value="grocery">Groceries (move)</option></select></label>
     <label>Notes<textarea name="note" rows="3" placeholder="Details, links, a checklist…">${esc(r.note || '')}</textarea></label>
     <div id="calRow"></div>
@@ -389,7 +400,9 @@ function editTask(r, s, ui) {
       learn({ text: t }, 'grocery', s);
     } else {
       const rm = f.rm.value === '' ? null : f.rm.value === 'morning' ? 'morning' : +f.rm.value;
-      await db.put(FILE, { ...r, t, due: f.due.value || null, time: f.due.value ? f.time.value || null : null, rep: f.due.value ? repOf(f.rep.value) : null, rm, list: f.list.value, note: f.note.value.trim() || undefined });
+      const cat = f.cat.value;
+      if (cat !== (r.cat || P.categoryOf(r.t))) { s.catLearn = { ...(s.catLearn || {}), [P.core(t).join(' ')]: cat }; await db.saveSettings(s); }
+      await db.put(FILE, { ...r, t, cat, pri: f.pri.checked || undefined, due: f.due.value || null, time: f.due.value ? f.time.value || null : null, rep: f.due.value ? repOf(f.rep.value) : null, rm, list: f.list.value, note: f.note.value.trim() || undefined });
     }
     ui.closeSheet(); ui.render();
   };

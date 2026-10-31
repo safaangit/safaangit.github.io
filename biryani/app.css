@@ -625,3 +625,18 @@ ul.tlist li.more { justify-content: center; color: var(--accent); font-weight: 5
 .tgrid button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px 8px; }
 .tgrid .ico { width: 18px; height: 18px; }
 .tdone { font-size: 18px; text-align: center; padding: 20px 0; }
+/* categories, pins, reference */
+ul.tlist li.tk { box-shadow: inset 4px 0 0 var(--cc, transparent); }
+li.tk.done { box-shadow: none; }
+.tsub .cat { color: var(--cc); font-weight: 600; }
+.star { color: #f5b301; margin-right: 4px; }
+.tsec.topsec > header h3 { color: #d99a00; }
+.tsec.topsec { box-shadow: 0 0 0 1.5px color-mix(in srgb, #f5b301 55%, transparent); }
+.tnote { font-size: 13px; color: var(--muted); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+label.check.pin { flex-direction: row; align-items: center; gap: 8px; font-size: 15px; color: var(--ink); align-self: end; padding-bottom: 12px; }
+label.check.pin input { width: auto; }
+.gbbox { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 12px; }
+.gbbox p { margin: 6px 0; }
+.gbsteps ol.steps li { margin-bottom: 10px; line-height: 1.45; }
+.gbsteps a { color: var(--accent); word-break: break-all; }

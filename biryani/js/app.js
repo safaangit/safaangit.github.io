@@ -12,6 +12,7 @@ import * as voice from './voice.js';
 import * as train from './trainview.js';
 import * as lifts from './lifts.js';
 import * as tasks from './tasks.js';
+import * as gb from './gbridge.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -1330,7 +1331,11 @@ async function viewSettings() {
   <details><summary>Tasks & quick add</summary><form id="tset" class="form">
     <label>When the app opens<select name="launchTo"><option value="last" ${local.get('launchTo', 'last') === 'last' ? 'selected' : ''}>Where I left off</option><option value="quick" ${local.get('launchTo', 'last') === 'quick' ? 'selected' : ''}>Quick add with the mic on</option></select></label>
     <p class="muted small">Pick "Quick add" if you open Baro's from the side button: you land on the mic and can say a task, groceries or food. Also after 10+ minutes away.</p>
-  </form></details>
+  </form>
+  <div class="gbbox"><b>Google Tasks & Calendar</b>
+    <p class="small ${local.get('gbErr', '') ? 'warn' : 'muted'}">${gb.configured() ? (local.get('gbErr', '') ? esc(local.get('gbErr', '')) : `Linked${local.get('gbLast', 0) ? ` · last sync ${new Date(local.get('gbLast', 0)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. Your lists show in the Google Tasks widget, timed tasks on Google Calendar.`) : 'Not linked. Puts your lists on the Google Tasks home-screen widget, lets Google Home add to them, and puts timed tasks on Google Calendar with reminders. Free, about 10 minutes once.'}</p>
+    <div class="actions"><button type="button" id="gbSetup" class="${gb.configured() ? '' : 'primary'}">${gb.configured() ? 'Setup steps' : 'Set up Google Tasks'}</button>${gb.configured() ? '<button type="button" id="gbSync">Sync now</button>' : ''}</div></div>
+  </details>
   <details><summary>Sync & Garmin</summary><form id="gh" class="form">
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
     <div class="grid2"><label>Repo<input name="ghRepo" value="${esc(local.get('ghRepo', 'safaangit/safaan-personal'))}"></label><label>Branch<input name="ghBranch" value="${esc(local.get('ghBranch', ''))}" placeholder="repo default"></label></div>
@@ -1399,6 +1404,8 @@ bind.settings = root => {
     if (!s.meals.length) s.meals = ['Meal 1'];
     await db.saveSettings(s); toast('Saved');
   };
+  $('#gbSetup', root).onclick = () => openGbSetup();
+  $('#gbSync', root)?.addEventListener('click', async () => { try { await gb.sync(); toast('Synced with Google Tasks'); } catch (e) { toast(e.message); } render(); });
   $('#tset', root).onchange = e => { local.set('launchTo', e.currentTarget.launchTo.value); toast('Saved on this device'); };
   $('#gh', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); syncBadge(); };
   $('#keys', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); toast('Saved on this device'); };
@@ -1449,6 +1456,48 @@ async function openRecommend() {
   };
 }
 
+// Google Tasks link: step by step, for someone who has never opened Apps Script.
+function openGbSetup() {
+  const script = new URL('tasks-bridge.txt', location.href).href;
+  const b = sheet(`<div class="gbsteps">
+    <p class="hint">Do steps 1–7 on your <b>computer</b> (Apps Script is painful on a phone). It's free and runs in your own Google account. Nothing here costs money.</p>
+    <ol class="steps">
+      <li>On your phone, install <b>Google Tasks</b> from the Play Store (that's where the widget comes from). Sign in with the same Google account you'll use below.</li>
+      <li>On the computer, open <a href="https://script.new" target="_blank" rel="noopener">script.new</a> (it opens a blank Apps Script project). Click <b>Untitled project</b> at the top and rename it <b>Baro's Tasks</b>.</li>
+      <li>Open <a href="${esc(script)}" target="_blank" rel="noopener">${esc(script.replace('https://', ''))}</a> in another tab, press <b>Ctrl+A</b>, <b>Ctrl+C</b>. Back in the script editor, select everything there, delete it, and press <b>Ctrl+V</b>. Press <b>Ctrl+S</b> to save.</li>
+      <li>In the left sidebar, click the <b>+</b> next to <b>Services</b>, pick <b>Google Tasks API</b>, click <b>Add</b>.</li>
+      <li>In the toolbar, pick <b>setup</b> in the function dropdown and click <b>Run</b>. Click <b>Review permissions</b>, pick your account. Google shows "Google hasn't verified this app" because it's your own script: click <b>Advanced → Go to Baro's Tasks (unsafe)</b> → <b>Allow</b>.</li>
+      <li>Click <b>Deploy → New deployment</b>. Click the gear next to "Select type" → <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>. Click <b>Deploy</b>, then <b>Done</b>.</li>
+      <li>Pick <b>link</b> in the function dropdown and click <b>Run</b>. The log at the bottom shows a link starting with safaangit.github.io. Send it to your phone (text it to yourself like you do with photos) and tap it there. Baro's opens and says "Google Tasks linked".</li>
+      <li>On your phone's home screen: long-press an empty spot → <b>Widgets</b> → <b>Tasks</b> → drag it out and pick the list <b>Baro's To do</b>. Add a second one for <b>Baro's Groceries</b> if you like.</li>
+    </ol>
+    <p class="hint">After that: whatever you add in Baro's shows in the widget in a couple of seconds. Things you add from the widget, or by saying "Hey Google, remind me to…", get sorted within about a minute and show in Baro's the next time you open it.</p>
+    <details><summary>Paste the link details by hand instead</summary><form id="gbf" class="form">
+      <label>Web app URL<input name="gbUrl" value="${esc(local.get('gbUrl', ''))}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+      <label>Key (from the setup log)<input name="gbKey" value="${esc(local.get('gbKey', ''))}" autocomplete="off"></label>
+    </form></details>
+    <div class="actions">${gb.configured() ? '<button type="button" class="danger" id="gbOff">Unlink</button>' : ''}<button type="button" class="primary" id="gbTest">Test connection</button></div>
+    <p id="gbRes" class="small"></p></div>`, { title: 'Set up Google Tasks' });
+  const f = $('#gbf', b);
+  f.onchange = () => { local.set('gbUrl', f.gbUrl.value.trim()); local.set('gbKey', f.gbKey.value.trim()); };
+  $('#gbOff', b)?.addEventListener('click', () => { local.set('gbUrl', ''); local.set('gbKey', ''); local.set('gbPushed', 0); closeSheet(); toast('Unlinked from Google Tasks'); render(); });
+  $('#gbTest', b).onclick = async () => {
+    f.onchange();
+    const out = $('#gbRes', b);
+    if (!gb.configured()) { out.className = 'small warn'; out.textContent = 'Open the link from step 7 on this phone, or paste the URL and key above.'; return; }
+    out.className = 'small muted'; out.textContent = 'Checking…';
+    try { await gb.test(); out.className = 'small ok'; out.textContent = '✓ Connected. Sending your lists to Google now.'; await gb.sync(); out.textContent = '✓ Connected and synced. Add the widget (step 8).'; }
+    catch (e) { out.className = 'small warn'; out.textContent = e.message === 'Failed to fetch' ? 'Couldn\'t reach the script. In step 6, "Who has access" must be "Anyone", and the URL must end in /exec.' : e.message; }
+  };
+}
+// Push task changes to Google a moment after they happen; pull Google's side when the app opens.
+let gbTimer;
+function scheduleBridge(ms = 1200) {
+  if (!gb.configured()) return;
+  clearTimeout(gbTimer);
+  gbTimer = setTimeout(() => gb.sync().then(ch => { if (ch && !$('.sheet-wrap')) render(); else if (state.tab === 'settings') render(); }).catch(() => {}), ms);
+}
+
 // ---------- boot ----------
 // Helpers the Training tab module borrows.
 const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render, swipeToDelete, goDay: d => { state.date = d; state.tab = 'today'; render(); },
@@ -1464,7 +1513,7 @@ function defaultMeal() {
   const h = new Date().getHours(), n = state.s?.meals.length || 1;
   return Math.min(n - 1, h < 15 ? 0 : h < 18 ? 1 : 2);
 }
-db.onChange(() => scheduleSync());
+db.onChange(name => { scheduleSync(); if (name === 'tasks') scheduleBridge(); });
 addEventListener('online', () => scheduleSync(500));
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
@@ -1474,11 +1523,20 @@ document.addEventListener('visibilitychange', () => {
   // Left open overnight: a diary that was on "Today" moves to the new day instead of logging into yesterday.
   if (state.today !== today()) { if (state.date === state.today) state.date = today(); state.today = today(); render(); }
   scheduleSync(500);
+  scheduleBridge(300);
 });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
 // Home-screen shortcuts (long-press the icon, or a Quick Tap / side-button action) open ?do=voice|add|scan.
 async function launchAction() {
   const u = new URL(location.href);
+  // Link from the Google script's `link` function: ?gb=<web app url>&gk=<key>
+  if (u.searchParams.get('gb')) {
+    local.set('gbUrl', u.searchParams.get('gb')); local.set('gbKey', u.searchParams.get('gk') || ''); local.set('gbPushed', 0);
+    u.searchParams.delete('gb'); u.searchParams.delete('gk'); history.replaceState(null, '', u.pathname + u.search + u.hash);
+    state.tab = 'tasks'; await render();
+    gb.sync().then(() => { toast('Google Tasks linked ✓'); render(); }).catch(e => toast(e.message));
+    return;
+  }
   // Settings → "When the app opens": jump straight into Quick add (for a side-button / double-press launch).
   const act = u.searchParams.get('do') || (local.get('launchTo', 'last') === 'quick' ? 'task' : null);
   if (!act) return;
@@ -1490,4 +1548,4 @@ async function launchAction() {
   else if (act === 'scan') openScanner(defaultMeal());
   else if (act === 'fits') openFits(); // from Explore's "What fits from my own foods"
 }
-render().then(() => { launchAction(); scheduleSync(300); });
+render().then(() => { launchAction(); scheduleSync(300); scheduleBridge(600); });

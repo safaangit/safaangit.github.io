@@ -280,7 +280,7 @@ export function splitCapture(text, ctx = {}) {
 }
 
 // Lists a task can live in.
-export const LISTS = [['todo', 'To do'], ['someday', 'Someday'], ['watch', 'Watch & read']];
+export const LISTS = [['todo', 'To do'], ['someday', 'Someday'], ['watch', 'Watch & read'], ['ref', 'Reference (kept, out of the way)']];
 export const listFor = text => (WATCH.test(text) ? 'watch' : 'todo');
 
 // Google Calendar "add event" link, prefilled (no account setup needed).
@@ -300,3 +300,32 @@ export function calendarLink(t) {
   try { p.set('ctz', Intl.DateTimeFormat().resolvedOptions().timeZone); } catch {}
   return 'https://calendar.google.com/calendar/render?' + p.toString();
 }
+
+// ---------- priority + categories ----------
+// "!", "urgent", "asap", "important", "high priority", "top priority" pin a task above everything.
+const PRI = /(?:^|\s)!+(?=\s|$)|\s*\b(?:asap|urgent(?:ly)?|important|high\s+priority|top\s+priority|priority|pin(?:\s+it)?)\b/gi;
+export function parsePri(text) {
+  const pri = PRI.test(text); PRI.lastIndex = 0;
+  return { pri, text: pri ? text.replace(PRI, ' ').replace(/\s+/g, ' ').replace(/^[\s,:-]+|[\s,:-]+$/g, '') : text };
+}
+// Auto categories: a color in the app, an emoji in the Google Tasks widget (which has no colors).
+export const CATS = [
+  ['call', 'Calls & messages', '📞', '#3b82f6', /\b(?:call|text|email|e-mail|reply|respond|message|msg|dm|tell|ask|send|zelle|venmo|rsvp|contact|follow\s+up|catch\s+up)\b/i],
+  ['money', 'Money & bills', '💵', '#16a34a', /\b(?:pay|bill|bills|rent|lease|bank|credit|refund|reimburse|expense|tax|taxes|zakat|invest|reinvest|fidelity|oracle|xfinity|subscription|cancel|annual|renewal|insurance|payment|charges?|\$\d)/i],
+  ['car', 'Car', '🚗', '#ca8a04', /\b(?:car|oil\s+change|tires?|rotation|registration|inspection|miles|mileage|wiper|filters?|mechanic|dealer|toyota|honda|parking|gas)\b/i],
+  ['health', 'Health', '🩺', '#db2777', /\b(?:dentist|dental|doctor|dr\.?|appt|appointment|prescription|pharmacy|meds?|adderall|refill|glasses|contacts|therapy|physio|knee|meniscus|vaccine|flu\s+shot)\b/i],
+  ['home', 'Home', '🏠', '#0d9488', /\b(?:clean|laundry|wash|vacuum|mop|dishes|trash|fix|repair|dispenser|fridge|filter|lease|landlord|move|moving|packing|pack|furniture|amazon\s+return|return|mail)\b/i],
+  ['work', 'Work & career', '💼', '#7c3aed', /\b(?:apply|application|resume|linkedin|interview|job|recruiter|offer|onboarding|pto|meeting|expense\s+report|boss|work|ascm|spacex|space\s+x|career)\b/i],
+  ['watch', 'Watch & read', '🎬', '#9333ea', /\b(?:watch|movie|film|show|series|anime|season|episode|ghibli|netflix|read|book|novel|podcast)\b/i],
+  ['run', 'Running', '🏃', '#ea580c', /\b(?:run|race|marathon|half|5k|10k|gu|shoes|strava|garmin|training)\b/i],
+  ['other', 'Other', '•', '#6b7280', null],
+].map(([k, label, emoji, color, re]) => ({ k, label, emoji, color, re }));
+export const catOf = k => CATS.find(c => c.k === k) || CATS[CATS.length - 1];
+export function categoryOf(text, learned = {}) {
+  const key = core(text).join(' ');
+  if (learned[key]) return learned[key];
+  for (const c of CATS) if (c.re && c.re.test(text)) return c.k;
+  return 'other';
+}
+// Things to keep but not see every day (car service notes, a list of race dates): "note:", "fyi", "ref:".
+export const REF_PREFIX = /^\s*(?:note|notes|fyi|ref|reference|log)\s*[:\-]\s*/i;
