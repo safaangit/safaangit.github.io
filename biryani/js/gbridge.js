@@ -20,7 +20,10 @@ const slim = r => {
   return o;
 };
 
+// Google's /dev address only answers someone signed in to Google in that same browser, so the phone can't use it.
+export const DEV_MSG = 'That link is Google\'s test address (ends in /dev). In the script: Deploy → Manage deployments → copy the Web app URL (ends in /exec) and paste it in Setup steps → "Paste the link details by hand".';
 async function call(items) {
+  if (/\/dev\/?$/.test(local.get('gbUrl', ''))) throw new Error(DEV_MSG);
   const r = await fetch(local.get('gbUrl', ''), {
     method: 'POST', redirect: 'follow',
     headers: { 'content-type': 'text/plain;charset=utf-8' }, // a "simple" request: no CORS preflight, which Apps Script can't answer

@@ -1467,8 +1467,8 @@ function openGbSetup() {
       <li>Open <a href="${esc(script)}" target="_blank" rel="noopener">${esc(script.replace('https://', ''))}</a> in another tab, press <b>Ctrl+A</b>, <b>Ctrl+C</b>. Back in the script editor, select everything there, delete it, and press <b>Ctrl+V</b>. Press <b>Ctrl+S</b> to save.</li>
       <li>In the left sidebar, click the <b>+</b> next to <b>Services</b>, pick <b>Google Tasks API</b>, click <b>Add</b>.</li>
       <li>In the toolbar, pick <b>setup</b> in the function dropdown and click <b>Run</b>. Click <b>Review permissions</b>, pick your account. Google shows "Google hasn't verified this app" because it's your own script: click <b>Advanced → Go to Baro's Tasks (unsafe)</b> → <b>Allow</b>.</li>
-      <li>Click <b>Deploy → New deployment</b>. Click the gear next to "Select type" → <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>. Click <b>Deploy</b>, then <b>Done</b>.</li>
-      <li>Pick <b>link</b> in the function dropdown and click <b>Run</b>. The log at the bottom shows a link starting with safaangit.github.io. Send it to your phone (text it to yourself like you do with photos) and tap it there. Baro's opens and says "Google Tasks linked".</li>
+      <li>Click <b>Deploy → New deployment</b>. Click the gear next to "Select type" → <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>. Click <b>Deploy</b>. Copy the <b>Web app URL</b> it shows (it ends in <b>/exec</b>), then <b>Done</b>.</li>
+      <li>Near the top of the script, paste that URL between the quotes in <b>const EXEC_URL = ''</b> and press <b>Ctrl+S</b>. Pick <b>link</b> in the function dropdown and click <b>Run</b>. The log at the bottom shows a link starting with safaangit.github.io. Email it to yourself and tap it on your phone. Baro's opens and says "Google Tasks linked".</li>
       <li>On your phone's home screen: long-press an empty spot → <b>Widgets</b> → <b>Tasks</b> → drag it out and pick the list <b>Baro's To do</b>. Add a second one for <b>Baro's Groceries</b> if you like.</li>
     </ol>
     <p class="hint">After that: whatever you add in Baro's shows in the widget in a couple of seconds. Things you add from the widget, or by saying "Hey Google, remind me to…", get sorted within about a minute and show in Baro's the next time you open it.</p>
@@ -1487,7 +1487,7 @@ function openGbSetup() {
     if (!gb.configured()) { out.className = 'small warn'; out.textContent = 'Open the link from step 7 on this phone, or paste the URL and key above.'; return; }
     out.className = 'small muted'; out.textContent = 'Checking…';
     try { await gb.test(); out.className = 'small ok'; out.textContent = '✓ Connected. Sending your lists to Google now.'; await gb.sync(); out.textContent = '✓ Connected and synced. Add the widget (step 8).'; }
-    catch (e) { out.className = 'small warn'; out.textContent = e.message === 'Failed to fetch' ? 'Couldn\'t reach the script. In step 6, "Who has access" must be "Anyone", and the URL must end in /exec.' : e.message; }
+    catch (e) { out.className = 'small warn'; out.textContent = e.message === 'Failed to fetch' ? 'Couldn\'t reach the script. In step 6, "Who has access" must be "Anyone", and the URL must end in /exec (Deploy → Manage deployments shows it).' : e.message; }
   };
 }
 // Push task changes to Google a moment after they happen; pull Google's side when the app opens.
