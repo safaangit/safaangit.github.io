@@ -585,3 +585,41 @@ a.btn.wide { width: 100%; gap: 8px; padding: 13px; margin-bottom: 12px; color: v
 .logv .pname { font-size: 20px; }
 .idea .why .badge.deal { margin-right: 4px; }
 .logv .pacts { grid-template-columns: 1fr; }
+
+/* ---- Map tab ---- */
+body.maptab { padding-bottom: 0; }
+body.maptab main { padding: 0; max-width: none; }
+.mapview { display: flex; flex-direction: column; position: relative; overflow: hidden; }
+.mtop { display: flex; gap: 8px; padding: 10px 12px 0; }
+.mtop input { flex: 1; } .mtop button { flex: none; padding: 8px 12px; display: flex; align-items: center; }
+.mapview .mapf { margin: 0; padding: 8px 12px; }
+.chips button.tog { border-style: dashed; }
+.mapview .mapwrap { position: relative; flex: 1; min-height: 0; }
+.mapview #hmap { position: absolute; inset: 0; background: var(--tile); }
+.madd { position: absolute; right: 12px; top: 64px; z-index: 500; width: 44px; height: 44px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.ghere { position: absolute; left: 50%; transform: translateX(-50%); top: 30px; z-index: 500; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 20px;
+  background: var(--card); color: var(--ink); text-decoration: none; font-size: 14px; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,.3); white-space: nowrap; }
+.ghere .ico { width: 16px; height: 16px; color: #4285f4; }
+.cross { position: absolute; left: 50%; top: 25%; z-index: 550; width: 34px; height: 34px; margin: -17px 0 0 -17px; pointer-events: none;
+  background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat, linear-gradient(var(--accent), var(--accent)) center / 100% 2px no-repeat; }
+.cross[hidden] { display: none; }
+.drawer { position: absolute; left: 0; right: 0; bottom: 0; z-index: 600; background: var(--card); border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px rgba(0,0,0,.25);
+  height: 34%; display: flex; flex-direction: column; transition: height .2s; }
+.drawer.open { height: 72%; }
+.drawer .dh { border: 0; background: none; border-radius: 0; padding: 6px 16px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 15px; font-weight: 500; }
+.drawer .dh .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line2); }
+.drawer .dh span:last-child { display: inline-flex; align-items: center; gap: 4px; } .drawer .dh .ico { width: 18px; height: 18px; }
+.drawer .dbody { flex: 1; overflow: auto; overscroll-behavior: contain; padding-bottom: 8px; }
+.drawer ul.list { margin: 0; } .drawer .pcard { padding: 0 14px 12px; }
+.drawer .pcard h4 { margin: 8px -14px 0; }
+.drawer.add { height: 50%; }
+.hc-acts.g { grid-template-columns: 1fr 1fr; margin: 0 0 10px; }
+.hc-acts a.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.hc-acts .danger { color: var(--warn); }
+.addspot { padding: 0 14px; } .addspot .seg { margin: 0; }
+.dot.lv-maybe { background: #9a9aa2; }
+.badge.lv-maybe { background: var(--tile); color: var(--muted); }
+.hcl { display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font: 700 13px Roboto, system-ui, sans-serif;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 0%, rgba(255,255,255,.55)); }
+.hcl.lv-cert { background: #34c759; } .hcl.lv-full { background: #3aa6d8; } .hcl.lv-listed { background: #ff9f0a; } .hcl.lv-maybe { background: #8a8a92; }
+.mapview .leaflet-top.leaflet-left .leaflet-control-attribution { font-size: 10px; margin: 0; border-radius: 0 0 6px 0; }

@@ -31,11 +31,12 @@ const ICONS = {
   map: '<path d="m1 6 7-4 8 4 7-4v16l-7 4-8-4-7 4z"/><path d="M8 2v16M16 6v16"/>',
   nav: '<path d="m3 11 19-9-9 19-2-8z"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
   locate: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/>',
 };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
 
-const TABS = ['cook', 'out', 'deals'];
+const TABS = ['cook', 'out', 'map', 'deals'];
 const state = { s: null, tab: TABS.includes(local.get('exMode')) ? local.get('exMode') : 'cook' };
 const bind = {};
 
@@ -44,6 +45,8 @@ async function render() {
   state.s = await db.settings();
   local.set('exMode', state.tab);
   $$('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
+  document.body.classList.toggle('maptab', state.tab === 'map');
+  state.mapCleanup?.();
   $('main').innerHTML = await views[state.tab]();
   bind[state.tab]?.($('main'));
   syncBadge();
@@ -62,7 +65,7 @@ function scheduleSync(ms = 6000) { clearTimeout(syncTimer); syncTimer = setTimeo
 async function runSync() {
   if (!sync.configured()) return;
   syncBadge('syncing…');
-  try { const r = await sync.sync(); syncErr = null; syncFails = 0; syncBadge(); if (r.pulled && !$('.sheet-wrap')) render(); }
+  try { const r = await sync.sync(); syncErr = null; syncFails = 0; syncBadge(); if (r.pulled && !$('.sheet-wrap') && state.tab !== 'map') render(); }
   catch (e) {
     syncErr = navigator.onLine === false ? "Offline. What you log is saved on this phone and syncs when you're back online." : e.message;
     syncBadge(); scheduleSync(Math.min(5 * 60e3, 15e3 * 2 ** syncFails++));
@@ -437,18 +440,28 @@ const orderRow = (o, i, halalPlace) => `<li class="food eo" data-o="${i}"><div c
 
 const miles = (a, b) => { const x = (b.lo - a.lo) * Math.cos(((a.la + b.la) / 2) * Math.PI / 180), y = b.la - a.la; return Math.hypot(x, y) * 69.05; };
 const KIND = { r: 'Restaurant', g: 'Grocery', b: 'Butcher / meat market' };
-// Strongest halal evidence first: a current certificate, then a "fully halal" map tag, then a listing.
+// Strongest halal evidence first: a current certificate, then a "fully halal" tag or your own guide,
+// then a listing, then a cuisine that's usually halal (a guess, shown in grey).
 function halalLevel(p) {
+  if (p.mine) return { lv: p.halal?.status === 'full' ? 'full' : 'listed', label: `Added by you${p.halal?.status === 'full' ? ' · fully halal' : p.halal?.status === 'partial' ? ' · partly halal' : ''}` };
   if (p.guide) return p.halal?.status === 'full' ? { lv: 'full', label: 'Fully halal (your guide)' } : { lv: 'listed', label: 'Partly halal (your guide)' };
   if (p.hms) return !p.hms.until || p.hms.until >= today() ? { lv: 'cert', label: 'HMS certified · hand-slaughtered' } : { lv: 'listed', label: 'HMS certificate expired' };
   if (p.osm?.h === 'only') return { lv: 'full', label: 'Fully halal (OpenStreetMap)' };
-  return { lv: 'listed', label: p.osm ? 'Halal options (OpenStreetMap)' : p.ov === 'cat' ? 'Listed as halal (Overture Maps)' : '“Halal” in the name' };
+  if (p.osm && p.osm.h !== 'name') return { lv: 'listed', label: 'Halal options (OpenStreetMap)' };
+  if (p.ov === 'cat') return { lv: 'listed', label: 'Listed as halal (Overture Maps)' };
+  if (p.ov === 'name' || p.osm) return { lv: 'listed', label: '“Halal” in the name' };
+  return { lv: 'maybe', label: `${p.cu ? p.cu[0].toUpperCase() + p.cu.slice(1) + ' place' : 'Cuisine'}: often halal, not confirmed` };
 }
+const LV_ORDER = { cert: 0, full: 1, listed: 2, maybe: 3 };
+// data/halal/us.json format version. A phone keeps its copy for a week; an older format is fetched again now.
+const HALAL_V = 2;
+let halalChecked;
 async function halalData() {
+  await (halalChecked ??= kv.get('halal').then(d => (d && (d.v || 1) < HALAL_V ? kv.set('halal', { ...d, fetched: 0 }) : null)));
   const [hp, guides] = await Promise.all([sync.halalPlaces(), db.all('places')]);
-  const g = guides.filter(p => p.la && ['full', 'partial'].includes(p.halal?.status))
-    .map(p => ({ n: p.name, la: p.la, lo: p.lo, k: 'r', a: p.address, c: p.city, guide: p.id, halal: p.halal }));
-  // A saved guide replaces the same place from the open data.
+  // Your guides (from Claude) and spots you added yourself sit on top of the open data.
+  const g = guides.filter(p => p.la && (p.mine || ['full', 'partial'].includes(p.halal?.status)))
+    .map(p => ({ n: p.name, la: p.la, lo: p.lo, k: p.kind || 'r', a: p.address, c: p.city, guide: p.id, mine: p.mine, halal: p.halal }));
   const dup = p => g.some(x => miles(x, p) < 0.15 && x.n.toLowerCase().split(' ')[0] === p.n.toLowerCase().split(' ')[0]);
   return { all: [...g, ...hp.places.filter(p => !dup(p))], built: hp.built };
 }
@@ -462,31 +475,43 @@ const hpRow = (p, i, here) => { const h = halalLevel(p); return `<li class="food
   <div class="r1"><span class="name">${esc(p.n)}</span><span class="muted small">${here ? r1(miles(here, p)) + ' mi' : ''}</span></div>
   <div class="r2"><span class="sub">${esc([KIND[p.k], p.c].filter(Boolean).join(' · '))}</span></div><div class="why"><span class="badge lv-${h.lv}">${esc(h.label)}</span></div></div></li>`; };
 
-// Detail for one map place: halal evidence with sources, then what to do next.
+// Google Maps links: the place itself (its Google listing, reviews, hours) and turn-by-turn directions.
+const gq = p => encodeURIComponent([p.n, p.a, p.c, p.s].filter(Boolean).join(', '));
+const gmaps = p => `https://www.google.com/maps/search/?api=1&query=${gq(p)}`;
+const gdir = p => `https://www.google.com/maps/dir/?api=1&destination=${gq(p)}`;
+// Google's own halal search around a spot: catches places no open dataset has yet.
+const gHalalHere = (la, lo, z = 14) => `https://www.google.com/maps/search/halal+food/@${la.toFixed(5)},${lo.toFixed(5)},${Math.round(z)}z`;
+
+// Detail for one place: halal evidence with sources, then what to do next.
 function halalCard(p, cuisines, { head = true } = {}) {
   const h = halalLevel(p), where = [p.a, p.c, p.s].filter(Boolean).join(', ');
-  const cu = !p.guide && cuisines.find(c => new RegExp(c.match, 'i').test(p.n));
-  const best = cu ? eoOrders(cu.orders, local.get('eoF', []).filter(k => k !== 'fits'), null, true).slice(0, 3) : [];
+  const cu = !p.guide && cuisines.find(c => new RegExp(c.match, 'i').test(p.n + ' ' + (p.cu || '')));
+  const best = cu ? eoOrders(cu.orders, local.get('eoF', []).filter(k => k !== 'fits'), null, h.lv !== 'maybe').slice(0, 3) : [];
   const src = [p.hms && `<a href="${esc(p.hms.url)}" target="_blank" rel="noopener">HMS listing${p.hms.no ? ' #' + esc(p.hms.no) : ''}</a>${p.hms.until ? ', valid through ' + esc(fmtDate(p.hms.until)) : ''}`,
-    p.osm && `<a href="https://www.openstreetmap.org/${esc(p.osm.id)}" target="_blank" rel="noopener">OpenStreetMap</a> (diet:halal=${esc(p.osm.h)})`,
-    p.ov && `Overture Maps (${p.ov === 'cat' ? 'halal restaurant category' : 'name'})`,
+    p.osm && `<a href="https://www.openstreetmap.org/${esc(p.osm.id)}" target="_blank" rel="noopener">OpenStreetMap</a>${p.osm.h === 'name' ? '' : ` (diet:halal=${esc(p.osm.h)})`}`,
+    p.ov && `Overture Maps (${p.ov === 'cat' ? 'halal restaurant category' : p.ov === 'cui' ? esc(p.cu || 'cuisine') + ' category' : 'name'})`,
     p.w && `<a href="${esc(p.w)}" target="_blank" rel="noopener">Website</a>`].filter(Boolean);
-  const q = encodeURIComponent([p.n, p.a, p.c, p.s].filter(Boolean).join(' '));
+  const caveat = p.hms || p.guide ? '' : h.lv === 'maybe'
+    ? "<p class=\"small muted\">Nothing says this place is halal yet: it's here because this cuisine usually is. Check Zabihah or ask before ordering meat.</p>"
+    : '<p class="small muted">Open map data only says this place serves halal; it doesn\'t confirm the certifier, slaughter method or alcohol. Check Zabihah or ask the restaurant.</p>';
   return `<div class="hc-top">${head ? `<div class="name">${esc(p.n)}</div>` : ''}<div class="sub">${esc([KIND[p.k], where].filter(Boolean).join(' · '))}</div></div>
-    <div class="halalbox">${p.guide ? halalBadges(p.halal) : `<span class="badge lv-${h.lv}">${esc(h.label)}</span> <span class="badge">${p.hms ? 'Hand-slaughtered (HMS standard)' : SLAUGHTER.unconfirmed}</span>`}
-      ${src.length ? `<p class="small muted">Sources: ${src.join(' · ')}</p>` : ''}
-      ${p.hms || p.guide ? '' : '<p class="small muted">Open map data only says this place serves halal; it doesn\'t confirm the certifier, slaughter method or alcohol. Check Zabihah or ask the restaurant.</p>'}</div>
-    ${best.length ? `<h4>Good orders (${esc(cu.name)} playbook)</h4><ul class="list">${best.map((o, i) => orderRow(o, i, true)).join('')}</ul>` : ''}
-    <div class="hc-acts"><a class="btn" href="https://www.google.com/maps/search/?api=1&query=${q}" target="_blank" rel="noopener">${ico('nav')}Directions</a>
-      <a class="btn" href="https://www.google.com/search?q=${encodeURIComponent('site:zabihah.com ' + p.n + ' ' + (p.c || ''))}" target="_blank" rel="noopener">${ico('search')}Zabihah</a>
-      ${p.guide ? '<button id="hcGuide" class="primary">Open guide</button>' : '<button id="hcAsk" class="primary">What to order</button>'}</div>`;
+    <div class="hc-acts g"><a class="btn primary" href="${gmaps(p)}" target="_blank" rel="noopener">${ico('map')}Google Maps</a>
+      <a class="btn" href="${gdir(p)}" target="_blank" rel="noopener">${ico('nav')}Directions</a></div>
+    <div class="halalbox">${p.guide ? (p.mine ? `<span class="badge lv-${h.lv}">${esc(h.label)}</span>${p.halal?.summary ? `<p class="small">${esc(p.halal.summary)}</p>` : ''}` : halalBadges(p.halal))
+      : `<span class="badge lv-${h.lv}">${esc(h.label)}</span> <span class="badge">${p.hms ? 'Hand-slaughtered (HMS standard)' : SLAUGHTER.unconfirmed}</span>`}
+      ${src.length ? `<p class="small muted">Sources: ${src.join(' · ')}</p>` : ''}${caveat}</div>
+    ${best.length ? `<h4>Good orders (${esc(cu.name)} playbook)</h4><ul class="list">${best.map((o, i) => orderRow(o, i, h.lv !== 'maybe')).join('')}</ul>` : ''}
+    <div class="hc-acts"><a class="btn" href="https://www.google.com/search?q=${encodeURIComponent('site:zabihah.com ' + p.n + ' ' + (p.c || ''))}" target="_blank" rel="noopener">${ico('search')}Zabihah</a>
+      ${p.guide && !p.mine ? '<button id="hcGuide">Open guide</button>' : '<button id="hcAsk">What to order</button>'}
+      ${p.mine ? '<button id="hcDel" class="danger">Remove</button>' : ''}</div>`;
 }
 function bindHalalCard(el, p, cuisines) {
-  const cu = !p.guide && cuisines.find(c => new RegExp(c.match, 'i').test(p.n));
-  const orders = cu ? eoOrders(cu.orders, local.get('eoF', []).filter(k => k !== 'fits'), null, true).slice(0, 3) : [];
+  const cu = !p.guide && cuisines.find(c => new RegExp(c.match, 'i').test(p.n + ' ' + (p.cu || '')));
+  const orders = cu ? eoOrders(cu.orders, local.get('eoF', []).filter(k => k !== 'fits'), null, halalLevel(p).lv !== 'maybe').slice(0, 3) : [];
   $$('li.eo', el).forEach(li => (li.onclick = () => logOrder(p.n, orders[+li.dataset.o])));
   $('#hcAsk', el)?.addEventListener('click', () => openAsk({ place: [p.n, p.c, p.s].filter(Boolean).join(', ') }));
   $('#hcGuide', el)?.addEventListener('click', async () => openPlace(await db.get('places', p.guide)));
+  $('#hcDel', el)?.addEventListener('click', async () => { await db.remove('places', p.guide); closeSheet(); toast(`Removed ${p.n}`); mapState.reload = true; render(); });
 }
 async function openHalal(p) {
   const { cuisines } = await loadEatout();
@@ -494,56 +519,191 @@ async function openHalal(p) {
   bindHalalCard(b, p, cuisines);
 }
 
+// ---------- Map ----------
+// What's at a point (Photon reverse geocoding): { name, housenumber, street, city, state, ... } or {}.
+async function whatsHere(c) {
+  try { return (await (await fetch(`https://photon.komoot.io/reverse?lang=en&lat=${c.lat.toFixed(6)}&lon=${c.lng.toFixed(6)}`)).json()).features?.[0]?.properties || {}; }
+  catch {}
+  try { // fallback: Nominatim, mapped to Photon's field names
+    const a = (await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&lat=${c.lat}&lon=${c.lng}`)).json()).address || {};
+    return { housenumber: a.house_number, street: a.road, city: a.city || a.town || a.village, state: a.state };
+  } catch { return {}; }
+}
+// Town / address / state -> a Photon-shaped feature, from Photon or (if it's down) Nominatim.
+async function geocode(q, near) {
+  try {
+    const f = (await (await fetch(`https://photon.komoot.io/api/?limit=1&lang=en&lat=${near.lat.toFixed(3)}&lon=${near.lng.toFixed(3)}&q=${encodeURIComponent(q)}`)).json()).features?.[0];
+    if (f) return f;
+  } catch {}
+  try {
+    const r = (await (await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`)).json())[0];
+    if (!r) return null;
+    const b = r.boundingbox.map(Number);
+    return { geometry: { coordinates: [+r.lon, +r.lat] }, properties: { type: r.addresstype || r.type, extent: [b[2], b[1], b[3], b[0]] } };
+  } catch { return null; }
+}
+// Its own tab: every place on one map (clustered, so all 8,000+ fit), a drawer listing what's on screen,
+// a search for any town or address, and Google Maps one tap away for navigation or Google's own halal search.
 let leafletP;
-const loadLeaflet = () => (leafletP ??= new Promise((res, rej) => {
-  const base = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min';
-  document.head.insertAdjacentHTML('beforeend', `<link rel="stylesheet" href="${base}.css">`);
-  const s = document.createElement('script'); s.src = base + '.js';
-  s.onload = () => res(window.L); s.onerror = () => { leafletP = null; s.remove(); rej(new Error("Couldn't load the map. Check your connection.")); };
-  document.head.append(s);
-}));
-const MAP_F = [['all', 'All'], ['cert', 'Certified'], ['r', 'Restaurants'], ['gb', 'Markets & butchers']];
-async function openMap() {
-  const b = sheet(`<div class="chips mapf" id="mapF">${MAP_F.map(([k, l]) => `<button data-f="${k}" class="${k === 'all' ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="mapwrap"><div id="hmap"></div><button id="mLoc" class="mloc" aria-label="My location">${ico('locate')}</button><div id="hcard" class="hcard" hidden></div></div>
-    <p class="muted small maplegend"><span class="dot lv-cert"></span>HMS certified <span class="dot lv-full"></span>Fully halal <span class="dot lv-listed"></span>Listed as halal, not verified</p>`, { title: 'Halal map', full: true });
-  const wrap = b.closest('.sheet-wrap'); wrap.classList.add('mapsheet');
+const CDN = 'https://cdnjs.cloudflare.com/ajax/libs/';
+const loadLeaflet = () => (leafletP ??= (async () => {
+  const css = h => document.head.insertAdjacentHTML('beforeend', `<link rel="stylesheet" href="${h}">`);
+  const js = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => { s.remove(); rej(new Error("Couldn't load the map. Check your connection.")); }; document.head.append(s); });
+  css(CDN + 'leaflet/1.9.4/leaflet.min.css'); css(CDN + 'leaflet.markercluster/1.5.3/MarkerCluster.min.css');
+  await js(CDN + 'leaflet/1.9.4/leaflet.min.js');
+  await js(CDN + 'leaflet.markercluster/1.5.3/leaflet.markercluster.js');
+  return window.L;
+})().catch(e => { leafletP = null; throw e; }));
+const MAP_F = [['all', 'All'], ['sure', 'Confirmed'], ['r', 'Restaurants'], ['gb', 'Markets & butchers'], ['maybe', 'Likely']];
+const mapState = { f: local.get('mapF', 'all'), likely: local.get('mapLikely', true), sel: null, reload: false };
+const COLOR = { cert: '#34c759', full: '#5ac8fa', listed: '#ff9f0a', maybe: '#9a9aa2' };
+const passes = p => {
+  const lv = halalLevel(p).lv, f = mapState.f;
+  if (lv === 'maybe' && !mapState.likely && f !== 'maybe') return false;
+  return f === 'all' ? true : f === 'sure' ? lv === 'cert' || lv === 'full' : f === 'r' ? p.k === 'r' : f === 'gb' ? p.k !== 'r' : f === 'maybe' ? lv === 'maybe' : true;
+};
+
+function viewMap() {
+  return `<div class="mapview">
+    <form class="mtop" id="mSearch"><input id="mQ" type="search" placeholder="Search a town, address or place" value="${esc(mapState.q || '')}" enterkeyhint="search"><button class="primary" aria-label="Search">${ico('search')}</button></form>
+    <div class="chips mapf" id="mapF">${MAP_F.map(([k, l]) => `<button data-f="${k}" class="${k === mapState.f ? 'on' : ''}">${l}</button>`).join('')}
+      <button data-likely class="${mapState.likely ? 'on' : ''} tog">${mapState.likely ? 'Showing' : 'Hiding'} likely</button></div>
+    <div class="mapwrap"><div id="hmap"></div>
+      <button id="mLoc" class="mloc" aria-label="My location">${ico('locate')}</button>
+      <button id="mAdd" class="madd" aria-label="Add a halal spot">${ico('plus')}</button>
+      <div id="cross" class="cross" hidden></div>
+      <a id="gHere" class="ghere" target="_blank" rel="noopener">${ico('search')}Halal here in Google Maps</a></div>
+    <div class="drawer" id="drawer"><button class="dh" id="dh"><span class="grab"></span><span id="dhT">Loading places…</span></button><div class="dbody" id="dbody"></div></div>
+  </div>`;
+}
+bind.map = async root => {
+  // The map fills the screen between the app bar and the nav.
+  const fit = () => { const v = $('.mapview', root); if (v) v.style.height = innerHeight - $('header.top').offsetHeight - $('nav').offsetHeight + 'px'; };
+  fit(); addEventListener('resize', fit);
   let L, data, cuisines;
-  try { [L, data, { cuisines }] = await Promise.all([loadLeaflet(), halalData(), loadEatout()]); } catch (e) { $('#hmap', b).innerHTML = `<p class="muted pad">${esc(e.message)}</p>`; return; }
-  if (!$('#hmap', b)?.isConnected) return;
+  try { [L, data, { cuisines }] = await Promise.all([loadLeaflet(), halalData(), loadEatout()]); }
+  catch (e) { $('#hmap', root).innerHTML = `<p class="muted pad">${esc(e.message)}</p>`; return; }
+  if (!$('#hmap', root)?.isConnected) return;
   const dark = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() === '#000';
-  const start = local.get('lastLoc', null) || HOME;
-  const map = L.map($('#hmap', b), { zoomControl: false, preferCanvas: true }).setView([start.la, start.lo], local.get('lastLoc', null) ? 13 : 11);
-  wrap._cleanup = () => map.remove();
-  // Standard OSM tiles; dark mode inverts them in CSS (.dark-tiles).
+  const v = local.get('mapView', null), start = v || local.get('lastLoc', null) || HOME;
+  const map = L.map($('#hmap', root), { zoomControl: false }).setView([start.la, start.lo], v?.z || (local.get('lastLoc', null) ? 13 : 11));
+  state.mapCleanup = () => { ro.disconnect(); map.remove(); removeEventListener('resize', fit); state.mapCleanup = null; };
+  const ro = new ResizeObserver(() => map.invalidateSize()); ro.observe($('#hmap', root));
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19,
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Overture · HMS' }).addTo(map);
-  $('#hmap', b).classList.toggle('dark-tiles', dark);
-  const COLOR = { cert: '#34c759', full: '#5ac8fa', listed: '#ff9f0a' };
-  const layer = L.layerGroup().addTo(map), card = $('#hcard', b);
-  let you, f = 'all';
-  const show = p => { card.hidden = false; card.innerHTML = halalCard(p, cuisines); bindHalalCard(card, p, cuisines); };
+  map.attributionControl.setPosition('topleft'); // the drawer covers the bottom of the map
+  $('#hmap', root).classList.toggle('dark-tiles', dark);
+  // Clusters show how many places sit under them, colored by the best evidence inside.
+  const clusters = L.markerClusterGroup({ chunkedLoading: true, showCoverageOnHover: false, maxClusterRadius: 48, spiderfyOnMaxZoom: true,
+    iconCreateFunction: c => {
+      const lv = c.getAllChildMarkers().reduce((b, m) => (LV_ORDER[m.options.lv] < LV_ORDER[b] ? m.options.lv : b), 'maybe'), n = c.getChildCount();
+      return L.divIcon({ html: `<span>${n < 1000 ? n : Math.round(n / 100) / 10 + 'k'}</span>`, className: `hcl lv-${lv}`, iconSize: [36, 36] });
+    } }).addTo(map);
+  let you, shown = [], adding = false;
   const draw = () => {
-    layer.clearLayers();
-    for (const p of data.all) {
-      const h = halalLevel(p);
-      if (f === 'cert' ? h.lv !== 'cert' : f === 'r' ? p.k !== 'r' : f === 'gb' ? p.k === 'r' : false) continue;
-      L.circleMarker([p.la, p.lo], { radius: p.guide ? 9 : 7, color: p.guide ? '#ff6150' : dark ? '#000' : '#fff', weight: p.guide ? 3 : 1.5, fillColor: COLOR[h.lv], fillOpacity: 0.95, bubblingMouseEvents: false })
-        .on('click', () => show(p)).addTo(layer);
-    }
+    clusters.clearLayers();
+    shown = data.all.filter(passes);
+    clusters.addLayers(shown.map(p => {
+      const lv = halalLevel(p).lv;
+      return L.circleMarker([p.la, p.lo], { lv, radius: p.guide ? 9 : lv === 'maybe' ? 6 : 8, color: p.guide ? '#ff6150' : dark ? '#000' : '#fff', weight: p.guide ? 3 : 1.5,
+        fillColor: COLOR[lv], fillOpacity: 0.95, bubblingMouseEvents: false }).on('click', () => select(p));
+    }));
+    list();
   };
+  const dr = $('#drawer', root), dbody = $('#dbody', root), dhT = $('#dhT', root);
+  const setDrawer = st => { dr.className = 'drawer ' + st; };
+  // Drawer: the places in view, nearest to the middle of the map first.
+  const list = () => {
+    if (mapState.sel || adding || !root.contains(dbody)) return;
+    const b = map.getBounds(), c = map.getCenter(), mid = { la: c.lat, lo: c.lng }, you = local.get('lastLoc', null);
+    const here = you && miles(you, mid) < 60 ? you : null; // distances only when you're near what's on screen
+    const inView = shown.filter(p => b.contains([p.la, p.lo])).sort((a, b2) => miles(mid, a) - miles(mid, b2));
+    const sure = inView.filter(p => halalLevel(p).lv !== 'maybe').length;
+    dhT.textContent = inView.length ? `${inView.length.toLocaleString()} place${inView.length === 1 ? '' : 's'} here${inView.length > sure ? ` · ${sure} with halal listed` : ''}` : 'Nothing here yet: try Google Maps above';
+    state.mapList = inView.slice(0, 60);
+    dbody.innerHTML = inView.length ? `<ul class="list">${state.mapList.map((p, i) => hpRow(p, i, here)).join('')}</ul>${inView.length > 60 ? '<p class="muted small pad">Zoom in to see the rest.</p>' : ''}`
+      : `<p class="muted pad">No places in the data here. Google Maps' own search (the button on the map) covers places nobody has tagged yet, and you can add one with +.</p>`;
+    $$('li.hp', dbody).forEach(li => (li.onclick = () => select(state.mapList[+li.dataset.h], true)));
+    $('#gHere', root).href = gHalalHere(c.lat, c.lng, map.getZoom());
+  };
+  const select = (p, pan) => {
+    mapState.sel = p;
+    if (pan) map.setView([p.la, p.lo], Math.max(map.getZoom(), 15));
+    dhT.innerHTML = `${ico('back')} All places here`;
+    dbody.innerHTML = `<div class="pcard">${halalCard(p, cuisines)}</div>`;
+    bindHalalCard(dbody, p, cuisines);
+    setDrawer('open'); dbody.scrollTop = 0;
+  };
+  $('#dh', root).onclick = () => {
+    if (adding) return stopAdd();
+    if (mapState.sel) { mapState.sel = null; list(); return setDrawer(''); }
+    setDrawer(dr.classList.contains('open') ? '' : 'open');
+  };
+  map.on('moveend', () => { local.set('mapView', { la: map.getCenter().lat, lo: map.getCenter().lng, z: map.getZoom() }); list(); });
+  map.on('click', () => { if (mapState.sel) { mapState.sel = null; list(); setDrawer(''); } });
   draw();
-  map.on('click', () => (card.hidden = true));
-  $$('#mapF button', b).forEach(x => (x.onclick = () => { f = x.dataset.f; $$('#mapF button', b).forEach(y => y.classList.toggle('on', y === x)); card.hidden = true; draw(); }));
+
+  $$('#mapF button', root).forEach(x => (x.onclick = () => {
+    if (x.hasAttribute('data-likely')) { mapState.likely = !mapState.likely; local.set('mapLikely', mapState.likely); x.classList.toggle('on', mapState.likely); x.textContent = `${mapState.likely ? 'Showing' : 'Hiding'} likely`; }
+    else { mapState.f = x.dataset.f; local.set('mapF', mapState.f); $$('#mapF button[data-f]', root).forEach(y => y.classList.toggle('on', y === x)); }
+    mapState.sel = null; draw();
+  }));
   const locate = async () => {
     const l = await getLoc(); if (!l) return toast('Location is off; showing the last place you looked');
-    you?.remove(); you = L.circleMarker([l.la, l.lo], { radius: 6, color: '#fff', weight: 2, fillColor: '#0a84ff', fillOpacity: 1 }).addTo(map);
-    map.setView([l.la, l.lo], 12);
+    you?.remove(); you = L.circleMarker([l.la, l.lo], { radius: 7, color: '#fff', weight: 2, fillColor: '#0a84ff', fillOpacity: 1 }).addTo(map);
+    map.setView([l.la, l.lo], 13);
   };
-  $('#mLoc', b).onclick = locate;
-  if (!local.get('lastLoc', null)) locate();
-  setTimeout(() => map.invalidateSize(), 60);
-}
+  $('#mLoc', root).onclick = locate;
+  if (!v && !local.get('lastLoc', null)) locate();
+
+  // Search: a town, state or address goes to that area; otherwise a place by name anywhere in the data.
+  $('#mSearch', root).onsubmit = async e => {
+    e.preventDefault();
+    const q = $('#mQ', root).value.trim(); mapState.q = q; $('#mQ', root).blur();
+    if (!q) return;
+    const ql = q.toLowerCase(), hits = q.length >= 3 ? data.all.filter(p => p.n.toLowerCase().includes(ql)) : [];
+    const f = await geocode(q, map.getCenter());
+    mapState.sel = null;
+    const area = f && ['city', 'state', 'county', 'district', 'locality', 'postcode', 'house', 'street'].includes(f.properties.type) && f.properties.osm_key !== 'amenity';
+    if (hits.length && hits.length <= 40 && !area) {
+      map.fitBounds(L.latLngBounds(hits.map(p => [p.la, p.lo])).pad(0.3), { maxZoom: 15 });
+      if (hits.length === 1) setTimeout(() => select(hits[0]), 400);
+      return;
+    }
+    if (!f) return toast(navigator.onLine === false ? 'Search needs a connection' : `Couldn't find “${q}”`);
+    const ex = f.properties.extent, [lo, la] = f.geometry.coordinates;
+    if (ex) map.fitBounds([[ex[3], ex[0]], [ex[1], ex[2]]], { maxZoom: 15 }); else map.setView([la, lo], 16);
+  };
+
+  // Add a spot you know: aim the crosshair, name it, done. Saved to your synced places (data/fuel/places.json).
+  // The crosshair sits in the middle of the map area above the form, not the middle of the whole map.
+  const aim = () => { const z = map.getSize(); return map.containerPointToLatLng([z.x / 2, z.y * 0.25]); };
+  const stopAdd = () => { adding = false; state.mapAddOff?.(); $('#cross', root).hidden = true; setDrawer(''); list(); };
+  $('#mAdd', root).onclick = () => {
+    adding = true; mapState.sel = null; $('#cross', root).hidden = false; setDrawer('add');
+    dhT.innerHTML = `${ico('back')} Cancel`;
+    dbody.innerHTML = `<form class="form addspot" id="addF"><p class="hint">Move the map so the crosshair sits on the place, then name it.</p>
+      <label>Name<input name="n" required placeholder="e.g. Tasty K"></label>
+      <div class="seg" id="addH"><button type="button" data-h="full">Fully halal</button><button type="button" data-h="partial">Partly halal</button><button type="button" data-h="unknown" class="on">Not sure</button></div>
+      <label>Note (optional)<input name="note" placeholder="e.g. halal chicken, ask for no pork bacon"></label>
+      <button class="primary wide">Save spot</button></form>`;
+    let hs = 'unknown';
+    // Prefill the name when OpenStreetMap already has a business under the crosshair.
+    const fill = async () => { const a = await whatsHere(aim()), n = $('#addF input[name=n]', dbody); if (n && !n.dataset.typed && a.name && a.osm_key !== 'highway' && a.type === 'house') n.value = a.name; };
+    fill(); map.on('moveend', fill); state.mapAddOff = () => map.off('moveend', fill);
+    $('#addF input[name=n]', dbody).oninput = e => (e.target.dataset.typed = e.target.value ? 1 : '');
+    $$('#addH button', dbody).forEach(b => (b.onclick = () => { hs = b.dataset.h; $$('#addH button', dbody).forEach(x => x.classList.toggle('on', x === b)); }));
+    $('#addF', dbody).onsubmit = async e => {
+      e.preventDefault();
+      const fd = new FormData(e.target), c = aim();
+      const a = await whatsHere(c), city = [a.city || a.town || a.village || a.district, a.state].filter(Boolean).join(', '), address = [a.housenumber, a.street].filter(Boolean).join(' ');
+      const p = await db.put('places', { name: fd.get('n').trim(), city, address, la: +c.lat.toFixed(5), lo: +c.lng.toFixed(5), mine: true, orders: [],
+        halal: { status: hs, summary: fd.get('note').trim() || undefined, source: 'you', checked: today() } });
+      toast(`Added ${p.name}`); scheduleSync(1500);
+      data = await halalData(); stopAdd(); draw();
+    };
+  };
+};
 
 async function viewEatOut() {
   const [{ cuisines }, places, hd] = await Promise.all([loadEatout(), db.all('places'), halalData()]);
@@ -556,7 +716,9 @@ async function viewEatOut() {
   // Halal places: search hits by name or town, else the closest restaurants.
   const pool = hd.all.filter(p => !p.guide);
   const near = q.length >= 3 ? pool.filter(p => hit(p.n, p.c)).sort((a, b) => (here ? miles(here, a) - miles(here, b) : 0)).slice(0, 8)
-    : here ? pool.filter(p => p.k === 'r').map(p => [miles(here, p), p]).filter(([d]) => d < 40).sort((a, b) => a[0] - b[0]).slice(0, 5).map(x => x[1]) : [];
+    // Listed-as-halal places first; "likely" (cuisine-only) ones only fill in after them.
+    : here ? pool.filter(p => p.k === 'r').map(p => [miles(here, p), p]).filter(([d]) => d < 40)
+      .sort((a, b) => (halalLevel(a[1]).lv === 'maybe') - (halalLevel(b[1]).lv === 'maybe') || a[0] - b[0]).slice(0, 6).map(x => x[1]) : [];
   state.eo = { ps, cs, rem, near };
   const best = (orders, hp) => eoOrders(orders, f, rem, hp)[0];
   const placeRow = (p, i) => { const b = best(p.orders, ['full', 'partial'].includes(p.halal?.status)); return `<li class="food place" data-p="${i}"><div class="grow">
@@ -572,7 +734,7 @@ async function viewEatOut() {
   return `<div class="row eoq"><input id="eoQ" type="search" placeholder="Restaurant, town or cuisine" value="${esc(state.eoQ || '')}" enterkeyhint="search"><button class="primary" id="eoAsk">Ask Claude</button></div>
     <div class="chips" id="eoChips">${EO_CHIPS.map(([k, l]) => `<button data-c="${k}" class="${f.includes(k) ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${fitsHint}
-    <button class="mapcard" id="eoMap">${ico('map')}<div class="grow"><div class="name">Halal map</div><div class="sub">${hd.all.length ? `${hd.all.length.toLocaleString()} US places${nCert ? ` · ${nCert} HMS certified` : ''}` : 'Loads after your next sync'}</div></div><span class="chev">›</span></button>
+    <button class="mapcard" id="eoMap">${ico('map')}<div class="grow"><div class="name">Halal map</div><div class="sub">${hd.all.length ? `${hd.all.length.toLocaleString()} US places${nCert ? ` · ${nCert} HMS certified` : ''} · Google Maps on each` : 'Loads after your next sync'}</div></div><span class="chev">›</span></button>
     ${near.length ? `<h4 class="eoh">${q.length >= 3 ? 'Halal places' : 'Halal near you'}</h4><ul class="list card ideas">${near.map((p, i) => hpRow(p, i, here)).join('')}</ul>`
       : !here && !q ? `<button class="wide" id="eoLoc">${ico('locate')}Show halal places near me</button>` : ''}
     ${ps.length ? `<h4 class="eoh">Your guides</h4><ul class="list card ideas">${ps.map(placeRow).join('')}</ul>` : ''}
@@ -588,7 +750,7 @@ bind.out = root => {
   }));
   $('#eoAsk', root).onclick = () => openAsk({ place: $('#eoQ', root).value.trim() });
   $('#eoPhoto', root).onclick = () => openAsk({ place: $('#eoQ', root).value.trim(), photo: true });
-  $('#eoMap', root).onclick = () => openMap();
+  $('#eoMap', root).onclick = () => { state.tab = 'map'; scrollTo(0, 0); render(); };
   $('#eoLoc', root)?.addEventListener('click', async () => { if (await getLoc()) render(); else toast('Location is off for this app'); });
   $$('li.place', root).forEach(li => (li.onclick = () => openPlace(state.eo.ps[+li.dataset.p])));
   $$('li.cuisine', root).forEach(li => (li.onclick = () => openCuisine(state.eo.cs[+li.dataset.c])));
@@ -662,7 +824,7 @@ async function openAsk({ place = '', cuisine = '', photo = false } = {}) {
 }
 
 // ---------- boot ----------
-const views = { cook: viewCook, out: viewEatOut, deals: viewDeals };
+const views = { cook: viewCook, out: viewEatOut, map: viewMap, deals: viewDeals };
 $$('nav button').forEach(b => {
   b.insertAdjacentHTML('afterbegin', ico(b.dataset.tab));
   b.onclick = () => {
