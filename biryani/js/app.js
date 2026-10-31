@@ -11,6 +11,7 @@ import { bars, line, ema, bindCharts } from './charts.js';
 import * as voice from './voice.js';
 import * as train from './trainview.js';
 import * as lifts from './lifts.js';
+import * as tasks from './tasks.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -42,6 +43,9 @@ const ICONS = {
   knee: '<path d="M12 2v8l-3 4v8M12 10l4 4v8"/><circle cx="12" cy="12" r="2.5"/>',
   pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
   pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
+  tasks: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>',
+  cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 7H6"/>',
+  note: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
 };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
 
@@ -51,7 +55,7 @@ const state = { date: today(), today: today(), tab: local.get('tab', 'today'), s
 async function render() {
   state.s = await db.settings();
   if (state.tab === 'recipes') state.tab = 'foods';
-  const views = { today: viewToday, training: () => train.view(state.s, ui), trends: viewTrends, foods: viewFoods, settings: viewSettings };
+  const views = { today: viewToday, training: () => train.view(state.s, ui), trends: viewTrends, foods: viewFoods, tasks: () => tasks.view(state.s, ui), settings: viewSettings };
   if (!views[state.tab]) state.tab = 'today'; // e.g. the old Explore tab, now its own app at ../explore/
   local.set('tab', state.tab);
   if (state.tab === 'recipes') state.tab = 'foods';
@@ -62,10 +66,21 @@ async function render() {
   document.body.classList.toggle('today', state.tab === 'today');
   $('#datenav').innerHTML = state.tab === 'today' ? `<button id="prev" aria-label="Previous day">${ico('prev')}</button><button id="dateLbl">${ico('cal')}${fmtDate(state.date)}</button><button id="next" aria-label="Next day">${ico('next')}</button>` : '';
   if (state.tab === 'training') train.bind(main, state.s, ui);
+  if (state.tab === 'tasks') tasks.bind(main, state.s, ui);
   bind[state.tab]?.(main);
   $('#gear').classList.toggle('on', state.tab === 'settings');
   $('#trendsBtn').classList.toggle('on', state.tab === 'trends');
   syncBadge();
+  taskBadge();
+}
+// Overdue + due-today count on the Tasks tab button.
+async function taskBadge() {
+  const btn = $('nav button[data-tab="tasks"]'); if (!btn) return;
+  const n = await tasks.dueCount().catch(() => 0);
+  let b = $('.nbadge', btn);
+  if (!n) return b?.remove();
+  if (!b) { b = document.createElement('span'); b.className = 'nbadge'; btn.append(b); }
+  b.textContent = n > 9 ? '9+' : n;
 }
 // Sync problems show in the header only (tap it for details) and retry on their own,
 // so a failed save never pops up over what you're doing. Your entries stay on the phone meanwhile.
@@ -1312,6 +1327,10 @@ async function viewSettings() {
     <label class="check"><input type="checkbox" name="netCarbs" ${s.netCarbs ? 'checked' : ''}> Show net carbs (carbs − fiber)</label>
     <label>Meals (one name = a single running list for the day; commas = separate meals)<input name="meals" value="${esc(s.meals.join(', '))}"></label>
   </form></details>
+  <details><summary>Tasks & quick add</summary><form id="tset" class="form">
+    <label>When the app opens<select name="launchTo"><option value="last" ${local.get('launchTo', 'last') === 'last' ? 'selected' : ''}>Where I left off</option><option value="quick" ${local.get('launchTo', 'last') === 'quick' ? 'selected' : ''}>Quick add with the mic on</option></select></label>
+    <p class="muted small">Pick "Quick add" if you open Baro's from the side button: you land on the mic and can say a task, groceries or food. Also after 10+ minutes away.</p>
+  </form></details>
   <details><summary>Sync & Garmin</summary><form id="gh" class="form">
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
     <div class="grid2"><label>Repo<input name="ghRepo" value="${esc(local.get('ghRepo', 'safaangit/safaan-personal'))}"></label><label>Branch<input name="ghBranch" value="${esc(local.get('ghBranch', ''))}" placeholder="repo default"></label></div>
@@ -1380,6 +1399,7 @@ bind.settings = root => {
     if (!s.meals.length) s.meals = ['Meal 1'];
     await db.saveSettings(s); toast('Saved');
   };
+  $('#tset', root).onchange = e => { local.set('launchTo', e.currentTarget.launchTo.value); toast('Saved on this device'); };
   $('#gh', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); syncBadge(); };
   $('#keys', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); toast('Saved on this device'); };
   $('#syncNow', root).onclick = async () => {
@@ -1431,7 +1451,9 @@ async function openRecommend() {
 
 // ---------- boot ----------
 // Helpers the Training tab module borrows.
-const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render, goDay: d => { state.date = d; state.tab = 'today'; render(); } };
+const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render, swipeToDelete, goDay: d => { state.date = d; state.tab = 'today'; render(); },
+  // Food lines from the Tasks quick add ("chicken 8.5 oz") open the voice logger with that text filled in.
+  logFoodText: text => { vstate = { text, rows: [] }; openVoice({ autostart: false }); $('#vt')?.dispatchEvent(new Event('input')); } };
 $$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ico(b.dataset.tab)));
 $('#gear').innerHTML = ico('settings');
 $('#trendsBtn').innerHTML = ico('trends');
@@ -1444,8 +1466,11 @@ function defaultMeal() {
 }
 db.onChange(() => scheduleSync());
 addEventListener('online', () => scheduleSync(500));
+let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') return runSync();
+  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return runSync(); }
+  // Reopened after 10+ minutes away with "open to Quick add" on: same as a fresh launch.
+  if (hiddenAt && Date.now() - hiddenAt > 10 * 60e3 && local.get('launchTo', 'last') === 'quick' && !$('.sheet-wrap')) { state.tab = 'tasks'; render().then(() => tasks.openQuick(state.s, ui)); }
   // Left open overnight: a diary that was on "Today" moves to the new day instead of logging into yesterday.
   if (state.today !== today()) { if (state.date === state.today) state.date = today(); state.today = today(); render(); }
   scheduleSync(500);
@@ -1453,9 +1478,12 @@ document.addEventListener('visibilitychange', () => {
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
 // Home-screen shortcuts (long-press the icon, or a Quick Tap / side-button action) open ?do=voice|add|scan.
 async function launchAction() {
-  const u = new URL(location.href), act = u.searchParams.get('do');
+  const u = new URL(location.href);
+  // Settings → "When the app opens": jump straight into Quick add (for a side-button / double-press launch).
+  const act = u.searchParams.get('do') || (local.get('launchTo', 'last') === 'quick' ? 'task' : null);
   if (!act) return;
   u.searchParams.delete('do'); history.replaceState(null, '', u.pathname + u.search + u.hash);
+  if (act === 'task' || act === 'groceries') { state.tab = 'tasks'; await render(); return tasks.openQuick(state.s, ui, { mode: act === 'groceries' ? 'groceries' : 'tasks' }); }
   if (state.tab !== 'today' || state.date !== today()) { state.tab = 'today'; state.date = today(); await render(); }
   if (act === 'voice') openVoice();
   else if (act === 'add') openAdd(defaultMeal());
