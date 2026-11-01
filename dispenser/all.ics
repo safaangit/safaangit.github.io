@@ -1,0 +1,58 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//safaangit//dispenser//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:dispenser-weekly@safaangit.github.io
+DTSTAMP:20261101T180000Z
+DTSTART:20261108T100000
+DTEND:20261108T101500
+RRULE:FREQ=WEEKLY;BYDAY=SU
+SUMMARY:Water dispenser: empty the ice bin
+DESCRIPTION:Dump old ice\, wipe the ice bin and scoop with soapy water\, d
+ ry. Empty and wipe the drip tray. Steps: https://safaangit.github.io/disp
+ enser/
+URL:https://safaangit.github.io/dispenser/
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Water dispenser: empty the ice bin
+TRIGGER:PT0M
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:dispenser-monthly@safaangit.github.io
+DTSTAMP:20261101T180000Z
+DTSTART:20261205T100000
+DTEND:20261205T110000
+RRULE:FREQ=MONTHLY;BYDAY=1SA
+SUMMARY:Water dispenser: vinegar clean
+DESCRIPTION:Half white vinegar\, half water in. Hold the ice button 3 seco
+ nds (self-clean\, about 10 min). Drain at the back. Run 2 more cycles wit
+ h plain water. Steps: https://safaangit.github.io/dispenser/
+URL:https://safaangit.github.io/dispenser/
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Water dispenser: vinegar clean
+TRIGGER:PT0M
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:dispenser-quarterly@safaangit.github.io
+DTSTAMP:20261101T180000Z
+DTSTART:20270206T100000
+DTEND:20270206T113000
+RRULE:FREQ=MONTHLY;INTERVAL=3;BYDAY=1SA
+SUMMARY:Water dispenser: deep clean (bleach)
+DESCRIPTION:Unplug. Drain. 1 tablespoon plain bleach per gallon of water\,
+  sit 5 min\, run out every tap. Rinse 4 times with fresh water. Do the vi
+ negar clean after. Never mix bleach and vinegar. Steps: https://safaangit
+ .github.io/dispenser/
+URL:https://safaangit.github.io/dispenser/
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Water dispenser: deep clean (bleach)
+TRIGGER:PT0M
+END:VALARM
+END:VEVENT
+END:VCALENDAR

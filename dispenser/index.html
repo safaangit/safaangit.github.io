@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Water Dispenser Care</title>
+<meta name="description" content="Simple cleaning steps and calendar reminders for the VECYS water dispenser with ice maker.">
+<meta name="theme-color" content="#f5f5f7">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>">
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--fg:#1d1d1f;--fg2:#424245;--muted:#6e6e73;--border:#d2d2d7;--soft:#e8e8ed;--accent:#0071e3;--accent-on:#fff;--link:#0066cc;--danger:#c4161c;--danger-bg:#fdecec;--ok:#16a34a;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000;--card:#1c1c1e;--fg:#f5f5f7;--fg2:#d2d2d7;--muted:#a1a1a6;--border:#3a3a3c;--soft:#2c2c2e;--accent:#0a84ff;--link:#2997ff;--danger:#ff6961;--danger-bg:#3a1414;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#000;--card:#1c1c1e;--fg:#f5f5f7;--fg2:#d2d2d7;--muted:#a1a1a6;--border:#3a3a3c;--soft:#2c2c2e;--accent:#0a84ff;--link:#2997ff;--danger:#ff6961;--danger-bg:#3a1414;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:19px/1.5 -apple-system,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif}
+main{max-width:640px;margin:0 auto;padding:28px 16px calc(40px + env(safe-area-inset-bottom))}
+h1{font:600 34px/1.1 -apple-system,"SF Pro Display","Helvetica Neue",sans-serif;letter-spacing:-.02em;margin:0 0 8px}
+h2{font:600 24px/1.2 -apple-system,"SF Pro Display","Helvetica Neue",sans-serif;letter-spacing:-.01em;margin:0}
+.lede{color:var(--fg2);margin:0 0 20px}
+.card{background:var(--card);border-radius:18px;padding:20px;margin:0 0 16px}
+.when{display:inline-block;font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.time{color:var(--muted);font-size:16px;margin:4px 0 12px}
+ol,ul{margin:0;padding-left:1.3em}
+li{margin:0 0 10px}
+li:last-child{margin-bottom:0}
+a{color:var(--link)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:56px;border-radius:980px;background:var(--accent);color:var(--accent-on);font-weight:600;font-size:19px;text-decoration:none;padding:0 22px;margin:16px 0 0}
+.btn.sec{background:transparent;color:var(--link);border:1.5px solid var(--border);min-height:48px;font-size:17px;margin-top:10px}
+.gcal{display:block;text-align:center;font-size:15px;margin-top:10px;color:var(--muted)}
+.gcal a{color:var(--muted)}
+.hero .btn{margin-top:4px}
+.small{font-size:15px;color:var(--muted);margin:10px 0 0}
+.check{list-style:none;padding:0}
+.check li{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--soft);margin:0}
+.check li:first-child{border-top:0;padding-top:0}
+.check input{appearance:none;-webkit-appearance:none;flex:none;width:28px;height:28px;border:2px solid var(--border);border-radius:50%;margin:1px 0 0;cursor:pointer;display:grid;place-content:center}
+.check input:checked{background:var(--ok);border-color:var(--ok)}
+.check input:checked::after{content:"";width:8px;height:14px;border:solid #fff;border-width:0 3px 3px 0;transform:rotate(45deg) translate(-1px,-2px)}
+.check input:checked+span{color:var(--muted);text-decoration:line-through}
+.warn{background:var(--danger-bg)}
+.warn h2{color:var(--danger)}
+.buy{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--soft);text-decoration:none;color:var(--fg)}
+.buy:first-of-type{border-top:0}
+.buy b{display:block;font-weight:600}
+.buy span{color:var(--muted);font-size:15px}
+.buy i{font-style:normal;color:var(--link);font-weight:600;white-space:nowrap;font-size:17px}
+footer{color:var(--muted);font-size:14px;text-align:center;margin-top:24px}
+</style>
+</head>
+<body>
+<main>
+  <h1>💧 Water Dispenser Care</h1>
+  <p class="lede">For the VECYS water and ice machine. Do the first clean once, then just follow the reminders.</p>
+
+  <section class="card hero">
+    <h2>📅 Get reminders</h2>
+    <p class="time">Adds 3 repeating reminders to your iPhone Calendar. Tap the button, then tap <b>Add All</b>.</p>
+    <a class="btn" href="all.ics">Add all reminders</a>
+    <p class="small">Every Sunday: ice bin · First Saturday of the month: vinegar clean · Every 3 months: deep clean</p>
+  </section>
+
+  <section class="card">
+    <span class="when">Do once, before using it</span>
+    <h2>🧽 First clean</h2>
+    <p class="time">It's used, so clean it before you drink from it. About 1 hour. Tap each step when it's done.</p>
+    <ul class="check" id="first">
+      <li><input type="checkbox" aria-label="Done"><span><b>Unplug it.</b> Take off the water bottle.</span></li>
+      <li><input type="checkbox" aria-label="Done"><span><b>Drain old water.</b> Put a bucket or bowl under the cap on the back and open it. Close it when empty.</span></li>
+      <li><input type="checkbox" aria-label="Done"><span><b>Wash the loose parts</b> (ice basket, scoop, drip tray) in the sink with dish soap and warm water.</span></li>
+      <li><input type="checkbox" aria-label="Done"><span><b>Mix bleach water:</b> 1 gallon of water + 1 tablespoon of plain bleach. Put it in where the water normally goes.</span></li>
+      <li><input type="checkbox" aria-label="Done"><span><b>Plug in and wait 5 minutes.</b> Then press every tap (cold, room, hot) until it runs out.</span></li>
+      <li><input type="checkbox" aria-label="Done"><span><b>Rinse 4 times.</b> Fill with fresh water and run it out of every tap, 4 times. No bleach smell = done.</span></li>
+      <li><input type="checkbox" aria-label="Done"><span><b>Run self-clean.</b> Fill with fresh water, hold the <b>ice button for 3 seconds</b>. It cleans itself for about 10 minutes. Drain at the back.</span></li>
+      <li><input type="checkbox" aria-label="Done"><span><b>Throw out the first 2–3 batches of ice.</b> Then it's ready.</span></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <span class="when">Every week</span>
+    <h2>🧊 Empty the ice bin</h2>
+    <p class="time">5 minutes. The ice bin is not a freezer, so old ice melts and sits.</p>
+    <ol>
+      <li>Dump any old ice.</li>
+      <li>Wipe the ice bin and scoop with soapy water, then dry.</li>
+      <li>Empty and wipe the drip tray.</li>
+    </ol>
+    <a class="btn sec" href="weekly.ics">Add this reminder only</a>
+    <span class="gcal">Use Google Calendar? <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=Water+dispenser%3A+empty+the+ice+bin&amp;dates=20261108T100000%2F20261108T101500&amp;details=Dump+old+ice%2C+wipe+the+ice+bin+and+scoop+with+soapy+water%2C+dry.+Empty+and+wipe+the+drip+tray.+Steps%3A+https%3A%2F%2Fsafaangit.github.io%2Fdispenser%2F&amp;recur=RRULE%3AFREQ%3DWEEKLY%3BBYDAY%3DSU">Add it there</a></span>
+  </section>
+
+  <section class="card">
+    <span class="when">Every month</span>
+    <h2>🍶 Vinegar clean</h2>
+    <p class="time">About 30 minutes. Stops white crust and keeps the ice tasting clean.</p>
+    <ol>
+      <li>Mix half white vinegar, half water and put it in where the water goes.</li>
+      <li>Hold the <b>ice button for 3 seconds</b> to start self-clean (about 10 minutes).</li>
+      <li>Drain at the back.</li>
+      <li>Fill with plain water and run self-clean <b>2 more times</b> to wash out the vinegar.</li>
+    </ol>
+    <a class="btn sec" href="monthly.ics">Add this reminder only</a>
+    <span class="gcal">Use Google Calendar? <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=Water+dispenser%3A+vinegar+clean&amp;dates=20261205T100000%2F20261205T110000&amp;details=Half+white+vinegar%2C+half+water+in.+Hold+the+ice+button+3+seconds+%28self-clean%2C+about+10+min%29.+Drain+at+the+back.+Run+2+more+cycles+with+plain+water.+Steps%3A+https%3A%2F%2Fsafaangit.github.io%2Fdispenser%2F&amp;recur=RRULE%3AFREQ%3DMONTHLY%3BBYDAY%3D1SA">Add it there</a></span>
+  </section>
+
+  <section class="card">
+    <span class="when">Every 3 months</span>
+    <h2>✨ Deep clean</h2>
+    <p class="time">About 1 hour. On these days, skip that month's vinegar clean, it's included.</p>
+    <ol>
+      <li>Do steps 1 to 6 of the <b>First clean</b> above (bleach, then rinse 4 times).</li>
+      <li>Then do the <b>Vinegar clean</b>.</li>
+    </ol>
+    <a class="btn sec" href="quarterly.ics">Add this reminder only</a>
+    <span class="gcal">Use Google Calendar? <a href="https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=Water+dispenser%3A+deep+clean+%28bleach%29&amp;dates=20270206T100000%2F20270206T113000&amp;details=Unplug.+Drain.+1+tablespoon+plain+bleach+per+gallon+of+water%2C+sit+5+min%2C+run+out+every+tap.+Rinse+4+times+with+fresh+water.+Do+the+vinegar+clean+after.+Never+mix+bleach+and+vinegar.+Steps%3A+https%3A%2F%2Fsafaangit.github.io%2Fdispenser%2F&amp;recur=RRULE%3AFREQ%3DMONTHLY%3BINTERVAL%3D3%3BBYDAY%3D1SA">Add it there</a></span>
+  </section>
+
+  <section class="card warn">
+    <h2>⚠️ Never</h2>
+    <ul style="margin-top:12px">
+      <li><b>Never mix bleach and vinegar.</b> Together they make a toxic gas. Rinse fully between them.</li>
+      <li>No steel wool, hard brushes, or rubbing alcohol on it. They scratch and damage it.</li>
+      <li>Always unplug before cleaning.</li>
+      <li>Going away for a week or more? Drain it first.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>🛒 What to buy</h2>
+    <p class="time">Prices as of Nov 2026, may change. You probably already have dish soap, a sponge, a bucket and a tablespoon.</p>
+    <a class="buy" href="https://www.walmart.com/ip/Great-Value-Distilled-White-Vinegar-1-gal/10450998" target="_blank" rel="noopener"><div><b>White vinegar, 1 gallon</b><span>Great Value · about $4 · lasts months</span></div><i>Walmart ›</i></a>
+    <a class="buy" href="https://www.walmart.com/ip/Clorox-Disinfecting-Liquid-Bleach-Regular-Scent-81-fl-oz/586467973" target="_blank" rel="noopener"><div><b>Plain bleach (Regular, no scent)</b><span>Clorox 81 oz · about $6 · not the scented or splash-less kind</span></div><i>Walmart ›</i></a>
+    <a class="buy" href="https://www.walmart.com/ip/OXO-Good-Grips-Water-Bottle-Cleaning-Set-Blue/13802408375" target="_blank" rel="noopener"><div><b>Soft brush set</b><span>OXO · about $19 · optional, for the taps and drip tray</span></div><i>Walmart ›</i></a>
+  </section>
+
+  <footer>The ice button steps are from the VECYS manual. If yours works differently, the model number is on the sticker on the back.</footer>
+</main>
+<script>
+(() => {
+  const K = 'dispenser-first-clean', boxes = [...document.querySelectorAll('#first input')];
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(K) || '[]'); } catch (e) {}
+  boxes.forEach((b, i) => {
+    b.checked = !!saved[i];
+    b.addEventListener('change', () => { try { localStorage.setItem(K, JSON.stringify(boxes.map(x => x.checked))); } catch (e) {} });
+  });
+})();
+</script>
+</body>
+</html>
