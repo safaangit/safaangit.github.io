@@ -644,3 +644,16 @@ label.check.pin input { width: auto; }
 .adjrow { display: flex; gap: 10px; width: 100%; text-align: left; border: 0; background: none; color: var(--ink); padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.35; }
 .adjrow:first-of-type { border-top: 0; }
 .adjrow b { flex: none; width: 52px; color: var(--accent); font-weight: 600; }
+/* Tasks v2: sub-groups, hints, reorder, grocery rhythm */
+.chips.wrap { flex-wrap: wrap; overflow: visible; }
+.tlist li.tsubh { font-size: 12.5px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); padding: 10px 0 2px; border: 0; min-height: 0; }
+.shint { margin: 0 0 4px; }
+button.link.reorder { display: flex; align-items: center; gap: 6px; margin: 4px auto 18px; color: var(--muted); }
+button.link.reorder svg { width: 16px; height: 16px; }
+.tk.ur .tsub { color: var(--muted); }
+.tk.ur.due .name::after { content: 'due'; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--chip); border-radius: 6px; padding: 1px 6px; vertical-align: 2px; }
+button.uadd { border: 0; background: var(--chip); color: var(--accent); width: 36px; height: 36px; min-width: 36px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+button.uadd svg { width: 18px; height: 18px; }
+.tsec.restock { border-left: 3px solid var(--accent); }
+.reord li { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.reord li button { width: 40px; height: 36px; padding: 0; }

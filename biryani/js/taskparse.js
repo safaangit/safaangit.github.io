@@ -256,6 +256,8 @@ export function splitCapture(text, ctx = {}) {
   const out = [];
   for (const line of text.split(/\n+/).map(l => l.trim()).filter(Boolean)) {
     const stripped = line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '');
+    // "ideas: wii remote app, grok bot" -> one idea each
+    if (IDEA_PREFIX.test(stripped)) { stripped.replace(IDEA_PREFIX, '').split(/\s*(?:,|;)\s*/).filter(Boolean).forEach(p => out.push({ text: 'idea: ' + p, kind: 'task' })); continue; }
     if (isFoodLog(stripped) && kindOf(stripped, ctx) === 'food') { out.push({ text: stripped, kind: 'food' }); continue; }
     const parts = stripped.split(/\s*(?:,|;|\s+&\s+)\s*/).map(p => p.trim()).filter(Boolean);
     if (parts.length > 1) {
@@ -280,8 +282,49 @@ export function splitCapture(text, ctx = {}) {
 }
 
 // Lists a task can live in.
-export const LISTS = [['todo', 'To do'], ['someday', 'Someday'], ['watch', 'Watch & read'], ['ref', 'Reference (kept, out of the way)']];
-export const listFor = text => (WATCH.test(text) ? 'watch' : 'todo');
+export const LISTS = [['todo', 'To do'], ['shop', 'Shopping (not groceries)'], ['ideas', 'Ideas'], ['watch', 'Watch & read'], ['someday', 'Someday'], ['ref', 'Reference (kept, out of the way)']];
+// "idea: …", or anything about Claude / AI tools, goes to Ideas (Claude & AI get their own group there).
+export const IDEA_PREFIX = /^\s*(?:idea|ideas|thought|maybe)\s*[:\-]\s*/i;
+export const AI_IDEA = /\b(?:claude|chatgpt|gpt|grok|grokbot|gemini|copilot|ai|llm|prompt|automation|automate|app\s+idea)\b/i;
+const IDEA = /\b(?:idea|ideas|what\s+if|could\s+build|side\s+project|project\s+idea)\b/i;
+// Things to buy that aren't groceries: gear, clothes, gifts, electronics, online orders.
+const SHOP = /\b(?:buy|order|purchase|amazon|gift|gifts|shoes|sneakers|socks|shirt|shirts|pants|jacket|hoodie|headphones|earbuds|shokz|charger|cable|controller|kcups?|k-cups?|mug|bottle|water\s+jug|backpack|bag|wallet|knife|pen|watch\s+band|band|case|replacement|refill\s+pack)\b/i;
+export function listFor(text) {
+  if (IDEA_PREFIX.test(text) || IDEA.test(text)) return 'ideas';
+  if (WATCH.test(text) && !/\bwatch\s+band\b/i.test(text)) return 'watch';
+  if (SHOP.test(text) && !/\b(?:call|text|email|reply|return|refund|cancel|pay)\b/i.test(text)) return 'shop';
+  if (AI_IDEA.test(text)) return 'ideas';
+  return 'todo';
+}
+// Ideas list groups: Claude & AI first, then everything else.
+export const ideaGroup = text => (AI_IDEA.test(text) ? 'ai' : 'other');
+
+// When a repeating reminder starts showing in Today / Coming up (days before it's due).
+// A monthly prescription shows 5 days ahead; a yearly renewal 3 weeks ahead.
+export const leadDays = r => (r.lead != null ? r.lead : !r.rep ? 0 : { day: 0, week: 1, month: 5, year: 21 }[r.rep.unit] ?? 3);
+
+// ---------- grocery rhythm ----------
+// Every purchase date is kept on the record (hist), so the app can learn "Gu about every 2 weeks".
+// A set rhythm (every, in days) wins over the learned one. Returns days, or null when there isn't enough to go on.
+export function cadence(r) {
+  if (r.every) return r.every;
+  const h = [...new Set((r.hist || []).map(t => Math.floor(t / 864e5)))].sort((a, b) => a - b);
+  if (h.length < 3) return null; // two gaps at least, or one odd week looks like a rhythm
+  const gaps = h.slice(1).map((d, i) => d - h[i]).filter(g => g >= 2).sort((a, b) => a - b);
+  if (!gaps.length) return null;
+  return gaps[Math.floor(gaps.length / 2)];
+}
+// Days until it's due again (negative = overdue), or null.
+export function dueIn(r, now = Date.now()) {
+  const c = cadence(r), last = r.last || Math.max(0, ...(r.hist || []));
+  if (!c || !last) return null;
+  return Math.round((last + c * 864e5 - now) / 864e5);
+}
+export function rhythmText(days) {
+  if (!days) return '';
+  if (days % 7 === 0 || days >= 12) { const w = Math.round(days / 7); return w <= 1 ? 'every week' : w === 4 ? 'about monthly' : `every ${w} weeks`; }
+  return `every ${days} days`;
+}
 
 // Google Calendar "add event" link, prefilled (no account setup needed).
 export function calendarLink(t) {
