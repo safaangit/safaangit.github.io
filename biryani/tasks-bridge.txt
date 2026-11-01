@@ -213,7 +213,11 @@ function groceryBits(line) {
   let qty = null;
   const q = /^\s*(\d+(?:\.\d+)?)\s*(?:x\b|×)?\s*/i.exec(s) || /\s+x?\s*(\d+)\s*$/i.exec(s);
   if (q && !/^\s*\d+(?:\.\d+)?\s*(?:%|(?:lb|lbs|oz|g|kg|ml|l|gal|pct|percent)\b)/i.test(s.slice(q.index).trimStart() ? s.slice(q.index) : '')) { qty = q[1]; s = s.slice(0, q.index) + ' ' + s.slice(q.index + q[0].length); }
-  s = s.replace(/^\s*(?:buy|get|grab|pick\s+up|need|more)\s+/i, '').replace(/\s+/g, ' ').replace(/^[\s,.\-:]+|[\s,.\-:]+$/g, '');
+  // "we're out of milk", "running low on eggs", "need to buy more feta" -> just the item.
+  s = s.replace(/^\s*(?:(?:we|i)(?:'?re|\s+are|'?m|\s+am)?\s+)?(?:(?:ran|run|running|all|almost|nearly|are|is)\s+)?(?:out\s+of|low\s+on)\s+/i, '')
+    .replace(/^\s*(?:(?:we|i)\s+)?(?:need\s+to\s+(?:buy|get|grab|reorder|restock)|need|buy|get|grab|pick\s+up|reorder|restock|order)\s+/i, '')
+    .replace(/^\s*(?:more|some|another)\s+/i, '')
+    .replace(/\s+(?:again|please)$/i, '').replace(/\s+/g, ' ').replace(/^[\s,.\-:]+|[\s,.\-:]+$/g, '');
   return { name: s ? s[0].toUpperCase() + s.slice(1) : '', qty, store };
 }
 

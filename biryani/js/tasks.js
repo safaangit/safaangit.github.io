@@ -20,6 +20,7 @@ const st = { mode: local.get('tasksMode', 'tasks'), store: local.get('grocerySto
 const saveOpen = () => local.set('tasksOpen', [...st.open]);
 
 export const all = () => db.all(FILE);
+export const showMode = m => { st.mode = m; local.set('tasksMode', m); };
 const tasksOf = async () => (await all()).filter(r => r.kind !== 'grocery');
 const groceriesOf = async () => (await all()).filter(r => r.kind === 'grocery');
 
@@ -101,7 +102,7 @@ export async function capture(text, s, ui, { kinds } = {}) {
   }
   const bits = [];
   if (res.tasks.length) bits.push(res.tasks.length === 1 ? `Added "${res.tasks[0].task}"${res.tasks[0].due ? ' · ' + fmtDue(res.tasks[0].due) : ''}` : `${res.tasks.length} tasks added`);
-  if (res.groceries.length) bits.push(`${res.groceries.length} to Groceries`);
+  if (res.groceries.length) bits.push(res.groceries.length === 1 ? `${res.groceries[0]} added to Groceries` : `${res.groceries.length} to Groceries`);
   if (res.dups.length) bits.push(`${res.dups.length === 1 ? `"${res.dups[0]}" was` : `${res.dups.length} were`} already on the list`);
   if (bits.length) ui.toast(bits.join(' · '));
   if (res.food.length) ui.logFoodText(res.food.join(', '));
