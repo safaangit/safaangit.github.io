@@ -121,7 +121,7 @@ function parseWhen(text, now = new Date()) {
     r.date = h * 60 + mi > now.getHours() * 60 + now.getMinutes() ? at(now, 0) : at(now, 1);
   }
   // A dash left hanging where a date was cut out: "haywoods - oct 7 ask wife" -> "haywoods ask wife"
-  let title = work.replace(/\s*[-–]\s{2,}|\s{2,}[-–]\s*/g, '  ').replace(/\s+/g, ' ')
+  let title = work.replace(/\s*[-–]\s{2,}|\s{2,}[-–]\s*/g, '  ').replace(/\s+/g, ' ').replace(/\s+([,;?!])/g, '$1')
     .replace(/\s+(?:on|at|by|due|this|next|in|for|the|-|–|,)\s*$/i, '')
     .replace(/^\s*(?:on|at|by|due|-|–|,)\s+/i, '')
     .replace(/^(?:remind\s+me\s+(?:to\s+)?|reminder\s*:?\s*(?:to\s+)?|don'?t\s+forget\s+(?:to\s+)?|todo\s*:?\s*)/i, '')
@@ -265,34 +265,146 @@ function kindOf(line, { known = new Set(), learned = {} } = {}) {
   return 'task';
 }
 
-// Splits a capture into items. Newlines always split. Commas split when most parts are groceries
-// ("tofu, dumplings, water jug"), but not a task that happens to have a comma ("Lego windstorm claude, claude gr...").
+// ---------- splitting a brain dump ----------
+// One capture can hold several things: "call dentist, milk, eggs, idea: grokbot, watch dune, pay rent friday".
+// Each piece is sorted on its own (task / grocery / food, then list and category in addItem).
+// Splits on new lines, ";", commas, sentence ends (". " "? " "! "), and spoken joins ("also", "and then").
+// A header carries over to every piece: "Claude code - use cases, gmail export" -> "Claude code: use cases", ...
+// "groceries: …", "ideas: …", "tomorrow: …" and a store ("aldi: …") are understood; a header alone on a line
+// ("Claude code:") applies to the lines under it. Pieces that only continue the one before stay attached
+// ("…, but only if it's on sale", "…, by friday", "…, 2026").
+const ABBR = /(?:\b(?:dr|mr|mrs|ms|st|vs|jr|sr|mt|ft|etc|approx|no|inc|co|e\.g|i\.e)|(?:^|\s)[a-z])\.$/i;
+const CONT = /^(?:but|because|cause|cuz|so|which|that|who|whose|where|while|if|since|though|although|or|nor|he|she|it|its|it's|they|them|their|him|her|his|with|without|for|from|of|than|as|like|etc|aka|including|especially|not|to(?!\s+do\b))\b/i;
+const JOIN = /\s+(?:and\s+also|also|and\s+then|oh\s+and|oh\s+also|another\s+thing(?:\s+is)?)\s+(?=\S)/gi;
+// Spoken dumps have no commas: "pay rent friday call mom tomorrow buy milk". A new one starts at one of these verbs.
+const STRONG = /\s(?:and\s+|then\s+)?(?=(?:call|text|email|pay|buy|cancel|book|schedule|return|renew|submit|order|pick\s+up|drop\s+off|remind\s+me|send)\s)/gi;
+const LINKER = /\b(?:to|or|the|a|an|will|should|need|must|gotta|have|not|dont|don't|please|me|i|can|could|would|and|then|also)$/i;
+const wc = s => s.trim().split(/\s+/).filter(Boolean).length;
+const hasWords = s => /[a-z]{2,}/i.test(s);
+// Only a date or time ("friday", "tomorrow 5pm", "2026")?
+const dateOnly = s => { if (!hasWords(s)) return true; const w = parseWhen(s); if (!w.spans.length) return false; let t = s; for (const [a, b] of w.spans) t = t.slice(0, a) + ' '.repeat(b - a) + t.slice(b); return !hasWords(t.replace(/\b(?:on|at|by|due|this|next|the|in)\b/gi, '')); };
+
+function sentences(line) {
+  const out = [];
+  for (const s of line.split(/(?<=[^\s.?!][.?!]+)\s+(?=\S)/)) {
+    if (out.length && ABBR.test(out[out.length - 1])) out[out.length - 1] += ' ' + s; else out.push(s);
+  }
+  return out.map(s => s.replace(/\.+$/, '').trim()).filter(Boolean);
+}
+// Splits `s` at every match of `re` where both sides look like their own item.
+function splitWhere(s, re, ok) {
+  const out = []; let from = 0;
+  for (const m of s.matchAll(re)) {
+    const left = s.slice(from, m.index).trim(), right = s.slice(m.index + m[0].length).trim();
+    if (ok(left, right)) { out.push(left); from = m.index + m[0].length; }
+  }
+  out.push(s.slice(from).trim());
+  return out.filter(Boolean);
+}
+// A line -> its pieces (strings), before deciding whether to keep them apart.
+function piecesOf(body, ctx) {
+  const out = [];
+  for (const sen of sentences(body)) {
+    let parts = sen.split(/\s*(?:;|,(?!\d)|\s+&\s+)\s*/).map(p => p.trim()).filter(Boolean);
+    parts = parts.flatMap(p => splitWhere(p, JOIN, (l, r) => wc(l) >= 2 && wc(r) >= 2 && (TASK_VERB.test(r) || /^(?:buy|get|grab)\b/i.test(r))));
+    if (parts.length === 1 && wc(sen) >= 6) parts = splitWhere(sen, STRONG, (l, r) => wc(l) >= 2 && wc(r) >= 2 && !LINKER.test(l));
+    parts.forEach((p, i) => {
+      p = p.replace(/^(?:and|then|plus)\s+/i, '').replace(/\s+(?:and|then)$/i, '').trim();
+      if (!p) return;
+      // "…, by friday" / "…, but only on sale" / "…, 2026" / ". She's sick." belong to the piece before.
+      if (out.length && (CONT.test(p) || dateOnly(p))) out[out.length - 1] += (i === 0 ? '. ' : dateOnly(p) ? ' ' : ', ') + p;
+      else out.push(p);
+    });
+  }
+  return out;
+}
+
+const HEAD = /^([^,;:]{2,40}?)(?<!\d)\s*:\s+(\S.*)$|^([^,;]{2,40}?)\s+[-–—]+\s+(\S.*)$/;
+const HEAD_ALONE = /^([^,;:]{2,40}?)\s*[:\-–—]\s*$/;
+function headType(h) {
+  const low = h.toLowerCase().trim();
+  if (/^(?:groceries|grocery(?:\s+(?:list|run))?)$/.test(low)) return 'groc';
+  if (/^(?:shopping(?:\s+list)?|to\s+buy|buy|get|need|pick\s+up|grab)$/.test(low)) return 'buy';
+  if (/^(?:ideas?|thoughts?|maybe|brainstorm)$/.test(low)) return 'idea';
+  if (/^(?:to\s*-?\s*dos?|tasks?|reminders?)$/.test(low)) return 'plain';
+  if (STORES.some(([, , re]) => re.test(low) && !hasWords(low.replace(re, '').replace(/\b(?:at|from|run|trip)\b/g, '')))) return 'store';
+  if (dateOnly(h)) return 'date';
+  return 'generic';
+}
+// One piece under a header -> { text, kind }.
+function underHead(p, h, type, ctx) {
+  const k = kindOf(p, ctx);
+  switch (type) {
+    case 'groc': return { text: p, kind: TASK_VERB.test(p) ? 'task' : 'grocery' };
+    case 'buy': return k === 'grocery' || TASK_VERB.test(p) || /^buy\b/i.test(p) ? { text: p, kind: k } : { text: 'Buy ' + p, kind: 'task' };
+    case 'idea': return { text: 'idea: ' + p, kind: 'task' };
+    case 'store': return k === 'grocery' ? { text: `${p} ${h}`, kind: k } : { text: `${cap1(h)}: ${p}`, kind: k };
+    case 'date': return k === 'grocery' ? { text: p, kind: k } : { text: `${p} ${h}`, kind: k };
+    case 'generic': return k === 'task' ? { text: `${cap1(h)}: ${p}`, kind: k } : { text: p, kind: k };
+    default: return { text: p, kind: k };
+  }
+}
+const cap1 = s => s.trim()[0].toUpperCase() + s.trim().slice(1);
+
+// Without a header, should these pieces be separate items?
+function keepApart(ps, kinds) {
+  if (ps.length < 2) return false;
+  if (ps.length >= 3) return ps.filter(p => wc(p) <= 12).length >= Math.ceil(ps.length * 2 / 3);
+  const [a, b] = ps;
+  return kinds[0] !== kinds[1] || listFor(a) !== listFor(b) || (TASK_VERB.test(a) && TASK_VERB.test(b));
+}
+
+// Splits a capture into items: [{ text, kind, line }] (`line` = which line of the capture it came from).
+// ctx.noSplit keeps each line whole ("Keep as one" in the preview).
 function splitCapture(text, ctx = {}) {
   const out = [];
-  for (const line of text.split(/\n+/).map(l => l.trim()).filter(Boolean)) {
-    const stripped = line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '');
-    // "ideas: wii remote app, grok bot" -> one idea each
-    if (IDEA_PREFIX.test(stripped)) { stripped.replace(IDEA_PREFIX, '').split(/\s*(?:,|;)\s*/).filter(Boolean).forEach(p => out.push({ text: 'idea: ' + p, kind: 'task' })); continue; }
-    if (isFoodLog(stripped) && kindOf(stripped, ctx) === 'food') { out.push({ text: stripped, kind: 'food' }); continue; }
-    const parts = stripped.split(/\s*(?:,|;|\s+&\s+)\s*/).map(p => p.trim()).filter(Boolean);
-    if (parts.length > 1) {
-      const kinds = parts.map(p => kindOf(p, ctx));
-      const g = kinds.filter(k => k === 'grocery').length;
-      if (g >= Math.ceil(parts.length / 2)) {
-        // "and" inside a grocery part: "eggs and milk"
-        parts.forEach((p, i) => {
-          const sub = kinds[i] === 'grocery' ? p.split(/\s+and\s+/).filter(Boolean) : [p];
-          sub.forEach(s => out.push({ text: s, kind: kinds[i] === 'grocery' ? 'grocery' : kindOf(s, ctx) }));
-        });
-        continue;
-      }
+  const lines = text.split(/\n+/).map(l => l.trim().replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')).filter(Boolean);
+  let carry = null; // a header alone on a line applies to the lines under it
+  lines.forEach((raw, li) => {
+    const push = (t, kind) => { t = t.trim().replace(/[\s,;]+$/, ''); if (t) out.push({ text: t, kind, line: li }); };
+    if (ctx.noSplit) return push(raw, kindOf(raw, ctx));
+    const alone = HEAD_ALONE.exec(raw);
+    if (alone && li < lines.length - 1 && wc(alone[1]) <= 5) { carry = alone[1].trim(); return; }
+    if (REF_PREFIX.test(raw)) return push(raw, 'task'); // notes stay whole
+    let head = carry, body = raw;
+    const hm = HEAD.exec(raw);
+    if (hm) {
+      const h = (hm[1] || hm[3]).trim(), b = (hm[2] || hm[4]).trim();
+      const type = headType(h);
+      if (wc(h) <= 5 && (type !== 'generic' || piecesOf(b, ctx).length > 1) && !(type === 'date' && !piecesOf(b, ctx).length)) { head = h; body = b; }
     }
-    const kind = kindOf(stripped, ctx);
+    const ps = piecesOf(body, ctx);
+    if (head) {
+      const type = headType(head);
+      // An idea or note header keeps a one-piece line as is; everything else applies to each piece.
+      ps.forEach(p => { const it = underHead(p, head, type, ctx); push(it.text, it.kind); });
+      return;
+    }
+    const kinds = ps.map(p => kindOf(p, ctx));
+    // Food log ("chicken 8.5 oz, rice 150 g") stays one line for the food logger, unless a task is mixed in.
+    if (isFoodLog(body) && kindOf(body, ctx) === 'food' && !kinds.includes('task')) return push(body, 'food');
+    const g = kinds.filter(k => k === 'grocery').length;
+    if (ps.length > 1 && g >= Math.ceil(ps.length / 2)) {
+      // "and" inside a grocery part: "eggs and milk"
+      ps.forEach((p, i) => (kinds[i] === 'grocery' ? p.split(/\s+and\s+/).filter(Boolean) : [p]).forEach(s => push(s, kinds[i] === 'grocery' ? 'grocery' : kindOf(s, ctx))));
+      return;
+    }
+    if (keepApart(ps, kinds)) {
+      const food = isFoodLog(body);
+      // Mostly ideas ("idea section, connect to wii, grokbot"): a plain note in the same breath is an idea too.
+      const ideas = ps.filter(p => listFor(p) === 'ideas').length >= ps.length / 2;
+      ps.forEach((p, i) => {
+        const plain = ideas && kinds[i] === 'task' && listFor(p) === 'todo' && !TASK_VERB.test(p) && !parseWhen(p).due;
+        push(plain ? 'idea: ' + p : p, food && kinds[i] !== 'task' ? 'food' : kinds[i]);
+      });
+      return;
+    }
+    const kind = kindOf(body, ctx);
     // "milk and eggs" -> two groceries, when both halves are groceries on their own.
-    const halves = kind === 'grocery' ? stripped.split(/\s+(?:and|&)\s+/) : [stripped];
-    if (halves.length > 1 && halves.every(h => kindOf(h, ctx) === 'grocery')) halves.forEach(h => out.push({ text: h, kind: 'grocery' }));
-    else out.push({ text: stripped, kind });
-  }
+    const halves = kind === 'grocery' ? body.split(/\s+(?:and|&)\s+/) : [body];
+    if (halves.length > 1 && halves.every(h => kindOf(h, ctx) === 'grocery')) halves.forEach(h => push(h, 'grocery'));
+    else push(body, kind);
+  });
   return out;
 }
 

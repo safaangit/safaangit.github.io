@@ -92,9 +92,9 @@ async function applyRemote(res) {
     } else {
       const w = P.parseWhen(pr.text);
       const ref = P.REF_PREFIX.test(pr.text);
-      const t = w.title.replace(P.REF_PREFIX, '');
+      const t = w.title.replace(P.REF_PREFIX, '').replace(P.IDEA_PREFIX, '');
       await db.put(FILE, { id: it.id, kind: 'task', t: t[0].toUpperCase() + t.slice(1), note: it.notes || undefined, due: it.due || w.due, time: it.time || w.time, rep: w.rep, pri: pr.pri || undefined,
-        cat: P.categoryOf(t, s.catLearn), list: ref ? 'ref' : P.listFor(t), rm: (it.time || w.time) ? 0 : null, created: Date.now(), src: 'google' });
+        cat: P.categoryOf(t, s.catLearn), list: ref ? 'ref' : P.listFor(w.title), rm: (it.time || w.time) ? 0 : null, created: Date.now(), src: 'google' });
     }
     changed = true;
   }

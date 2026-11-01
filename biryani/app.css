@@ -581,6 +581,8 @@ nav button { position: relative; }
 .cprev:empty { display: none; }
 .cprev { display: flex; flex-direction: column; gap: 6px; padding: 8px 2px 4px; }
 .cprev.big { padding: 10px 0; }
+.pv-tog { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 2px; }
+.pv-tog .link { font-size: 13.5px; }
 .pv-it { display: flex; align-items: center; gap: 8px; font-size: 15px; }
 .pv-it .grow { overflow: hidden; text-overflow: ellipsis; }
 .pv-it .kind { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 14px; font-size: 12.5px; font-weight: 600; border: 0; }
