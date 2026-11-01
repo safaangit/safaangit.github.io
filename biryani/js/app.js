@@ -1335,6 +1335,11 @@ async function viewSettings() {
   <div class="gbbox"><b>Google Tasks & Calendar</b>
     <p class="small ${local.get('gbErr', '') ? 'warn' : 'muted'}">${gb.configured() ? (local.get('gbErr', '') ? esc(local.get('gbErr', '')) : `Linked${local.get('gbLast', 0) ? ` · last sync ${new Date(local.get('gbLast', 0)).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. Your lists show in the Google Tasks widget, timed tasks on Google Calendar.`) : 'Not linked. Puts your lists on the Google Tasks home-screen widget, lets Google Home add to them, and puts timed tasks on Google Calendar with reminders. Free, about 10 minutes once.'}</p>
     <div class="actions"><button type="button" id="gbSetup" class="${gb.configured() ? '' : 'primary'}">${gb.configured() ? 'Setup steps' : 'Set up Google Tasks'}</button>${gb.configured() ? '<button type="button" id="gbSync">Sync now</button>' : ''}</div></div>
+  <div class="gbbox"><b>Fridge tags</b>
+    <p class="small muted">Stick an NFC sticker (NTAG213/215) on the fridge for each staple. Tap your phone on it, unlocked, and that item goes on Groceries. If it's already on the list it isn't added twice.</p>
+    <div class="form"><label>Item<input id="tagItem" placeholder="Milk" autocomplete="off"></label></div>
+    <div class="actions"><button type="button" id="tagCopy">Copy link</button><button type="button" class="primary" id="tagWrite">Write tag</button></div>
+    <p id="tagRes" class="small muted"></p></div>
   </details>
   <details><summary>Sync & Garmin</summary><form id="gh" class="form">
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
@@ -1407,6 +1412,26 @@ bind.settings = root => {
   $('#gbSetup', root).onclick = () => openGbSetup();
   $('#gbSync', root)?.addEventListener('click', async () => { try { await gb.sync(); toast('Synced with Google Tasks'); } catch (e) { toast(e.message); } render(); });
   $('#tset', root).onchange = e => { local.set('launchTo', e.currentTarget.launchTo.value); toast('Saved on this device'); };
+  // Fridge tags: write a ?buy= link onto an NFC sticker (Web NFC, Chrome on Android), or copy it for the NFC Tools app.
+  const tagItem = () => $('#tagItem', root).value.trim().replace(/\s+/g, ' ');
+  const tagUrl = it => location.origin + location.pathname + '?buy=' + encodeURIComponent(it);
+  const tagRes = $('#tagRes', root);
+  $('#tagCopy', root).onclick = async () => {
+    const it = tagItem(); if (!it) return toast('Type the item first');
+    try { await navigator.clipboard.writeText(tagUrl(it)); toast('Link copied'); } catch { tagRes.textContent = tagUrl(it); }
+  };
+  $('#tagWrite', root).onclick = async () => {
+    const it = tagItem(); if (!it) return toast('Type the item first');
+    if (!('NDEFReader' in window)) { tagRes.textContent = `This browser can't write tags (it needs Chrome on Android). Tap Copy link, then in the free NFC Tools app: Write → Add a record → URL, paste, and write.`; return; }
+    const ac = new AbortController(), stop = setTimeout(() => ac.abort(), 30e3);
+    tagRes.textContent = `Hold a sticker flat against the back of your phone for "${it}"…`;
+    try {
+      await new NDEFReader().write({ records: [{ recordType: 'url', data: tagUrl(it) }] }, { signal: ac.signal });
+      tagRes.textContent = `Done ✓ Tapping that sticker now adds ${it} to Groceries. Label it so you know which is which.`;
+    } catch (e) {
+      tagRes.textContent = e.name === 'AbortError' ? 'No sticker found in 30 seconds. Try again, and hold it near the middle-top of the phone.' : e.name === 'NotAllowedError' ? 'NFC permission was blocked. Allow NFC for this app in Chrome site settings, and check NFC is on in quick settings.' : e.message;
+    } finally { clearTimeout(stop); }
+  };
   $('#gh', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); syncBadge(); };
   $('#keys', root).onchange = e => { for (const [k, v] of new FormData(e.currentTarget)) local.set(k, String(v).trim()); toast('Saved on this device'); };
   $('#syncNow', root).onclick = async () => {
@@ -1535,6 +1560,15 @@ async function launchAction() {
     u.searchParams.delete('gb'); u.searchParams.delete('gk'); history.replaceState(null, '', u.pathname + u.search + u.hash);
     state.tab = 'tasks'; await render();
     gb.sync().then(() => { toast('Google Tasks linked ✓'); render(); }).catch(e => toast(e.message));
+    return;
+  }
+  // Fridge NFC tag (or any link): ?buy=Milk[,Eggs] puts those on Groceries, merging with what's already there.
+  const buy = (u.searchParams.get('buy') || '').trim();
+  if (buy) {
+    u.searchParams.delete('buy'); history.replaceState(null, '', u.pathname + u.search + u.hash);
+    state.tab = 'tasks'; tasks.showMode('groceries');
+    await tasks.capture(buy, state.s, ui, { kinds: buy.split(/\s*,\s*/).filter(Boolean).map(text => ({ text, kind: 'grocery' })) });
+    await render(); scheduleSync(500); scheduleBridge(300);
     return;
   }
   // Settings → "When the app opens": jump straight into Quick add (for a side-button / double-press launch).
