@@ -16,7 +16,36 @@ export const fmtPace = sec => { const s = Math.round(sec); return `${Math.floor(
 export const fmtTime = sec => { const s = Math.round(sec); return `${Math.floor(s / 3600)}:${pad2(Math.floor((s % 3600) / 60))}:${pad2(s % 60)}`; };
 export const parseTime = t => { const p = String(t || '').trim().split(':').map(Number); if (!p.length || p.some(isNaN)) return null; while (p.length < 3) p.push(0); return p[0] * 3600 + p[1] * 60 + p[2] || null; };
 
-export const config = s => ({ ...DEFAULTS, ...(s.training || {}) });
+// The long game: races after the current one, in order. Once a race is over, the next marathon here
+// becomes the race the plan builds to, with recovery, base and speed weeks first (seasonPlan).
+// Saved edits live in settings.training.season; these are the defaults. Times in seconds.
+export const SEASON = {
+  goal: 'Boston 2028', std: 10500, aim: 10140, // M18-34 standard 2:55; recent cutoffs 4:34-6:51 under, so aim 2:49
+  windowEnd: '2027-09-12', // the 2028 window closes at B.A.A. registration week in Sept 2027 (date not set yet)
+  baseTop: 54, peakMi: 64, blockWeeks: 18, recoverWeeks: 3,
+  races: [
+    { id: 'philly26', name: 'Philadelphia Marathon', date: '2026-11-22', start: '7:00 AM', mi: 26.2 },
+    // Checkpoint: 1:21 or faster = 2:49 shot; 1:24 or faster = 2:55 shot (lottery); slower = PR race, BQ moves to 2029.
+    { id: 'half27', name: 'Spring half', date: '2027-05-02', start: '', mi: 13.1, gate: [4860, 5040], tbc: true },
+    { id: 'erie27', name: 'Erie Marathon', date: '2027-09-12', start: '7:00 AM', mi: 26.2, bq: true, tbc: true },
+  ],
+};
+export const season = s => { const x = s.training?.season || {}; return { ...SEASON, ...x, races: [...(x.races || SEASON.races)].sort((a, b) => a.date.localeCompare(b.date)) }; };
+
+// The race you're training for: the one in settings until it's over, then the next marathon in the
+// season. A season race with a finished marathon before it gets recovery, base and speed weeks first
+// (seasonPlan); until then nothing changes. Edits to a season race are saved on the race (openRace).
+export const config = (s, ref = today()) => {
+  const cfg = { ...DEFAULTS, ...(s.training || {}) }, sea = season(s), M = sea.races.filter(r => r.mi > 26);
+  let r = ref <= cfg.raceDate ? sea.races.find(x => x.date === cfg.raceDate) : M.find(x => x.date >= ref);
+  if (!r && ref > cfg.raceDate) r = [...M].reverse().find(x => x.date < ref);
+  const prev = r && [...M].reverse().find(x => x.date < r.date && x.date < ref);
+  if (!r || !prev) return { ...cfg, raceId: r?.id, season: sea };
+  const after = d => d > prev.date;
+  return { ...cfg, raceId: r.id, raceName: r.name, raceDate: r.date, raceStart: r.start || '', raceMi: r.mi, goalSec: r.goalSec || null,
+    planStart: addDays(prev.date, 1), prevRace: prev, peakMi: sea.peakMi, season: sea,
+    swaps: (cfg.swaps || []).filter(p => after(p[0])), skips: (cfg.skips || []).filter(after) };
+};
 
 // Every Garmin run, one row per activity.
 export function runsFrom(gdays) {
@@ -41,7 +70,8 @@ export const doneMiles = (runs, d) => (d.kind === 'long' ? longestOn(runs, d.dat
 // still through the taper instead of drifting as the miles drop.
 export function predict(runs, ref = today(), raceDate) {
   if (raceDate && ref > addDays(weekStart(raceDate), -15)) ref = addDays(weekStart(raceDate), -15);
-  const from = addDays(ref, -56);
+  // Months out (season base weeks are all easy), look back 6 months so the goal doesn't sink with easy pace.
+  const from = addDays(ref, raceDate && daysBetween(ref, raceDate) > 7 * 18 ? -182 : -56);
   const eq = runs.filter(r => r.date >= from && r.date <= ref && r.mi >= 5 && r.sec)
     .map(r => ({ ...r, eq: r.sec * Math.pow(MARATHON / r.mi, 1.07) * (r.tread ? 1.02 : 1) }))
     .sort((a, b) => a.eq - b.eq);
@@ -81,31 +111,38 @@ export function weekly(runs) {
 // Plan weeks from this week through race week. Weeks out: 0 = race week, 1-3 = taper
 // (60 / 80 / 100% of peak, last 20-miler 3 weeks out), 4+ = build at most +8% a week with a
 // cutback every third week. Ramps are kept gentle for the repaired meniscus.
-export function buildPlan(cfg, runs, ref = today()) {
+// o (used by seasonPlan): from = first plan week, v0 / lg0 = where base training left the weekly and long-run miles.
+export function buildPlan(cfg, runs, ref = today(), o = {}) {
   const z = zones(cfg.goalSec, cfg.raceMi), race = cfg.raceDate;
-  const raceWk = weekStart(race), thisWk = weekStart(ref);
+  const raceWk = weekStart(race), thisWk = o.from || weekStart(ref);
   const nWeeks = Math.floor(daysBetween(thisWk, raceWk) / 7);
   if (nWeeks < 0) return { weeks: [], z };
   const wk = weekly(runs);
   const past = k => wk.get(addDays(thisWk, -7 * k)) || 0;
   const avg4 = (past(1) + past(2) + past(3) + past(4)) / 4, max6 = Math.max(...[1, 2, 3, 4, 5, 6].map(past));
-  const peak = Math.min(70, Math.max(20, avg4 * 1.1, max6 * 0.85));
-  const recentLong = Math.max(0, ...runs.filter(r => r.date >= addDays(ref, -42)).map(r => r.mi));
+  // Season blocks cut back every third week, so they build from the better of the last two weeks, not the average.
+  const v0 = o.v0 ?? (cfg.peakMi ? Math.max(past(1), past(2)) : avg4);
+  // A season race can peak higher (peakMi), but only 20% over what you're really running, for the knee.
+  const peak = cfg.peakMi ? Math.min(cfg.peakMi, Math.max(20, v0 * 1.2, max6 * 0.85)) : Math.min(70, Math.max(20, v0 * 1.1, max6 * 0.85));
+  const recentLong = Math.max(o.lg0 || 0, ...runs.filter(r => r.date >= addDays(ref, -42)).map(r => r.mi));
   const longPeak = cfg.raceMi > 26 ? Math.min(20, Math.max(14, Math.round(recentLong) + 2)) : Math.min(14, Math.max(10, Math.round(recentLong) + 1));
   const L = cfg.longDay;
 
   // Build-week volumes, worked forward from now so the first week starts near what you run.
   const vols = [], longs = [];
-  let v = Math.max(avg4, 15), lg = Math.max(8, Math.min(recentLong, longPeak - 2));
+  let v = Math.max(v0, 15), lg = Math.max(8, Math.min(recentLong, longPeak - 2));
+  // Cutback weeks (every third) dip 20% and 3 mi off the long run, then the build carries on from where
+  // it was. A season block cuts on schedule even in the current week, so its cutbacks really happen.
   for (let w = nWeeks; w >= 0; w--) {
-    if (w === 3) { v = peak; lg = longPeak; }
-    else if (w === 2) { v = peak * 0.8; lg = longPeak * 0.7; }
-    else if (w === 1) { v = peak * 0.6; lg = longPeak * 0.5; }
+    let vw = v, lw = lg;
+    if (w === 3) { vw = v = peak; lw = lg = longPeak; }
+    else if (w === 2) { vw = peak * 0.8; lw = longPeak * 0.7; }
+    else if (w === 1) { vw = peak * 0.6; lw = longPeak * 0.5; }
     else if (w > 3) {
-      const cut = w % 3 === 0 && w !== nWeeks;
-      v = cut ? v * 0.8 : Math.min(peak, v * 1.08); lg = cut ? lg - 3 : Math.min(longPeak, lg + 1);
+      const cut = w % 3 === 0 && (w !== nWeeks || !!cfg.peakMi);
+      if (cut) { vw = v * 0.8; lw = lg - 3; } else { vw = v = Math.min(peak, v * 1.08); lw = lg = Math.min(longPeak, lg + 1); }
     }
-    vols[w] = v; longs[w] = Math.max(6, half(lg));
+    vols[w] = vw; longs[w] = Math.max(6, half(lw));
   }
 
   const P = k => { const x = zone(z, k); return [x[2], x[3]]; };
@@ -152,10 +189,123 @@ export function buildPlan(cfg, runs, ref = today()) {
       else if (off === 4) days.push(day(date, 'easy', Math.max(3, rest * share[4]), 'Recovery', 'Truly easy after the workout.', P('recovery')));
       else days.push(day(date, 'medium', Math.max(4, rest * share[5]), 'Medium long', 'Steady, a little quicker than easy and a bit longer.', P('long')));
     }
-    weeks.push({ start, w, phase: PHASE[w] || (w % 3 === 0 && w !== nWeeks ? 'Cutback' : 'Build'), days, mi: days.filter(d => d.kind !== 'race').reduce((t, d) => t + d.mi, 0) });
+    weeks.push({ start, w, phase: PHASE[w] || (w % 3 === 0 && (w !== nWeeks || !!cfg.peakMi) ? 'Cutback' : 'Build'), days, mi: days.filter(d => d.kind !== 'race').reduce((t, d) => t + d.mi, 0) });
   }
-  applyMoves(weeks, cfg);
+  if (!o.noMoves) applyMoves(weeks, cfg);
   return { weeks, z, peak, longPeak };
+}
+
+// A season race far away: recovery after the last race, base, then speed (with the checkpoint half),
+// then the normal buildPlan block for the last blockWeeks weeks. Close races are just buildPlan.
+export function seasonPlan(cfg, runs, ref = today()) {
+  const sea = cfg.season || SEASON, raceWk = weekStart(cfg.raceDate), thisWk = weekStart(ref);
+  const nWeeks = Math.floor(daysBetween(thisWk, raceWk) / 7), B = sea.blockWeeks;
+  if (!cfg.prevRace || nWeeks < B) return buildPlan(cfg, runs, ref);
+  const z = zones(cfg.goalSec, cfg.raceMi), blockStart = addDays(raceWk, -7 * (B - 1));
+  const gate = sea.races.find(r => r.gate && r.date > cfg.prevRace.date && r.date < blockStart);
+  const recEnd = addDays(weekStart(addDays(cfg.prevRace.date, 1)), 7 * sea.recoverWeeks);
+  const speedFrom = speedStart(gate, blockStart);
+  const wk = weekly(runs), past = k => wk.get(addDays(thisWk, -7 * k)) || 0;
+  const recentLong = Math.max(0, ...runs.filter(r => r.date >= addDays(ref, -21) && r.date > cfg.prevRace.date).map(r => r.mi));
+  // Start from what you actually ran the last 2 weeks (+10%), then project +10% a week, a 20% cut every 4th.
+  let v = Math.max(22, Math.max(past(1), past(2)) * 1.1), lg = Math.max(10, Math.min(recentLong + 1, 16));
+  const weeks = [], P = k => { const x = z.list.find(y => y[0] === k); return [x[2], x[3]]; };
+  for (let start = thisWk, i = 0; start < blockStart; start = addDays(start, 7), i++) {
+    const w = Math.floor(daysBetween(start, raceWk) / 7);
+    const rec = start < recEnd ? Math.floor(daysBetween(weekStart(addDays(cfg.prevRace.date, 1)), start) / 7) : -1;
+    const gateWk = gate && weekStart(gate.date) === start, afterGate = gate && addDays(weekStart(gate.date), 7) === start;
+    const speed = start >= speedFrom, top = speed ? sea.baseTop + 4 : sea.baseTop;
+    const baseIdx = Math.floor(daysBetween(recEnd, start) / 7), cut = rec < 0 && !gateWk && !afterGate && baseIdx % 4 === 3;
+    let phase, vol, long;
+    if (rec >= 0) { phase = 'Recover'; vol = [8, 18, 25][rec] ?? 25; long = [0, 6, 8][rec] ?? 8; }
+    else {
+      // Base restarts at 25 mi after recovery; after that, +10% a week up to the phase's top.
+      if (i > 0 && start === recEnd) v = 25;
+      else if (i > 0 && !cut) v = v * 1.1;
+      v = Math.min(top, v);
+      vol = cut ? v * 0.8 : gateWk ? v * 0.7 : afterGate ? v * 0.75 : v;
+      if (i > 0 && !cut) lg = Math.min(speed ? 17 : 16, lg + 1);
+      long = cut ? lg - 3 : lg;
+      phase = cut ? 'Cutback' : gateWk ? 'Checkpoint' : afterGate ? 'Recover' : speed ? 'Speed' : 'Base';
+    }
+    weeks.push(layWeek(start, w, phase, vol, long, cfg, P, { rec, speed: speed && !cut && !afterGate, gate: gateWk ? gate : null, hills: !speed && rec < 0 }));
+  }
+  const block = buildPlan(cfg, runs, ref, { from: blockStart, v0: v, lg0: lg, noMoves: true });
+  const all = [...weeks, ...block.weeks];
+  applyMoves(all, cfg);
+  return { weeks: all, z, peak: block.peak, longPeak: block.longPeak };
+}
+
+// Speed weeks: the 7 before the checkpoint week (plus it and the week after), or the 8 before the block.
+const speedStart = (gate, blockStart) => gate ? addDays(weekStart(gate.date), -7 * 7) : addDays(blockStart, -7 * 8);
+
+// One week of the season's pre-block training, laid out around the long-run day like buildPlan.
+function layWeek(start, w, phase, vol, long, cfg, P, o) {
+  const L = cfg.longDay, days = [];
+  const day = (date, kind, mi, title, detail, pace) => ({ date, kind, mi: kind === 'race' ? mi : half(mi), title, detail, pace, ...range(kind, kind === 'race' ? mi : half(mi)) });
+  const longMi = Math.max(0, half(long)), rest = Math.max(0, vol - longMi);
+  const share = { 2: 0.24, 3: 0.30, 4: 0.20, 5: 0.26, ...(cfg.restDays < 2 ? { 6: 0.12 } : {}), ...(cfg.restDays < 1 ? { 1: 0.12 } : {}) };
+  const tot = Object.values(share).reduce((a, b) => a + b, 0);
+  for (const k in share) share[k] /= tot;
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(start, i), off = (dow(date) - L + 7) % 7;
+    if (o.gate) {
+      const r = daysBetween(date, o.gate.date);
+      if (r === 0) { days.push(day(date, 'race', o.gate.mi, o.gate.name, 'Checkpoint race. Even effort, first 2 mi a touch easy. This time decides the fall goal.', P('tempo'))); continue; }
+      if (r === 1 || r === 3) { days.push(day(date, 'rest', 0, 'Rest', r === 1 ? 'Off before the race.' : 'Off.')); continue; }
+      if (r === 2) { days.push(day(date, 'easy', 3, 'Easy + strides', '3 mi easy + 4 × 20 s strides.', P('easy'))); continue; }
+      if (r === 4) { days.push(day(date, 'quality', 5, 'Sharpener', '1.5 mi easy, 3 × 1 mi at half effort (2 min jog), rest easy.', P('tempo'))); continue; }
+      if (r >= 5) { days.push(day(date, 'easy', Math.max(3, rest * 0.18), 'Easy', 'Easy miles. Nothing hard this week before the race.', P('easy'))); continue; }
+      if (r < 0) { days.push(day(date, 'easy', r === -1 ? 0 : 3, r === -1 ? 'Recover' : 'Easy', 'Very easy.', P('recovery'))); continue; }
+    }
+    if (o.rec === 0) {
+      const k = { 4: 3, 0: 5 }[off];
+      days.push(k ? day(date, 'easy', k, 'Easy (optional)', 'Only if stairs feel normal. Walking counts.', P('recovery')) : day(date, 'rest', 0, 'Rest', 'Walk, eat, sleep. The knee gets back to zero this week.'));
+      continue;
+    }
+    if (off === 0) days.push(day(date, 'long', longMi, 'Long run', o.speed ? 'Easy, last 3-4 mi steady (long-run pace).' : 'Easy and conversational. Time on feet, not pace.', P('long')));
+    else if (off === 1 && cfg.restDays < 1) days.push(day(date, 'easy', Math.max(3, rest * share[1]), 'Recovery', 'Very easy, the day after the long run.', P('recovery')));
+    else if (off === 6 && cfg.restDays < 2) days.push(day(date, 'easy', Math.max(3, rest * share[6]), 'Shakeout', 'Short and easy. A few strides.', P('recovery')));
+    else if (off === 1 || off === 6) days.push(day(date, 'rest', 0, 'Rest', off === 1 ? 'Off. Strength day: single-leg squats, step-downs, RDLs, calf raises.' : 'Off. Legs up before the long run.'));
+    else if (off === 2) days.push(day(date, 'easy', Math.max(3, rest * share[2]), 'Easy + strides', 'Easy miles, then 6 × 20 s strides.', P('easy')));
+    else if (off === 3) {
+      const mi = Math.max(4, rest * share[3]);
+      if (o.speed) days.push(day(date, 'quality', mi, 'Threshold', `2 mi easy, ${Math.min(5, Math.max(3, Math.round(mi / 2)))} × 1 mi @ tempo (1 min jog), rest easy.`, P('tempo')));
+      else days.push(day(date, 'easy', mi, o.hills ? 'Easy + hill sprints' : 'Easy', o.hills ? 'Easy miles, then 8 × 10 s hill sprints, walk back down. Full rest.' : 'Easy miles.', P('easy')));
+    } else if (off === 4) days.push(day(date, 'easy', Math.max(3, rest * share[4]), 'Recovery', 'Truly easy.', P('recovery')));
+    else {
+      const mi = Math.max(4, rest * share[5]);
+      if (o.speed) days.push(day(date, 'quality', mi, 'Intervals', '2 mi easy, 5-6 × 1000 m @ interval pace (equal jog), rest easy.', P('interval')));
+      else days.push(day(date, 'medium', mi, 'Steady', 'A little quicker than easy, still conversational.', P('long')));
+    }
+  }
+  return { start, w, phase, days, noSwap: !!o.gate, mi: days.filter(d => d.kind !== 'race').reduce((t, d) => t + d.mi, 0) };
+}
+
+// Where the season stands: the phase you're in and the road ahead, for the Boston tab.
+export function roadmap(cfg, ref = today()) {
+  const sea = cfg.season || SEASON, out = [];
+  let after = null;
+  for (const r of sea.races) {
+    if (r.mi > 26 && after) {
+      const recEnd = addDays(weekStart(addDays(after, 1)), 7 * sea.recoverWeeks), blockStart = addDays(weekStart(r.date), -7 * (sea.blockWeeks - 1));
+      const gate = sea.races.find(g => g.gate && g.date > after && g.date < blockStart), speedFrom = speedStart(gate, blockStart);
+      out.push({ k: 'recover', name: 'Recover', from: addDays(after, 1), to: addDays(recEnd, -1), note: 'Week 1 off, then 18 → 25 mi, all easy.' });
+      if (speedFrom > recEnd) out.push({ k: 'base', name: 'Base', from: recEnd, to: addDays(speedFrom, -1), note: `Build to ${sea.baseTop} mi/week, +10% max, every 4th week cut. Strides, hill sprints, strength 2×.` });
+      out.push({ k: 'speed', name: 'Speed', from: speedFrom, to: addDays(blockStart, -1), note: 'Threshold + intervals each week, long runs 14-17.' });
+      if (gate) out.push({ k: 'gate', name: gate.name, from: gate.date, to: gate.date, race: gate });
+      out.push({ k: 'block', name: 'Marathon block', from: blockStart, to: addDays(r.date, -1), note: `Peak up to ${sea.peakMi} mi/week (never 20% past what you've been running), long runs to 20-22.` });
+    }
+    if (r.mi > 26) { out.push({ k: 'race', name: r.name, from: r.date, to: r.date, race: r }); after = r.date; }
+  }
+  return out.map(p => ({ ...p, now: p.from <= ref && ref <= p.to, done: p.to < ref }));
+}
+
+// Days that went hard (tempo pace or faster, a long run near race pace, or rated 9-10/10) in the last n days.
+export function hardDays(runs, z, ref = today(), n = 7) {
+  const tempoSlow = z.list.find(x => x[0] === 'tempo')[3], mpSlow = z.list.find(x => x[0] === 'mp')[3];
+  return [...new Set(runs.filter(r => r.date > addDays(ref, -n) && r.date <= ref && r.mi >= 3 && r.sec &&
+    (r.rpe >= 90 || r.sec / r.mi <= tempoSlow + 10 || (r.mi >= 13 && r.sec / r.mi <= mpSlow + 15))).map(r => r.date))];
 }
 
 // Your own changes, on top of the generated plan:
@@ -171,7 +321,7 @@ function applyMoves(weeks, cfg) {
     a.moved = `${every ? 'Every week: s' : 'S'}wapped with ${DOW[dow(b.date)]}.`; b.moved = `${every ? 'Every week: s' : 'S'}wapped with ${DOW[dow(a.date)]}.`;
   };
   for (const w of weeks) {
-    if (w.w === 0) continue;
+    if (w.w === 0 || w.noSwap) continue;
     for (const [x, y, from = ''] of cfg.weekSwaps || []) {
       const a = w.days.find(d => dow(d.date) === x), b = w.days.find(d => dow(d.date) === y);
       if (ok(a) && ok(b) && a.date >= from && b.date >= from) swap(a, b, true);
@@ -363,6 +513,11 @@ export function notes({ gdays, runs, plan, cfg, s, ref = today() }) {
   const toRace = daysBetween(ref, cfg.raceDate);
   if (toRace >= 0 && toRace <= 28 && s.goal?.type === 'cut')
     out.push(['fuel', `You're still on a cut. Ease to maintenance through the taper, then carb-load the 3 days before (about ${Math.round((s.profile.weightLb / 2.2046) * 8 / 10) * 10} g carbs a day).`]);
+  const hd = hardDays(runs, plan.z, ref);
+  if (hd.length >= 3) out.push(['warn', `${hd.length} hard days in the last 7. Two a week builds fitness; more just adds risk for the knee. Keep the next few easy.`]);
+  const ph = cfg.prevRace && roadmap(cfg, ref).find(p => p.now);
+  if (ph && (ph.k === 'speed' || ph.k === 'gate' || ph.k === 'block') && s.goal?.type === 'cut')
+    out.push(['fuel', 'Workouts have started. Switch your goal from cut to maintenance so the hard days get fueled; losing weight now costs fitness.']);
   if (toRace >= 0 && toRace <= 28) out.push(['info', 'Taper time: fitness is banked. Volume drops, a little marathon pace stays in so the legs stay sharp.']);
   return out;
 }
