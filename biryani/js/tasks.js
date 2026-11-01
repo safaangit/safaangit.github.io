@@ -308,43 +308,50 @@ async function toggle(id, ui) {
 
 // Live preview of what a capture will turn into, with a tap to switch an item's type.
 // On the Groceries list every comma or line is a grocery; elsewhere each piece is sorted on its own.
-async function parseCap(text, s, mode, overrides = {}) {
+// A brain dump split into several items gets a "Keep as one" link (`whole`), which keeps each line as one item.
+async function parseCap(text, s, mode, overrides = {}, whole = false) {
   const base = mode === 'groceries'
     ? text.split(/\s*(?:,|;|\n)\s*/).map(t => t.trim()).filter(Boolean).map(t => ({ text: t, kind: 'grocery' }))
-    : P.splitCapture(text, await ctx(s));
+    : P.splitCapture(text, { ...(await ctx(s)), noSplit: whole });
   return base.map((it, i) => ({ ...it, kind: overrides[i] || it.kind }));
 }
-async function previewHtml(text, s, ui, overrides, mode) {
-  const items = await parseCap(text, s, mode, overrides);
+async function previewHtml(text, s, ui, overrides, mode, whole = false) {
+  const items = await parseCap(text, s, mode, overrides, whole);
   if (!text.trim()) return { items: [], html: '' };
+  const lines = text.split(/\n+/).filter(l => l.trim()).length;
+  const toggle = mode === 'groceries' ? '' : whole ? `<button class="link pv-split" data-whole="0">Split it up</button>`
+    : items.length > lines ? `<button class="link pv-split" data-whole="1">Keep as one item</button>` : '';
   const ICON = { task: 'check', grocery: 'cart', food: 'foods' }, LBL = { task: 'Task', grocery: 'Grocery', food: 'Food log' };
   const html = items.map((it, i) => {
     let detail = '';
-    if (it.kind === 'task') { const pr = P.parsePri(it.text), w = P.parseWhen(pr.text.replace(P.REF_PREFIX, '')), c = P.catOf(P.categoryOf(w.title, s.catLearn)); detail = `${pr.pri ? '<span class="star">★</span>' : ''}${P.REF_PREFIX.test(pr.text) ? '<span class="muted">Reference · </span>' : ''}${c.k !== 'other' ? `<span class="cdot" style="background:${c.color}"></span>` : ''}${ui.esc(w.title)}${w.due ? ` <span class="due">${ui.ico('cal')}${ui.esc(fmtDue(w.due, w.time))}</span>` : ''}${w.rep ? ` <span class="rep">${ui.ico('refresh')}${ui.esc(P.repText(w.rep))}</span>` : ''}`; }
+    if (it.kind === 'task') { const pr = P.parsePri(it.text), w = P.parseWhen(pr.text.replace(P.REF_PREFIX, '').replace(P.IDEA_PREFIX, '')), c = P.catOf(P.categoryOf(w.title, s.catLearn)); const lst = P.REF_PREFIX.test(pr.text) ? 'Reference' : PV_LIST[P.listFor(it.text)]; detail = `${pr.pri ? '<span class="star">★</span>' : ''}${lst ? `<span class="muted">${lst} · </span>` : ''}${c.k !== 'other' ? `<span class="cdot" style="background:${c.color}"></span>` : ''}${ui.esc(w.title)}${w.due ? ` <span class="due">${ui.ico('cal')}${ui.esc(fmtDue(w.due, w.time))}</span>` : ''}${w.rep ? ` <span class="rep">${ui.ico('refresh')}${ui.esc(P.repText(w.rep))}</span>` : ''}`; }
     else if (it.kind === 'grocery') { const g = P.groceryBits(it.text); detail = `${ui.esc(g.name)}${g.qty ? ` ×${ui.esc(g.qty)}` : ''} <span class="muted">· ${ui.esc(P.AISLES.find(a => a.k === P.aisleOf(g.name, s.aisleLearn))?.label || '')}${g.store ? ' · ' + ui.esc(P.storeLabel(g.store)) : ''}</span>`; }
     else detail = `${ui.esc(it.text)} <span class="muted">· opens the food logger</span>`;
     return `<div class="pv-it"><button class="kind k-${it.kind}" data-i="${i}">${ui.ico(ICON[it.kind])}${LBL[it.kind]}</button><span class="grow">${detail}</span></div>`;
-  }).join('');
+  }).join('') + (toggle ? `<div class="pv-tog">${items.length > 1 && !whole ? `<span class="muted small">Split into ${items.length}</span>` : ''}${toggle}</div>` : '');
   return { items, html };
 }
+const PV_LIST = { ideas: 'Idea', watch: 'Watch', shop: 'Shopping', someday: 'Someday' };
 const NEXT_KIND = { task: 'grocery', grocery: 'food', food: 'task' };
 
 function bindCapture(root, s, ui) {
   const { $, $$ } = ui;
   const inp = $('#capIn', root), prev = $('#capPrev', root);
   if (!inp) return;
-  let overrides = {}, items = [], seq = 0;
+  let overrides = {}, items = [], seq = 0, whole = false;
   const refresh = async () => {
     const my = ++seq;
-    const r = await previewHtml(inp.value, s, ui, overrides, st.mode);
+    if (!inp.value.trim()) whole = false;
+    const r = await previewHtml(inp.value, s, ui, overrides, st.mode, whole);
     if (my !== seq) return;
     items = r.items; prev.innerHTML = r.html;
     $$('.kind', prev).forEach(b => (b.onclick = () => { const i = +b.dataset.i; overrides[i] = NEXT_KIND[items[i].kind]; learn(items[i], overrides[i], s); refresh(); }));
+    $$('.pv-split', prev).forEach(b => (b.onclick = () => { whole = b.dataset.whole === '1'; overrides = {}; refresh(); }));
   };
   const go = async () => {
     if (!inp.value.trim()) return inp.focus();
     await refresh();
-    const text = inp.value; inp.value = ''; prev.innerHTML = ''; overrides = {};
+    const text = inp.value; inp.value = ''; prev.innerHTML = ''; overrides = {}; whole = false;
     await capture(text, s, ui, { kinds: items });
     ui.render();
   };
@@ -374,15 +381,16 @@ export function openQuick(s, ui, { mode = 'tasks', autostart = true } = {}) {
     <div id="qPrev" class="cprev big"></div>
     <div class="actions"><button class="primary" id="qAdd" disabled>Add</button></div>`, { title: mode === 'groceries' ? 'Add groceries' : 'Quick add' });
   const ta = $('#qT', b), mic = $('#qMic', b), pv = $('#qPrev', b), add = $('#qAdd', b);
-  let rec = null, items = [], overrides = {}, seq = 0, typingT;
+  let rec = null, items = [], overrides = {}, seq = 0, typingT, whole = false;
   const refresh = async () => {
     const my = ++seq;
-    const r = await previewHtml(ta.value, s, ui, overrides, mode);
+    const r = await previewHtml(ta.value, s, ui, overrides, mode, whole);
     if (my !== seq) return;
     items = r.items; pv.innerHTML = r.html;
     add.disabled = !items.length;
     add.textContent = items.length ? `Add ${items.length} item${items.length === 1 ? '' : 's'}` : 'Add';
     $$('.kind', pv).forEach(k => (k.onclick = () => { const i = +k.dataset.i; overrides[i] = NEXT_KIND[items[i].kind]; learn(items[i], overrides[i], s); refresh(); }));
+    $$('.pv-split', pv).forEach(b => (b.onclick = () => { whole = b.dataset.whole === '1'; overrides = {}; refresh(); }));
   };
   const setMic = on => { if (!mic) return; mic.textContent = on ? '■ Done' : '🎤 Start talking'; mic.classList.toggle('on', on); };
   const start = (auto = false) => {
