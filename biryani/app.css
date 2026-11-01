@@ -659,3 +659,13 @@ button.uadd svg { width: 18px; height: 18px; }
 .tsec.restock { border-left: 3px solid var(--accent); }
 .reord li { display: flex; align-items: center; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .reord li button { width: 40px; height: 36px; padding: 0; }
+/* Boston tab: the season road, one row per phase; the current phase is outlined. */
+ul.entries.road li { cursor: default; align-items: stretch; }
+ul.entries.road .kst { width: 4px; border-radius: 4px; background: var(--k); flex: none; }
+ul.entries.road li.now { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+ul.entries.road li.now .name { font-weight: 700; }
+ul.entries.road li.done { opacity: .55; }
+ul.entries.road .r1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+ul.entries.road .r1 .muted { white-space: nowrap; }
+fieldset.srace label { display: block; }
+fieldset.srace .sDel { margin-top: 6px; }

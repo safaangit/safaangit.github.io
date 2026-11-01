@@ -22,8 +22,11 @@ const wkday = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekda
 
 // Everything the tab needs: Garmin days for ~4 months, runs, config with a goal, the plan.
 async function load(s, ref = today()) {
-  const cfg = T.config(s);
-  const months = [...new Set(Array.from({ length: 5 }, (_, i) => monthOf(T.addDays(ref, -31 * i))))].sort();
+  const cfg = T.config(s, ref);
+  // 7 months: a season race months out predicts from 6 months of runs (training.js predict).
+  // Whole calendar months back from this one (stepping 31 days skipped a month: Oct 1 → Aug 31 lost September).
+  const [y0, m0] = monthOf(ref).split('-').map(Number);
+  const months = Array.from({ length: 7 }, (_, i) => { const k = y0 * 12 + m0 - 1 - i; return `${Math.floor(k / 12)}-${String(k % 12 + 1).padStart(2, '0')}`; }).sort();
   const gdays = Object.assign({}, ...(await Promise.all(months.map(m => sync.garminMonth(m).catch(() => ({ days: {} }))))).map(g => g.days || {}));
   const manual = (await db.all('exercises')).filter(x => x.run && x.mi > 0);
   for (const x of manual) (gdays[x.date] ??= { activities: [] }).activities = [...(gdays[x.date].activities || []), { name: x.name, type: 'running', distance: x.mi * 1609.34, duration: (x.min || 0) * 60 }];
@@ -31,7 +34,7 @@ async function load(s, ref = today()) {
   const pred = T.predict(runs, ref, cfg.raceDate);
   const autoGoal = !cfg.goalSec;
   if (autoGoal) cfg.goalSec = pred ? T.suggestGoal(pred.sec) : 4 * 3600;
-  const plan = T.buildPlan(cfg, runs, ref);
+  const plan = T.seasonPlan(cfg, runs, ref);
   const adapted = T.adapt(plan, runs, gdays, cfg, ref);
   const gear = ((await sync.garminGear().catch(() => null))?.gear || []).filter(g => /shoe/i.test(g.type || ''));
   return { cfg, gdays, runs, lifts, pred, autoGoal, plan, adapted, gear };
@@ -68,8 +71,8 @@ let picked = null; // what the Trends charts were drawn from, for taps
 export async function view(s, ui) {
   const sub = local.get('trainTab', 'plan');
   const data = await load(s);
-  const seg = `<div class="seg" id="trainSeg">${[['plan', 'Plan'], ['trends', 'Trends'], ['race', 'Race']].map(([k, l]) => `<button data-k="${k}" class="${k === sub ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  return seg + (sub === 'trends' ? trends(data, ui) : sub === 'race' ? race(data, s, ui) : planView(data, s, ui));
+  const seg = `<div class="seg" id="trainSeg">${[['plan', 'Plan'], ['trends', 'Trends'], ['race', 'Race'], ['goal', 'Boston']].map(([k, l]) => `<button data-k="${k}" class="${k === sub ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  return seg + (sub === 'trends' ? trends(data, ui) : sub === 'race' ? race(data, s, ui) : sub === 'goal' ? boston(data, s, ui) : planView(data, s, ui));
 }
 
 function hero({ cfg, autoGoal, plan }, ui) {
@@ -140,7 +143,7 @@ function planView(data, s, ui) {
     .map(([k, l, z]) => `<div class="ptile k-${k}"><b>${l}</b><span>${T.fmtPace(Z(z)[2])}–${T.fmtPace(Z(z)[3])}</span></div>`).join('');
   return hero(data, ui) + changedHtml + `<section class="card calcard"><h3>Plan to race day</h3>
     <div class="calstick"><div class="ptiles">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
-    ${pastHtml}${ahead.map(wkHtml).join('')}
+    ${pastHtml}${ahead.slice(0, 8).map(wkHtml).join('')}${ahead.length > 8 ? `<details class="pastwks" id="laterWks" ${local.get('calLaterOpen', false) ? 'open' : ''}><summary><span>${ahead.length - 8} more weeks</span><span class="muted">${mon(ahead[8].start)} – ${mon(cfg.raceDate)} · ${ahead.slice(8).map(w => w.phase).filter((x, i, a) => a.indexOf(x) === i && x !== 'Cutback').join(' → ')}</span></summary>${ahead.slice(8).map(wkHtml).join('')}</details>` : ''}
     <p class="muted small">Paces are per mile. Dots show how hard the day is, and any distance in the range counts. Done days show what you actually ran; a purple corner means you lifted. Tap a day to see the workout, swap it with another day, or skip it.</p></section>
   ${todayCardHtml}${notesHtml}
   <section class="card"><details class="how"><summary><h3>How this plan adjusts</h3></summary><ul class="tips">
@@ -226,12 +229,86 @@ function race({ cfg, plan, pred, autoGoal }, s, ui) {
   </ul></section>`;
 }
 
+// ---------- Boston: the long game ----------
+const hms = sec => sec ? T.fmtTime(sec).replace(/^0:/, '') : '–';
+const PH_TARGET = (sea, k) => ({ recover: 25, base: sea.baseTop, speed: sea.baseTop + 4, gate: sea.baseTop + 4, block: sea.peakMi })[k];
+function boston({ cfg, runs, pred, plan }, s, ui) {
+  const sea = cfg.season, t = today(), road = T.roadmap(cfg, t), nowP = road.find(p => p.now) || road.find(p => p.from > t);
+  const bq = sea.races.find(r => r.bq), toBq = bq ? T.daysBetween(t, bq.date) : null;
+  const sec = pred?.sec, gap = sec ? sec - sea.aim : null;
+  const verdict = !sec ? 'Sync a few runs of 5+ mi to see where you stand.'
+    : sec <= sea.aim ? `Your runs point to ${hms(sec)}: under ${hms(sea.aim)}. That's a BQ with room for the cutoff.`
+    : sec <= sea.std ? `Your runs point to ${hms(sec)}: under the ${hms(sea.std)} standard but inside the cutoff zone. Another ${Math.ceil((sec - sea.aim) / 60)} min makes it safe.`
+    : `Your runs point to ${hms(sec)}. ${Math.ceil(gap / 60)} min to find${toBq > 0 ? ` in ${Math.round(toBq / 7)} weeks` : ''}. Miles find most of it.`;
+  const avgWk = pred?.avgWk ?? (() => { const w = T.weekly(runs), m = T.weekStart(t); return Array.from({ length: 8 }, (_, k) => w.get(T.addDays(m, -7 * (k + 1))) || 0).reduce((a, b) => a + b, 0) / 8; })();
+  const target = nowP && PH_TARGET(sea, nowP.k), hd = T.hardDays(runs, plan.z, t);
+  // Checkpoint result: a 13-13.5 mi run on (or a day either side of) the checkpoint date.
+  const gates = sea.races.filter(r => r.gate).map(g => {
+    const res = runs.filter(r => Math.abs(T.daysBetween(g.date, r.date)) <= 1 && r.mi >= 12.9 && r.mi <= 13.6 && r.sec).sort((a, b) => a.sec - b.sec)[0];
+    const v = !res ? '' : res.sec <= g.gate[0] ? `Under ${hms(g.gate[0])}: go for ${hms(sea.aim)} at ${bq?.name || 'the BQ race'}.` : res.sec <= g.gate[1] ? `Under ${hms(g.gate[1])}: a ${hms(sea.std)} attempt is on (lottery spot if it holds).` : `Slower than ${hms(g.gate[1])}: race ${bq?.name || 'the fall marathon'} for a PR and aim the BQ at the next window.`;
+    return { g, res, v };
+  });
+  const row = p => `<li class="${p.now ? 'now' : p.done ? 'done' : ''} k-${p.k === 'race' || p.k === 'gate' ? 'race' : p.k === 'block' ? 'quality' : p.k === 'speed' ? 'long' : 'easy'}"><span class="kst"></span><div class="grow">
+    <div class="r1"><span class="name">${ui.esc(p.name)}${p.race?.tbc ? ' <span class="muted small">date not set</span>' : ''}</span><span class="muted small">${p.from === p.to ? mon(p.from) : `${mon(p.from)} – ${mon(p.to)}`}</span></div>
+    ${p.note || p.race?.gate ? `<div class="sub">${ui.esc(p.note || `Checkpoint: ${hms(p.race.gate[0])} or faster = ${hms(sea.aim)} shot; ${hms(p.race.gate[1])} or faster = ${hms(sea.std)} shot.`)}</div>` : ''}</div></li>`;
+  return `<section class="card hero"><div class="cdown">${toBq > 0 ? `<b>${toBq}</b><span>days to ${ui.esc((bq.name || '').replace(/ Marathon$/, ''))}</span>` : '<b>BQ</b><span>set the race</span>'}</div><div class="grow"><div class="rn">${ui.esc(sea.goal)}</div>
+    <div class="sub">Standard ${hms(sea.std)} · aim ${hms(sea.aim)} for the cutoff</div><div class="goal">Window closes about <b>${mon(sea.windowEnd)}</b>${sea.windowEnd.slice(0, 4) !== t.slice(0, 4) ? ` ${sea.windowEnd.slice(0, 4)}` : ''}</div></div>
+    <button class="icon" id="seasonEdit" aria-label="Edit season">${ui.ico('settings')}</button></section>
+  <section class="card"><h3>Where you stand</h3><p>${ui.esc(verdict)}</p>
+    <div class="stats">
+      <div class="stat run"><div class="k">Predicted</div><div class="v">${hms(sec)}</div><div class="k">marathon</div></div>
+      <div class="stat burn"><div class="k">Mi / week</div><div class="v">${Math.round(avgWk)}</div><div class="k">${target ? `aim ${Math.round(target)} now` : '8-wk avg'}</div></div>
+      <div class="stat ${hd.length > 2 ? 'heart' : 'steps'}"><div class="k">Hard days</div><div class="v">${hd.length}</div><div class="k">last 7 · max 2</div></div>
+    </div>
+    <p class="muted small">Prediction is the same one the Race tab uses. Months out it looks back 6 months, so easy base weeks don't drag it down.</p></section>
+  ${gates.map(({ g, res, v }) => `<section class="card"><h3>Checkpoint: ${ui.esc(g.name)}</h3>${res ? `<p><b>${hms(res.sec)}</b> on ${mon(res.date)}. ${ui.esc(v)}</p>` : `<p>${mon(g.date)}${g.tbc ? ' (pick the race and set the date)' : ''}. ${hms(g.gate[0])} or faster: ${hms(sea.aim)} is on. ${hms(g.gate[1])} or faster: ${hms(sea.std)} is on. Slower: the fall race is a PR race and the BQ moves to the next window.</p>`}</section>`).join('')}
+  <section class="card"><h3>The road</h3><ul class="entries road">${road.filter(p => !p.done || p.k === 'race').map(row).join('')}</ul>
+    <p class="muted small">The Plan tab follows this on its own: after each marathon it builds recovery, base and speed weeks, then the race block. Long runs stop at 20 mi and no week jumps more than ~10%, for the knee.</p></section>
+  <section class="card"><h3>Rules that get you there</h3><ul class="tips">
+    <li><b>Easy means easy.</b> Two hard days a week. The rest conversational.</li>
+    <li><b>Miles first.</b> Most of the gap closes by holding 55-65 mi weeks, not by faster workouts.</li>
+    <li><b>Cut only in base.</b> Once workouts start, eat at maintenance.</li>
+    <li><b>Strength 2× a week</b> (single-leg squats, step-downs, RDLs, calf raises) and 7.5 h+ sleep past 50 mi a week.</li>
+  </ul></section>`;
+}
+
+function openSeason(s, ui) {
+  const sea = T.season(s);
+  const raceRow = (r, i) => `<fieldset class="srace" data-i="${i}"><legend>${r.mi > 26 ? 'Marathon' : 'Half'}${r.gate ? ' · checkpoint' : ''}${r.bq ? ' · BQ race' : ''}</legend>
+    <label>Name<input class="sName" value="${ui.esc(r.name)}"></label><label>Date<input class="sDate" type="date" value="${r.date}"></label>
+    <label>Distance<select class="sMi"><option value="26.2" ${r.mi > 26 ? 'selected' : ''}>Marathon</option><option value="13.1" ${r.mi < 26 ? 'selected' : ''}>Half marathon</option></select></label>
+    <button class="sDel">Remove</button></fieldset>`;
+  const b = ui.sheet(`<label>Goal<input id="sGoal" value="${ui.esc(sea.goal)}"></label>
+    <label>Qualifying standard<input id="sStd" inputmode="numeric" value="${T.fmtTime(sea.std)}"></label>
+    <label>Aim (standard minus a cutoff buffer)<input id="sAim" inputmode="numeric" value="${T.fmtTime(sea.aim)}"></label>
+    <label>Window closes<input id="sWin" type="date" value="${sea.windowEnd}"></label>
+    <h4>Races</h4><div id="sRaces">${sea.races.map(raceRow).join('')}</div>
+    <div class="actions"><button id="sAdd">Add race</button><button class="primary" id="sSave">Save</button></div>
+    <p class="muted small">Marathons set the plan, in date order: after each one, the next becomes your race. Halves between them are checkpoints.</p>`, { title: 'Season' });
+  let races = sea.races.map(r => ({ ...r }));
+  const read = () => ui.$$('.srace', b).forEach(f => { const r = races[+f.dataset.i]; Object.assign(r, { name: ui.$('.sName', f).value.trim() || r.name, date: ui.$('.sDate', f).value || r.date, mi: +ui.$('.sMi', f).value }); if (r.date !== sea.races.find(x => x.id === r.id)?.date) r.tbc = false; });
+  const redraw = () => { ui.$('#sRaces', b).innerHTML = races.map(raceRow).join(''); wire(); };
+  const wire = () => ui.$$('.sDel', b).forEach(x => (x.onclick = () => { read(); races.splice(+x.closest('.srace').dataset.i, 1); redraw(); }));
+  wire();
+  ui.$('#sAdd', b).onclick = () => { read(); races.push({ id: 'r' + Date.now(), name: 'Marathon', date: T.addDays(races.at(-1)?.date || today(), 70), start: '7:00 AM', mi: 26.2 }); redraw(); };
+  ui.$('#sSave', b).onclick = async () => {
+    read();
+    races = races.map(r => r.mi < 26 && !r.gate ? { ...r, gate: [sea.aim * 0.479, sea.std * 0.48].map(Math.round) } : r);
+    const season = { goal: ui.$('#sGoal', b).value.trim() || sea.goal, std: T.parseTime(ui.$('#sStd', b).value) || sea.std, aim: T.parseTime(ui.$('#sAim', b).value) || sea.aim,
+      windowEnd: ui.$('#sWin', b).value || sea.windowEnd, races: races.sort((x, y) => x.date.localeCompare(y.date)) };
+    await db.saveSettings({ ...s, training: { ...(s.training || {}), season: { ...(s.training?.season || {}), ...season } } });
+    ui.closeSheet(); ui.toast('Season saved'); ui.render();
+  };
+}
+
 export function bind(root, s, ui) {
   ui.$$('#trainSeg button', root).forEach(b => (b.onclick = () => { local.set('trainTab', b.dataset.k); ui.render(); }));
   const edit = ui.$('#raceEdit', root);
   if (edit) edit.onclick = () => openRace(s, ui);
   ui.$$('.cal[data-d], .adjrow[data-d]', root).forEach(c => (c.onclick = () => openDay(s, c.dataset.d, ui)));
   const pw = ui.$('#pastWks', root); if (pw) pw.ontoggle = () => local.set('calPastOpen', pw.open);
+  const lw = ui.$('#laterWks', root); if (lw) lw.ontoggle = () => local.set('calLaterOpen', lw.open);
+  const se = ui.$('#seasonEdit', root); if (se) se.onclick = () => openSeason(s, ui);
   if (picked) bindCharts(root, (id, i, c) => {
     const P = picked, box = c.closest('.card').querySelector('.tipbox');
     if (id === 'wk' || id === 'pace') {
@@ -314,6 +391,13 @@ function openRace(s, ui) {
     <p class="muted small">Same weekly miles either way, spread over more days. To move a rest day, tap it on the calendar and swap.</p>
     <div class="actions"><button class="primary" id="rSave">Save</button></div>`, { title: 'Race settings' });
   ui.$('#rSave', b).onclick = async () => {
+    // A season race (after the first one) is saved on the race itself; settings keep the original race.
+    if (c.prevRace) {
+      const sea = T.season(s), v = { name: ui.$('#rName', b).value.trim() || c.raceName, date: ui.$('#rDate', b).value || c.raceDate, start: ui.$('#rStart', b).value.trim(), mi: +ui.$('#rMi', b).value, goalSec: T.parseTime(ui.$('#rGoal', b).value), tbc: false };
+      const races = sea.races.map(r => r.id === c.raceId ? { ...r, ...v } : r);
+      await db.saveSettings({ ...s, training: { ...(s.training || {}), restDays: +ui.$('#rRest', b).value, longDay: +ui.$('#rLong', b).value, season: { ...(s.training?.season || {}), races } } });
+      ui.closeSheet(); ui.toast('Race saved'); ui.render(); return;
+    }
     const training = { ...(s.training || {}), restDays: +ui.$('#rRest', b).value, raceName: ui.$('#rName', b).value.trim() || c.raceName, raceDate: ui.$('#rDate', b).value || c.raceDate, raceStart: ui.$('#rStart', b).value.trim(),
       raceMi: +ui.$('#rMi', b).value, goalSec: T.parseTime(ui.$('#rGoal', b).value), longDay: +ui.$('#rLong', b).value,
       planStart: ui.$('#rDate', b).value !== c.raceDate ? T.weekStart(today()) : c.planStart };
