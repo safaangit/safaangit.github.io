@@ -330,7 +330,7 @@ function applyMoves(weeks, cfg) {
   for (const [x, y] of cfg.swaps || []) { const a = at(x), b = at(y); if (ok(a) && ok(b)) swap(a, b, false); }
   for (const x of cfg.skips || []) {
     const d = at(x);
-    if (ok(d) && d.kind !== 'rest') Object.assign(d, { kind: 'rest', mi: 0, lo: 0, hi: 0, pace: null, moved: `Skipped (was ${d.title.toLowerCase()}${d.mi ? `, ${d.mi} mi` : ''}).`, title: 'Rest', detail: 'Day off, your call.' });
+    if (ok(d) && d.kind !== 'rest') Object.assign(d, { kind: 'rest', mi: 0, lo: 0, hi: 0, pace: null, moved: `Skipped (was ${d.title.toLowerCase()}${d.mi ? `, ${d.mi} mi` : ''}).`, title: 'Rest', detail: 'Day off, your call.', was: { kind: d.kind, title: d.title, mi: d.mi, lo: d.lo, hi: d.hi } });
   }
   const hard = d => d && (d.kind === 'quality' || d.kind === 'long');
   all.forEach((d, i) => { if (d.moved && hard(d) && (hard(all[i - 1]) || hard(all[i + 1]))) d.moved += ' That puts two hard days in a row; take one of them easy if your legs are heavy.'; });
@@ -520,4 +520,105 @@ export function notes({ gdays, runs, plan, cfg, s, ref = today() }) {
     out.push(['fuel', 'Workouts have started. Switch your goal from cut to maintenance so the hard days get fueled; losing weight now costs fitness.']);
   if (toRace >= 0 && toRace <= 28) out.push(['info', 'Taper time: fitness is banked. Volume drops, a little marathon pace stays in so the legs stay sharp.']);
   return out;
+}
+
+// ---------- Change log ----------
+// The plan as the app showed it on the morning of `ref`: Garmin data up to the day before.
+export function planAt(s, gdays, ref) {
+  const g = {};
+  for (const d in gdays) if (d < ref) g[d] = gdays[d];
+  const cfg = config(s, ref), runs = runsFrom(g);
+  if (!cfg.goalSec) { const p = predict(runs, ref, cfg.raceDate); cfg.goalSec = p ? suggestGoal(p.sec) : 4 * 3600; }
+  const plan = seasonPlan(cfg, runs, ref), ad = adapt(plan, runs, g, cfg, ref);
+  return { cfg, plan, fatigue: ad.fatigue };
+}
+
+const shortDay = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+const dayTag = d => `${DOW[dow(d)]} ${+d.slice(8)}`;
+const miTxt = x => !x.mi ? '' : x.lo === x.hi ? `${x.mi} mi` : `${x.lo}-${x.hi} mi`;
+const ttl = x => x.title.replace(/ \(was [^)]*\)$/, '').toLowerCase();
+const desc = x => x.mi ? `${ttl(x)} ${miTxt(x)}` : ttl(x);
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+
+// What happened each day since the plan started and what it changed, newest first. Replays the plan
+// morning by morning (the way the app showed it each day) and diffs it, so it needs no stored history
+// and always matches the calendar. Entries: { date, why: [[kind, text]], res: [text], tag }.
+// Kinds: rest (skipped / unplanned rest), miss, short, long (longer), extra, hard, body, week, you, goal, plan.
+export function changeLog(s, gdays, ref = today(), maxDays = 120) {
+  const runs = runsFrom(gdays), now = config(s, ref), out = [];
+  const start = now.planStart > addDays(ref, -maxDays) ? now.planStart : addDays(ref, -maxDays);
+  let prev = planAt(s, gdays, start);
+  for (let D = addDays(start, 1); D <= ref; D = addDays(D, 1)) {
+    const cur = planAt(s, gdays, D), ev = addDays(D, -1), why = [], res = [];
+    if (cur.cfg.raceId !== prev.cfg.raceId || cur.cfg.raceDate !== prev.cfg.raceDate) {
+      out.push({ date: ev, why: [['plan', `${prev.cfg.raceName} is done.`]], res: [`New plan: ${cur.cfg.raceName}, ${shortDay(cur.cfg.raceDate)}.`] });
+      prev = cur; continue;
+    }
+    // What you did yesterday against what the plan said that morning.
+    const d = planFor(prev.plan, ev);
+    if (d && d.kind !== 'race' && ev >= now.planStart) {
+      const all = milesOn(runs, ev), got = d.kind === 'long' ? longestOn(runs, ev) : all, z = prev.plan.z;
+      const tempoSlow = z.list.find(x => x[0] === 'tempo')[3], mpSlow = z.list.find(x => x[0] === 'mp')[3];
+      const best = runs.filter(r => r.date === ev && r.mi >= 3 && r.sec).sort((a, b) => b.mi - a.mi)[0];
+      const pace = best ? `${fmtPace(best.sec / best.mi)}/mi` : '';
+      if (d.was && !all) why.push(['rest', `Unplanned rest: skipped ${desc(d.was)}.`]);
+      else if (d.mi && !all) why.push(['miss', `Missed ${desc(d)}.`]);
+      else if (!d.mi && all) why.push(['extra', `Ran ${r1(all)} mi on a rest day.`]);
+      else if (d.mi && got > d.hi + 0.5) why.push(['long', `Went longer: ${r1(got)} mi (plan ${miTxt(d)}).`]);
+      else if (d.mi && got < d.lo * 0.95) why.push(['short', `Cut short: ${r1(got)} of ${miTxt(d)}.`]);
+      if (best && d.kind === 'long' && best.mi >= d.lo * 0.9 && (best.sec / best.mi <= mpSlow + 15 || best.rpe >= 90))
+        why.push(['hard', `Hard long run: ${r1(best.mi)} mi at ${pace}${best.rpe ? `, effort ${Math.round(best.rpe / 10)}/10` : ''}.`]);
+      else if (best && d.kind !== 'quality' && d.kind !== 'long' && best.sec / best.mi <= tempoSlow + 10)
+        why.push(['hard', `Went harder: ${r1(best.mi)} mi at ${pace}, tempo effort on ${d.mi ? `an ${d.kind === 'medium' ? 'medium' : 'easy'} day` : 'a rest day'}.`]);
+    }
+    // Resting HR / ratings that started flagging overnight.
+    for (const sig of cur.fatigue.signals) if (!prev.fatigue.signals.includes(sig)) why.push(['body', cap(sig) + '.']);
+    // A new week rebuilds the plan from what you ran.
+    if (dow(D) === 1) {
+      const w = prev.plan.weeks.find(x => x.start === weekStart(ev));
+      if (w && ev >= now.planStart) why.push(['week', `Week done: ${r1(weekly(runs).get(w.start) || 0)} mi (plan ${Math.round(w.lo)}-${Math.round(w.hi)}).`]);
+    }
+    if (cur.cfg.goalSec !== prev.cfg.goalSec) res.push(`Goal ${fmtTime(prev.cfg.goalSec).replace(/:00$/, '')} → ${fmtTime(cur.cfg.goalSec).replace(/:00$/, '')}, so every pace moved.`);
+    // The diff: the next 7 days one by one, later weeks as weekly totals.
+    const was = new Map(prev.plan.weeks.flatMap(w => w.days).map(x => [x.date, x])), weeks = new Map();
+    for (const w of cur.plan.weeks) for (const x of w.days) {
+      const p = was.get(x.date);
+      if (x.date < D || !p || (p.kind === x.kind && p.title === x.title && p.lo === x.lo && p.hi === x.hi)) continue;
+      if (daysBetween(D, x.date) < 7) res.push(`${dayTag(x.date)}: ${p.title === x.title ? `${ttl(x)} ${miTxt(p) || 'off'} → ${miTxt(x) || 'off'}` : `${desc(p)} → ${desc(x)}`}.`);
+      else weeks.set(w.start, w);
+    }
+    // Later weeks: the first two that changed, then a count (a new week can nudge the whole season).
+    const far = [...weeks.values()].map(w => {
+      const pw = prev.plan.weeks.find(x => x.start === w.start);
+      const a = pw ? `${Math.round(pw.lo)}-${Math.round(pw.hi)}` : '', b = `${Math.round(w.lo)}-${Math.round(w.hi)}`;
+      return `Week of ${shortDay(w.start).replace(/^\w+, /, '')}: ${a && a !== b ? `${a} → ${b} mi` : 'days reshuffled'}.`;
+    });
+    res.push(...far.slice(0, 2));
+    if (far.length > 2) res.push(`${far.length - 2} later weeks adjusted to match.`);
+    if (why.length || res.length) {
+      if (!why.length) why.push(['plan', 'Plan rules updated the days ahead.']);
+      if (!res.length) res.push(why.some(([k]) => k === 'rest' || k === 'miss' || k === 'short') ? 'No change ahead: the plan picks up as written, the standard rule for a few missed runs (Pfitzinger, RunnersConnect).' : 'No change to the plan.');
+      out.push({ date: ev, why, res });
+    }
+    prev = cur;
+  }
+  // Your own moves from the day sheet (skips already show up as unplanned rest when they're past).
+  const cfg = now, at = d => planFor(planAt(s, gdays, d < ref ? d : ref).plan, d), was = d => d ? desc(d) : 'its plan';
+  for (const [x, y, from = cfg.planStart] of cfg.weekSwaps || []) {
+    if (from > ref) continue;
+    // A week where both days moved, to say what each one holds now.
+    const w = planAt(s, gdays, ref).plan.weeks.find(w => w.days.some(d => dow(d.date) === x && d.moved?.startsWith('Every')));
+    const dx = w?.days.find(d => dow(d.date) === x), dy = w?.days.find(d => dow(d.date) === y);
+    out.push({ date: from, why: [['you', `You swapped ${DOW[x]} and ${DOW[y]}, every week.`]],
+      res: [dx && dy ? `${DOW[x]} is now ${ttl(dx)} and ${DOW[y]} is ${ttl(dy)}, every week but race week.` : 'The two days trade workouts every week but race week.'] });
+  }
+  for (const [a, b] of cfg.swaps || []) {
+    const [x, y] = [a, b].sort();
+    if (x > ref || y < start) continue;
+    const dx = at(x), dy = at(y);
+    out.push({ date: x, why: [['you', `You swapped ${dayTag(x)} and ${dayTag(y)}.`]], res: [dx && dy ? `${dayTag(x)} became ${was(dx)}, ${dayTag(y)} ${was(dy.was || dy)}.` : 'The two days trade workouts.'] });
+  }
+  for (const x of cfg.skips || []) if (x >= ref)
+    out.push({ date: x, why: [['you', `You skipped ${shortDay(x)} ahead of time.`]], res: ['That day is rest. Its miles aren\'t moved anywhere.'] });
+  return out.filter(e => e.date >= start || e.why[0][0] === 'you').sort((a, b) => b.date.localeCompare(a.date));
 }
