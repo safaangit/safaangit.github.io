@@ -103,14 +103,15 @@ async function usdaBarcode(code) {
 }
 
 // ---- Bundled whole foods ----
-// app/generic.json (built by tools/generic_foods.js): ~5,000 plain foods per 100 g from USDA
-// Foundation + SR Legacy, so "shrimp" or "chicken breast" works instantly, offline and without a key.
+// app/generic.json (built by tools/generic_foods.js): ~10,000 foods per 100 g from USDA Foundation +
+// SR Legacy (plain foods) and FNDDS (cooking methods and dishes: "chicken thigh, grilled", "chicken curry"),
+// so "shrimp" or "chicken breast" works instantly, offline and without a key.
 let genP;
-function fromGeneric([id, name, full, kcal, p, c, f, fib, sug, na, por, pop]) {
+function fromGeneric([id, name, full, kcal, p, c, f, fib, sug, na, por, pop, survey]) {
   const units = por ? por.split('|').map(x => { const i = x.lastIndexOf(':'); return { label: x.slice(0, i), mult: +x.slice(i + 1) / 100 }; }) : [];
   return {
     name: name || full, full, n: clean({ kcal, p, c, f, fib, sug, na }), units: gramUnits(units),
-    source: 'gen', srcLabel: 'USDA', srcId: id, pop,
+    source: 'gen', srcLabel: survey ? 'USDA FNDDS' : 'USDA', srcId: id, pop, ...(survey ? { survey: 1 } : {}),
   };
 }
 export function generic() {
@@ -156,7 +157,9 @@ function fromLib([gtin, name, brand, kcal, p, c, f, fib, sug, na, sv, svg, src])
 async function brandedSearch(q) {
   const idx = await libJSON('index.json');
   if (!idx) return [];
-  const P = idx.prefixes, keys = [...new Set(foodWords(q).map(w => libKey(P, w)).filter(Boolean))].sort((a, b) => P[a] - P[b]);
+  // Food words' files first, then cooking words' ("boiled"), smallest first within each.
+  const P = idx.prefixes, ws = foodWords(q), first = k => (ws.some(w => !METHOD[w] && libKey(P, w) === k) ? 0 : 1);
+  const keys = [...new Set(ws.map(w => libKey(P, w)).filter(Boolean))].sort((a, b) => first(a) - first(b) || P[a] - P[b]);
   // A food is filed under its brand and first two name words, so read each word's file (the smallest
   // three); very common words ("chocolate") are left to the other sources.
   const files = await Promise.all(keys.filter(k => P[k] <= 1500).slice(0, 3).map(k => libJSON(`w/${k}.json`)));
@@ -178,12 +181,28 @@ const stem = w => (w.length > 3 ? w.replace(/(ies)$/, 'y').replace(/(es|s)$/, ''
 export const STOP = new Set(['a', 'an', 'the', 'of', 'and', 'with', 'in', 'on', 'i', 'no', 'said', 'mean', 'meant', 'some', 'my', 'yeah', 'so', 'um', 'uh', 'okay', 'ok', 'like', 'had', 'ate']);
 // Words that only say "the ordinary one" ("plain shrimp"): fine to have, never required.
 const SOFT = new Set(['plain', 'fresh', 'natural', 'regular', 'unseasoned', 'organic', 'simple', 'just']);
-// Cooking words match how USDA names the method ("cooked" finds "boiled", "roasted", "dry heat").
-const SYN = {
-  cooked: ['cooked', 'boiled', 'steamed', 'roasted', 'grilled', 'baked', 'broiled', 'stewed', 'braised', 'poached', 'heat', 'browned'],
-  grilled: ['grilled', 'broiled', 'roasted', 'heat'], baked: ['baked', 'roasted', 'heat'], boiled: ['boiled', 'moist', 'steamed'],
-  steamed: ['steamed', 'boiled', 'moist'], raw: ['raw', 'uncooked', 'dry'], uncooked: ['raw', 'uncooked', 'dry'], dry: ['dry', 'raw', 'uncooked'],
+// Cooking methods. USDA names them its own way (chicken is "stewed", beef "simmered", fish "moist heat"),
+// so a method word matches any word in its group. A different cooking method still counts part way, so
+// "boiled chicken thigh" finds a cooked thigh before a raw one, and raw never stands in for cooked.
+const GROUPS = {
+  moist: 'boiled boil stewed poached poach simmered braised steamed steam moistheat pressurecooked slowcooked',
+  dry: 'grilled grill broiled roasted roast baked bake dryheat airfried rotisserie charbroiled barbecued bbq',
+  fried: 'fried fry panfried deepfried sauteed saute',
+  raw: 'raw uncooked dry',
 };
+const METHOD = {}, GROUP = {};
+for (const [g, ws] of Object.entries(GROUPS)) { GROUP[g] = new Set(ws.split(' ')); for (const w of GROUP[g]) METHOD[w] = g; }
+METHOD.cooked = 'cooked';
+const COOKED = new Set(['cooked', ...GROUP.moist, ...GROUP.dry, ...GROUP.fried]);
+export const isMethod = w => !!METHOD[w];
+// Two-word methods become one word on both sides ("air fried" → airfried, "dry heat" → dryheat), and
+// USDA's "meat only" / "skin not eaten" also read as skinless.
+const PHRASES = [
+  [/\bair[\s-]*fr(?:y|ied|ier|yer)\b/g, 'airfried'], [/\bpan[\s-]*fr(?:y|ied)\b/g, 'panfried'], [/\bdeep[\s-]*fr(?:y|ied)\b/g, 'deepfried'],
+  [/\b(dry|moist)[\s-]+heat\b/g, '$1heat'], [/\b(?:instant[\s-]*pot|pressure[\s-]*cook(?:ed|er)?)\b/g, 'pressurecooked'],
+  [/\b(?:crock[\s-]*pot|slow[\s-]*cook(?:ed|er)?)\b/g, 'slowcooked'], [/\b(?:meat only|skin not eaten)\b/g, '$& skinless'],
+];
+const phrase = s => PHRASES.reduce((t, [re, to]) => t.replace(re, to), (s || '').toLowerCase());
 export const tokens = s => (s || '').toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter(Boolean);
 export function lev(a, b) {
   if (Math.abs(a.length - b.length) > 2) return 9;
@@ -199,7 +218,13 @@ export function lev(a, b) {
 // ("cookie" finds "cookies", but "i" no longer matches every word with an i in it); a typo in a
 // longer word ("drizzalicious" for Drizzilicious) counts most of the way.
 export function wordHit(w, hay) {
-  if (SYN[w] && hay.some(h => SYN[w].includes(h))) return 1;
+  const g = METHOD[w];
+  if (g) {
+    if (hay.includes(w)) return 1;
+    if (g === 'cooked') return hay.some(h => COOKED.has(h)) ? 1 : 0;
+    if (hay.some(h => GROUP[g].has(h))) return g === 'raw' ? 1 : 0.97; // the exact word ranks a little higher
+    return g !== 'raw' && hay.some(h => COOKED.has(h)) ? 0.6 : 0;
+  }
   const s = stem(w);
   if (hay.some(h => h === w || h.startsWith(s) || stem(h) === s)) return 1;
   const tol = w.length >= 9 ? 2 : w.length >= 5 ? 1 : 0;
@@ -207,18 +232,23 @@ export function wordHit(w, hay) {
 }
 // Share of the query's food words found in a food (0-1). Brand words count double, so
 // "yasso cookie dough" ranks Yasso bars above plain cookie dough.
-const foodWords = q => { const w = tokens(q).filter(x => !STOP.has(x)), hard = w.filter(x => !SOFT.has(x)); return hard.length ? hard : w; };
-const hayOf = f => (f._hay ??= [...tokens(f.full || f.name), ...tokens(f.brand)]); // the full name, so a shortened one keeps its flavor
+const foodWords = q => { const w = tokens(phrase(q)).filter(x => !STOP.has(x)), hard = w.filter(x => !SOFT.has(x)); return hard.length ? hard : w; };
+const hayOf = f => (f._hay ??= [...tokens(phrase(f.full || f.name)), ...tokens(f.brand)]); // the full name, so a shortened one keeps its flavor
+// A cooking word alone never makes a match: "pan fried tilapia" isn't pan-fried veal.
 export function coverage(q, f, brands) {
   const words = foodWords(q);
   if (!words.length) return tokens(q).length ? 0 : 1;
   const hay = hayOf(f);
-  let got = 0, max = 0;
-  for (const w of words) { const wt = brands && wordHit(w, brands) ? 2 : 1; max += wt; got += wt * wordHit(w, hay); }
-  return got / max;
+  let got = 0, max = 0, food = 0, foodHit = 0;
+  for (const w of words) {
+    const wt = brands && wordHit(w, brands) ? 2 : 1, hit = wordHit(w, hay);
+    max += wt; got += wt * hit;
+    if (!METHOD[w]) { food++; if (hit) foodHit++; }
+  }
+  return food && !foodHit ? 0 : got / max;
 }
 export function relevance(q, f, brands) {
-  const first = foodWords(q)[0], name = tokens(f.name);
+  const ws = foodWords(q), first = ws.find(w => !METHOD[w]) || ws[0], name = tokens(f.name);
   const starts = first && name[0] && wordHit(first, [name[0]]) ? 0.15 : 0;
   const short = 0.2 / Math.max(1, (name.length + tokens(f.brand).length) / 4); // prefer "Chicken breast, cooked" over long descriptions
   return coverage(q, f, brands) + starts + short;
@@ -230,12 +260,15 @@ export function brandWords(list, generic = []) {
 }
 // Not halal: sinks to the bottom rather than hiding, so a search for it still finds something.
 const HARAM = /\b(pork|lard|gelatine?|wine|beer|rum|liqueur|whiske?y|vodka|bourbon|brandy|tequila|pepperoni|salami|prosciutto|chorizo|pancetta)\b|(?<!(turkey|beef|chicken) )\b(ham|bacon)\b/i;
+const SKIN_ONLY = /\bskin \(|\bskin only\b/i;
 export function score(q, f, brands) {
   const c = check(f.n);
   const complete = ['kcal', 'p', 'c', 'f'].every(k => f.n?.[k] != null) ? 1 : 0.7;
-  const rel = relevance(q, f, brands), staple = f.pop && rel >= 1 ? 0.3 : 0; // shrimp, chicken breast, rice, eggs…
   const cov = q ? coverage(q, f, brands) : 1; // a missing word ("greek" in "great value greek yogurt") costs twice
-  return (rel + staple) * cov * (SRC_W[f.source] || 0.6) * (c.ok ? 1 : 0.6) * complete * (HARAM.test(`${f.full || f.name} ${f.brand || ''}`) ? 0.3 : 1);
+  // Shrimp, chicken breast, rice, eggs… lead, unless only a stand-in cooking method matched ("poached egg" isn't hard-boiled).
+  const rel = relevance(q, f, brands), staple = f.pop && rel >= 1 && cov >= 0.99 ? 0.3 : 0;
+  const part = SKIN_ONLY.test(f.full || f.name) && !/\bskin\b/i.test(q) ? 0.6 : 1; // "chicken thigh" isn't the skin alone
+  return (rel + staple) * cov * part * (SRC_W[f.source] || 0.6) * (f.survey ? 0.88 : 1) * (c.ok ? 1 : 0.6) * complete * (HARAM.test(`${f.full || f.name} ${f.brand || ''}`) ? 0.3 : 1);
 }
 function dedupe(list) {
   const seen = new Map();
