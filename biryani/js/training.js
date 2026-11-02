@@ -44,7 +44,7 @@ export const config = (s, ref = today()) => {
   const after = d => d > prev.date;
   return { ...cfg, raceId: r.id, raceName: r.name, raceDate: r.date, raceStart: r.start || '', raceMi: r.mi, goalSec: r.goalSec || null,
     planStart: addDays(prev.date, 1), prevRace: prev, peakMi: sea.peakMi, season: sea,
-    swaps: (cfg.swaps || []).filter(p => after(p[0])), skips: (cfg.skips || []).filter(after) };
+    swaps: (cfg.swaps || []).filter(p => after(p[0])), skips: (cfg.skips || []).filter(after), easyLongs: (cfg.easyLongs || []).filter(after) };
 };
 
 // Every Garmin run, one row per activity.
@@ -84,18 +84,32 @@ export function predict(runs, ref = today(), raceDate) {
 // Suggested goal: the prediction to the nearest 5 minutes.
 export const suggestGoal = pred => Math.round(pred / 300) * 300;
 
+// Jack Daniels' VDOT formulas: the fitness a race time implies, and the time that fitness gives at
+// another distance (minutes). Used to turn the goal into its equivalent 5K pace for intervals.
+const vo2At = (m, min) => { const v = m / min; return (-4.6 + 0.182258 * v + 0.000104 * v * v) / (0.8 + 0.1894393 * Math.exp(-0.012778 * min) + 0.2989558 * Math.exp(-0.1932605 * min)); };
+export const equivSec = (fromM, fromSec, toM) => {
+  const vd = vo2At(fromM, fromSec / 60); let lo = 1, hi = 600;
+  for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; vo2At(toM, mid) > vd ? (lo = mid) : (hi = mid); }
+  return lo * 60;
+};
+
+// Pace bands, slowest to fastest, none overlapping. Sources (training-plan audit, 2026-11-02):
+// long runs start at Pfitzinger's "10% slower than marathon pace" (his range is 10-20%; Higdon's is MP + 30-90 s)
+// and stop where easy starts; easy sits in Pfitzinger's general aerobic 15-25% and Hansons' MP + 1-2 min;
+// tempo is Pfitzinger's lactate threshold (MP is 15-30 s/mi slower); intervals are his "about 5K race pace",
+// worked out from the goal with VDOT (Higdon's Yasso 800s land in the same spot).
 export function zones(goalSec, raceMi = 26.2) {
-  const mp = goalSec / (raceMi > 26 ? MARATHON : raceMi);
+  const m = raceMi > 26 ? MARATHON : raceMi, mp = goalSec / m;
+  const p5k = equivSec(m * M, goalSec, 5000) / (5000 / M);
   return {
     mp,
     list: [
-      // Bands don't overlap, slowest to fastest. Long runs and medium-long runs share the steady band.
       ['recovery', 'Recovery', mp + 105, mp + 135, 'Day after hard efforts. Slower is fine.'],
       ['easy', 'Easy', mp + 70, mp + 100, 'Conversational. Most of your miles.'],
-      ['long', 'Long / medium', mp + 40, mp + 65, 'Steady, still able to talk.'],
+      ['long', 'Long / steady', Math.min(mp * 1.1, mp + 60), mp + 70, 'Steady, still able to talk. Finish at the fast end.'],
       ['mp', 'Marathon pace', mp - 5, mp + 5, 'Goal race effort.'],
       ['tempo', 'Tempo', mp - 25, mp - 15, 'Comfortably hard, ~1 hr race effort.'],
-      ['interval', 'Intervals', mp - 50, mp - 40, '5K-ish effort, full recovery jogs.'],
+      ['interval', 'Intervals', p5k - 5, p5k + 5, '5K race effort, jog recoveries.'],
     ],
   };
 }
@@ -153,9 +167,14 @@ export function buildPlan(cfg, runs, ref = today(), o = {}) {
     if (t === 'interval') return ['Intervals', '2 mi easy, 6 × 800 m @ interval pace with 400 m jogs, rest easy.', P('interval')];
     return ['Marathon pace', `2 mi easy, ${Math.max(3, Math.round(mi - 3))} mi @ marathon pace, 1 mi easy.`, P('mp')];
   };
+  // Marathon pace inside the last long runs is Pfitzinger's approach; Higdon says never. Those days carry
+  // mpLong so you can switch them to all easy from the day sheet (settings.training.easyLongs).
   const longText = w => w === 3 ? 'Last big one. Easy effort; last 3 mi @ marathon pace only if the knee feels great. Practice race fueling.'
-    : w === 2 ? 'Middle 6 mi @ marathon pace, the rest easy.' : w === 1 ? 'Easy, with 3 mi @ marathon pace near the end.'
+    : w === 2 ? 'Middle 6 mi @ marathon pace, the rest easy (Pfitzinger style).' : w === 1 ? 'Easy, with 3 mi @ marathon pace near the end (Pfitzinger style).'
     : 'Easy and conversational. Practice race fueling (a gel every 35-40 min).';
+  // Season blocks get Pfitzinger's tune-up races (his 18/55 has them 6, 4 and 2 weeks out); 6 and 4 here, on the
+  // long-run day, with easy miles after to make the distance, as his 4th edition suggests.
+  const tuneUp = w => !!cfg.peakMi && (w === 6 || w === 4);
   const PHASE = { 0: 'Race week', 1: 'Taper', 2: 'Taper', 3: 'Peak week' };
   // How the non-long miles spread over the running days (by days after the long run). Fewer rest days
   // spreads the same weekly miles thinner, not more miles.
@@ -180,14 +199,19 @@ export function buildPlan(cfg, runs, ref = today(), o = {}) {
         else days.push(day(date, 'quality', 5, 'Sharpener', '1.5 mi easy, 2 × 1 mi @ marathon pace (3 min jog), rest easy.', P('mp')));
         continue;
       }
-      if (off === 0) days.push(day(date, 'long', longMi, `Long run`, longText(w), P('long')));
+      if (off === 0 && tuneUp(w)) { const mi = Math.min(longMi, 14); days.push(day(date, 'long', mi, 'Tune-up race', `Race an 8K-15K (or run a time trial), then easy miles to make ${mi} mi. It checks your fitness against the goal.`, P('tempo'))); }
+      else if (off === 0) days.push({ ...day(date, 'long', longMi, `Long run`, longText(w), P('long')), ...(w === 1 || w === 2 ? { mpLong: true } : {}) });
       else if (off === 1 && cfg.restDays < 1) days.push(day(date, 'easy', Math.max(3, rest * share[1]), 'Recovery', 'Very easy, the day after the long run.', P('recovery')));
       else if (off === 6 && cfg.restDays < 2) days.push(day(date, 'easy', Math.max(3, rest * share[6]), 'Shakeout', 'Short and easy before the long run. A few strides.', P('recovery')));
       else if (off === 1 || off === 6) days.push(day(date, 'rest', 0, 'Rest', off === 1 ? 'Off, or strength / mobility. Ice the knee if it talks back.' : 'Off. Legs up before the long run.'));
       else if (off === 2) days.push(day(date, 'easy', Math.max(3, rest * share[2]), 'Easy', 'Easy miles. Add 4-6 strides at the end.', P('easy')));
       else if (off === 3) { const mi = Math.max(4, rest * share[3]), [t, d, p] = quality(w, mi); days.push(day(date, 'quality', mi, t, d, p)); }
       else if (off === 4) days.push(day(date, 'easy', Math.max(3, rest * share[4]), 'Recovery', 'Truly easy after the workout.', P('recovery')));
-      else days.push(day(date, 'medium', Math.max(4, rest * share[5]), 'Medium long', 'Steady, a little quicker than easy and a bit longer.', P('long')));
+      else {
+        // Pfitzinger's medium-long run is 11-15 mi; shorter than that it's a steady run, not a medium-long.
+        const mi = Math.max(4, rest * share[5]);
+        days.push(day(date, 'medium', mi, mi >= 11 ? 'Medium long' : 'Steady', 'Steady, a little quicker than easy and a bit longer.', P('long')));
+      }
     }
     weeks.push({ start, w, phase: PHASE[w] || (w % 3 === 0 && (w !== nWeeks || !!cfg.peakMi) ? 'Cutback' : 'Build'), days, mi: days.filter(d => d.kind !== 'race').reduce((t, d) => t + d.mi, 0) });
   }
@@ -294,18 +318,36 @@ export function roadmap(cfg, ref = today()) {
       if (speedFrom > recEnd) out.push({ k: 'base', name: 'Base', from: recEnd, to: addDays(speedFrom, -1), note: `Build to ${sea.baseTop} mi/week, +10% max, every 4th week cut. Strides, hill sprints, strength 2×.` });
       out.push({ k: 'speed', name: 'Speed', from: speedFrom, to: addDays(blockStart, -1), note: 'Threshold + intervals each week, long runs 14-17.' });
       if (gate) out.push({ k: 'gate', name: gate.name, from: gate.date, to: gate.date, race: gate });
-      out.push({ k: 'block', name: 'Marathon block', from: blockStart, to: addDays(r.date, -1), note: `Peak up to ${sea.peakMi} mi/week (never 20% past what you've been running), long runs to 20-22.` });
+      out.push({ k: 'block', name: 'Marathon block', from: blockStart, to: addDays(r.date, -1), note: `Peak up to ${sea.peakMi} mi/week (never 20% past what you've been running), long runs to 20, tune-up races 6 and 4 weeks out.` });
     }
     if (r.mi > 26) { out.push({ k: 'race', name: r.name, from: r.date, to: r.date, race: r }); after = r.date; }
   }
   return out.map(p => ({ ...p, now: p.from <= ref && ref <= p.to, done: p.to < ref }));
 }
 
-// Days that went hard (tempo pace or faster, a long run near race pace, or rated 9-10/10) in the last n days.
+// Your usual long-run heart rate: the median of your 13+ mi runs in the 12 weeks before a date (needs 3).
+export function longHR(runs, date) {
+  const hs = runs.filter(r => r.date < date && r.date >= addDays(date, -84) && r.mi >= 13 && r.hr > 0).map(r => r.hr).sort((a, b) => a - b);
+  return hs.length >= 3 ? (hs[(hs.length - 1) >> 1] + hs[hs.length >> 1]) / 2 : null;
+}
+// Was this run hard? Short runs: tempo pace + 10 s or faster, or rated 9-10/10. Long runs (13+ mi, or the
+// plan's long day): within 15 s of marathon pace or rated 9-10/10, unless your heart rate stayed under your
+// usual long-run HR. Pfitzinger sets long-run and marathon-pace effort by heart rate, so a fast long run at an
+// easy heart rate isn't treated as a race effort. The thresholds themselves are the app's own.
+export function isHard(r, z, runs, longDay) {
+  if (!r || r.mi < 3 || !r.sec) return false;
+  if (r.rpe >= 90) return true;
+  const Z = k => z.list.find(x => x[0] === k)[3], pace = r.sec / r.mi;
+  if (longDay || r.mi >= 13) {
+    if (pace > Z('mp') + 15) return false;
+    const ref = longHR(runs, r.date);
+    return !(ref && r.hr && r.hr < ref);
+  }
+  return pace <= Z('tempo') + 10;
+}
+// Days that went hard in the last n days.
 export function hardDays(runs, z, ref = today(), n = 7) {
-  const tempoSlow = z.list.find(x => x[0] === 'tempo')[3], mpSlow = z.list.find(x => x[0] === 'mp')[3];
-  return [...new Set(runs.filter(r => r.date > addDays(ref, -n) && r.date <= ref && r.mi >= 3 && r.sec &&
-    (r.rpe >= 90 || r.sec / r.mi <= tempoSlow + 10 || (r.mi >= 13 && r.sec / r.mi <= mpSlow + 15))).map(r => r.date))];
+  return [...new Set(runs.filter(r => r.date > addDays(ref, -n) && r.date <= ref && isHard(r, z, runs)).map(r => r.date))];
 }
 
 // Your own changes, on top of the generated plan:
@@ -313,7 +355,7 @@ export function hardDays(runs, z, ref = today(), n = 7) {
 // - swaps [[dateA, dateB]]: a one-off swap. skips [date]: that day becomes rest.
 // Race day never moves.
 export const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const PLAN_KEYS = ['kind', 'mi', 'title', 'detail', 'pace', 'lo', 'hi'];
+const PLAN_KEYS = ['kind', 'mi', 'title', 'detail', 'pace', 'lo', 'hi', 'mpLong'];
 function applyMoves(weeks, cfg) {
   const all = weeks.flatMap(w => w.days), at = d => all.find(x => x.date === d), ok = d => d && d.kind !== 'race';
   const swap = (a, b, every) => {
@@ -332,6 +374,19 @@ function applyMoves(weeks, cfg) {
     const d = at(x);
     if (ok(d) && d.kind !== 'rest') Object.assign(d, { kind: 'rest', mi: 0, lo: 0, hi: 0, pace: null, moved: `Skipped (was ${d.title.toLowerCase()}${d.mi ? `, ${d.mi} mi` : ''}).`, title: 'Rest', detail: 'Day off, your call.', was: { kind: d.kind, title: d.title, mi: d.mi, lo: d.lo, hi: d.hi } });
   }
+  // A long run with marathon pace in it, switched to all easy (Higdon style) from the day sheet.
+  for (const x of cfg.easyLongs || []) {
+    const d = at(x);
+    if (d?.mpLong) Object.assign(d, { title: 'Long run (all easy)', detail: 'Easy and conversational the whole way (Higdon style: no marathon pace in long runs). Practice race fueling.', moved: 'Switched to all easy.' });
+  }
+  // Moved days keep their workout but not wording that only made sense where they were.
+  all.forEach((d, i) => {
+    if (!d.moved) return;
+    const prev = all[i - 1], next = all[i + 1];
+    if (/before the long run/.test(d.detail) && next?.kind !== 'long') d.detail = d.kind === 'rest' ? 'Off. Rest up for the next run.' : d.detail.replace(' before the long run', '');
+    if (/after the workout/.test(d.detail) && prev?.kind !== 'quality') d.detail = 'Truly easy.';
+    if (/the day after the long run/.test(d.detail) && prev?.kind !== 'long') d.detail = 'Very easy.';
+  });
   const hard = d => d && (d.kind === 'quality' || d.kind === 'long');
   all.forEach((d, i) => { if (d.moved && hard(d) && (hard(all[i - 1]) || hard(all[i + 1]))) d.moved += ' That puts two hard days in a row; take one of them easy if your legs are heavy.'; });
 }
@@ -420,7 +475,7 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
   // Harder than planned: a tempo-or-faster run on an easy day, or a long run near race pace (or rated 9-10/10).
   // The next day turns into a short recovery run, a workout within 2 days turns easy, and a workout on day 3
   // after a hard long run gets shorter. Checked for every plan day so far, so past changes stay on the calendar.
-  const Z = k => plan.z.list.find(z => z[0] === k), tempoSlow = Z('tempo')[3], mpSlow = Z('mp')[3];
+  const Z = k => plan.z.list.find(z => z[0] === k), tempoSlow = Z('tempo')[3];
   const wkday = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'long' });
   const easyFrom = (q, why, detail) => set(q, { kind: 'easy', mi: Math.max(3, q.mi - 2), title: 'Easy (was ' + q.title.replace(/ \(moved\)$/, '').toLowerCase() + ')', detail, pace: Z('easy').slice(2, 4) }, why);
   // Last week's days aren't in a plan built on Monday, so a hard long run from Saturday is looked up from the runs.
@@ -428,9 +483,8 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
     .map(date => ({ date, kind: 'long', lo: 13 }));
   for (const d of [...before, ...all.filter(x => x.date >= cfg.planStart && x.date <= ref && x.kind !== 'race')]) {
     const longDay = d.kind === 'long';
-    const hard = runs.find(r => r.date === d.date && r.mi >= 3 && r.sec && (longDay
-      ? r.mi >= d.lo * 0.9 && (r.sec / r.mi <= mpSlow + 15 || r.rpe >= 90)
-      : d.kind !== 'quality' && r.sec / r.mi <= tempoSlow + 10));
+    const hard = runs.find(r => r.date === d.date && (longDay ? r.mi >= d.lo * 0.9 && isHard(r, plan.z, runs, true)
+      : d.kind !== 'quality' && r.mi >= 3 && r.sec && r.sec / r.mi <= tempoSlow + 10));
     if (!hard) continue;
     const pace = fmtPace(hard.sec / hard.mi), what = `${wkday(d.date)}'s ${r1(hard.mi)} mi at ${pace}/mi`;
     d.adj ??= longDay ? `Hard long run (${r1(hard.mi)} mi at ${pace}/mi${hard.rpe ? `, effort ${Math.round(hard.rpe / 10)}/10` : ''}).` : `Ran as a workout (${r1(hard.mi)} mi at ${pace}/mi).`;
@@ -466,13 +520,20 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
 }
 const r1 = v => Math.round(v * 10) / 10;
 
+// Resting HR over the last 3 days against the 4 weeks before, in bpm (null without enough days).
+// The one place this is worked out, so the plan and its notes always agree.
+export function rhrUp(gdays, ref = today()) {
+  const v = (from, to) => Object.entries(gdays).filter(([d]) => d >= from && d <= to).map(([, g]) => g.rhr).filter(x => x > 0);
+  const avg = a => a.reduce((t, x) => t + x, 0) / a.length;
+  const r3 = v(addDays(ref, -2), ref), r28 = v(addDays(ref, -31), addDays(ref, -4));
+  return r3.length >= 2 && r28.length >= 10 ? avg(r3) - avg(r28) : null;
+}
+
 // Signals from resting HR and your post-run ratings over the last few days.
 export function fatigue(runs, gdays, ref = today()) {
   const signals = [], rated = runs.filter(r => r.date > addDays(ref, -5) && r.date <= ref && (r.feel != null || r.rpe));
-  const v = (from, to) => Object.entries(gdays).filter(([d]) => d >= from && d <= to).map(([, g]) => g.rhr).filter(x => x > 0);
-  const avg = a => a.reduce((t, x) => t + x, 0) / (a.length || 1);
-  const r3 = v(addDays(ref, -2), ref), r28 = v(addDays(ref, -31), addDays(ref, -4));
-  if (r3.length >= 2 && r28.length >= 10 && avg(r3) - avg(r28) >= 4) signals.push(`resting HR up ${Math.round(avg(r3) - avg(r28))} bpm`);
+  const up = rhrUp(gdays, ref);
+  if (up >= 4) signals.push(`resting HR up ${Math.round(up)} bpm`);
   const weak = rated.filter(r => r.feel != null && r.feel <= 25).length;
   const hardEasy = rated.filter(r => r.rpe >= 70 && r.mi < 10 && r.hr && r.hr < 150).length;
   if (weak >= 2) signals.push(`${weak} recent runs felt weak`);
@@ -500,9 +561,7 @@ export function notes({ gdays, runs, plan, cfg, s, ref = today() }) {
   const out = [];
   const vals = (from, to, k) => Object.entries(gdays).filter(([d]) => d >= from && d <= to).map(([, g]) => g[k]).filter(v => v > 0);
   const avg = a => a.reduce((t, v) => t + v, 0) / (a.length || 1);
-  const rhr3 = vals(addDays(ref, -3), ref, 'rhr'), rhr28 = vals(addDays(ref, -31), addDays(ref, -4), 'rhr');
-  if (rhr3.length >= 2 && rhr28.length >= 10 && avg(rhr3) - avg(rhr28) >= 4)
-    out.push(['warn', `Resting HR is up ${Math.round(avg(rhr3) - avg(rhr28))} bpm on your 4-week normal. Swap any hard day this week for easy until it settles.`]);
+  // Resting HR is handled by fatigue(): one signal shows a heads-up, two turn the next workout easy.
   const sleep = vals(addDays(ref, -4), ref, 'sleepSec').map(v => v / 3600);
   if (sleep.length >= 2 && avg(sleep) < 6.5) out.push(['warn', `Sleep is averaging ${avg(sleep).toFixed(1)} h lately. In the taper, sleep does more than extra miles.`]);
   // Rolling 7 days vs the 3 weeks before, so a big week shows up as soon as it happens.
@@ -514,7 +573,7 @@ export function notes({ gdays, runs, plan, cfg, s, ref = today() }) {
   if (toRace >= 0 && toRace <= 28 && s.goal?.type === 'cut')
     out.push(['fuel', `You're still on a cut. Ease to maintenance through the taper, then carb-load the 3 days before (about ${Math.round((s.profile.weightLb / 2.2046) * 8 / 10) * 10} g carbs a day).`]);
   const hd = hardDays(runs, plan.z, ref);
-  if (hd.length >= 3) out.push(['warn', `${hd.length} hard days in the last 7. Two a week builds fitness; more just adds risk for the knee. Keep the next few easy.`]);
+  if (hd.length >= 3) out.push(['warn', `${hd.length} hard days in the last 7; your plan has 2 (one workout and the long run), like Pfitzinger's lower-mileage plans. Hansons runs 3 but keeps every other run truly easy. Keep the next few easy.`]);
   const ph = cfg.prevRace && roadmap(cfg, ref).find(p => p.now);
   if (ph && (ph.k === 'speed' || ph.k === 'gate' || ph.k === 'block') && s.goal?.type === 'cut')
     out.push(['fuel', 'Workouts have started. Switch your goal from cut to maintenance so the hard days get fueled; losing weight now costs fitness.']);
@@ -558,7 +617,7 @@ export function changeLog(s, gdays, ref = today(), maxDays = 120) {
     const d = planFor(prev.plan, ev);
     if (d && d.kind !== 'race' && ev >= now.planStart) {
       const all = milesOn(runs, ev), got = d.kind === 'long' ? longestOn(runs, ev) : all, z = prev.plan.z;
-      const tempoSlow = z.list.find(x => x[0] === 'tempo')[3], mpSlow = z.list.find(x => x[0] === 'mp')[3];
+      const tempoSlow = z.list.find(x => x[0] === 'tempo')[3];
       const best = runs.filter(r => r.date === ev && r.mi >= 3 && r.sec).sort((a, b) => b.mi - a.mi)[0];
       const pace = best ? `${fmtPace(best.sec / best.mi)}/mi` : '';
       if (d.was && !all) why.push(['rest', `Unplanned rest: skipped ${desc(d.was)}.`]);
@@ -566,10 +625,10 @@ export function changeLog(s, gdays, ref = today(), maxDays = 120) {
       else if (!d.mi && all) why.push(['extra', `Ran ${r1(all)} mi on a rest day.`]);
       else if (d.mi && got > d.hi + 0.5) why.push(['long', `Went longer: ${r1(got)} mi (plan ${miTxt(d)}).`]);
       else if (d.mi && got < d.lo * 0.95) why.push(['short', `Cut short: ${r1(got)} of ${miTxt(d)}.`]);
-      if (best && d.kind === 'long' && best.mi >= d.lo * 0.9 && (best.sec / best.mi <= mpSlow + 15 || best.rpe >= 90))
+      if (best && d.kind === 'long' && best.mi >= d.lo * 0.9 && isHard(best, z, runs, true))
         why.push(['hard', `Hard long run: ${r1(best.mi)} mi at ${pace}${best.rpe ? `, effort ${Math.round(best.rpe / 10)}/10` : ''}.`]);
       else if (best && d.kind !== 'quality' && d.kind !== 'long' && best.sec / best.mi <= tempoSlow + 10)
-        why.push(['hard', `Went harder: ${r1(best.mi)} mi at ${pace}, tempo effort on ${d.mi ? `an ${d.kind === 'medium' ? 'medium' : 'easy'} day` : 'a rest day'}.`]);
+        why.push(['hard', `Went harder: ${r1(best.mi)} mi at ${pace}, tempo effort on ${d.mi ? `${d.kind === 'medium' ? 'a steady' : 'an easy'} day` : 'a rest day'}.`]);
     }
     // Resting HR / ratings that started flagging overnight.
     for (const sig of cur.fatigue.signals) if (!prev.fatigue.signals.includes(sig)) why.push(['body', cap(sig) + '.']);
@@ -618,6 +677,8 @@ export function changeLog(s, gdays, ref = today(), maxDays = 120) {
     const dx = at(x), dy = at(y);
     out.push({ date: x, why: [['you', `You swapped ${dayTag(x)} and ${dayTag(y)}.`]], res: [dx && dy ? `${dayTag(x)} became ${was(dx)}, ${dayTag(y)} ${was(dy.was || dy)}.` : 'The two days trade workouts.'] });
   }
+  for (const x of cfg.easyLongs || []) if (x >= start)
+    out.push({ date: x, why: [['you', `You switched ${shortDay(x)}'s long run to all easy.`]], res: ['Same distance, no marathon pace in it (Higdon style).'] });
   for (const x of cfg.skips || []) if (x >= ref)
     out.push({ date: x, why: [['you', `You skipped ${shortDay(x)} ahead of time.`]], res: ['That day is rest. Its miles aren\'t moved anywhere.'] });
   return out.filter(e => e.date >= start || e.why[0][0] === 'you').sort((a, b) => b.date.localeCompare(a.date));

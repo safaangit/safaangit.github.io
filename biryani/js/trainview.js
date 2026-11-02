@@ -7,14 +7,14 @@ import * as T from './training.js';
 import { bars, line, bindCharts } from './charts.js';
 import * as L from './lifts.js';
 
-const KIND = { easy: 'Easy', medium: 'Medium', quality: 'Workout', long: 'Long', race: 'Race', rest: 'Rest', recovery: 'Recover' };
+const KIND = { easy: 'Easy', medium: 'Steady', quality: 'Workout', long: 'Long', race: 'Race', rest: 'Rest', recovery: 'Recover' };
 const r1 = v => Math.round(v * 10) / 10;
 // Fast to slow, the way a watch reads (8:41–9:06/mi).
 const paceRange = p => p ? `${T.fmtPace(p[0])}–${T.fmtPace(p[1])}/mi` : '';
 const miRange = x => !x.mi ? '' : x.kind === 'race' || x.lo === x.hi ? `${x.mi} mi` : `${x.lo}-${x.hi} mi`;
 // Short calendar label and 1-3 intensity pips, so hard days stand out at a glance.
-const SHORT = { Tempo: 'Tempo', Intervals: 'Intervals', 'Marathon pace': 'MP', Sharpener: 'MP', Recovery: 'Recover', Shakeout: 'Shakeout', 'Medium long': 'Medium' };
-const calLabel = x => x.kind === 'quality' ? SHORT[x.title.replace(/ \((moved|shorter)\)$/, '')] || 'Workout' : x.kind === 'long' ? 'Long' : SHORT[x.title] || KIND[x.kind];
+const SHORT = { Tempo: 'Tempo', Intervals: 'Intervals', 'Marathon pace': 'MP', Sharpener: 'MP', Recovery: 'Recover', Shakeout: 'Shakeout', 'Medium long': 'Med-long', Steady: 'Steady' };
+const calLabel = x => x.kind === 'quality' ? SHORT[x.title.replace(/ \((moved|shorter)\)$/, '')] || 'Workout' : x.kind === 'long' ? (/^Tune-up/.test(x.title) ? 'Tune-up' : 'Long') : SHORT[x.title] || KIND[x.kind];
 const LEVEL = { recovery: 0, rest: 0, easy: 1, medium: 2, long: 2, quality: 3, race: 3 };
 const shoeName = (gear, ids) => (ids || []).map(id => gear.find(g => g.uuid === id)?.name).filter(Boolean).join(', ');
 const mon = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -145,7 +145,7 @@ function planView(data, s, ui) {
   // Target paces for each kind of day, pinned above the calendar while you scroll it.
   const Z = k => plan.z.list.find(x => x[0] === k);
   // One tile per pace zone, colored like the calendar days that use it, fast–slow per mile.
-  const chips = [['easy', 'Recovery', 'recovery'], ['easy', 'Easy', 'easy'], ['long', 'Long · <span class="k-medium">Medium</span>', 'long'], ['quality', 'Marathon', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
+  const chips = [['easy', 'Recovery', 'recovery'], ['easy', 'Easy', 'easy'], ['long', 'Long · <span class="k-medium">Steady</span>', 'long'], ['quality', 'Marathon', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
     .map(([k, l, z]) => `<div class="ptile k-${k}"><b>${l}</b><span>${T.fmtPace(Z(z)[2])}–${T.fmtPace(Z(z)[3])}</span></div>`).join('');
   // Change log: folded by default, worked out only when opened (it replays the plan day by day).
   const logHtml = `<section class="card chlog"><details class="how" id="chLog" ${local.get('chLogOpen', false) ? 'open' : ''}><summary><h3>Change log</h3></summary>
@@ -385,7 +385,8 @@ async function openDay(s, date, ui) {
     ${canMove ? `<h4>Change this day</h4>${others.length ? `<p class="muted small">Tap a day to swap with it.</p>
       <div class="wkruns swaps">${others.map(x => `<button data-sw="${x.date}">${wkday(x.date)} · ${x.kind === 'rest' ? 'Rest' : calLabel(x)}</button>`).join('')}</div>
       <label class="chk"><input type="checkbox" id="swEvery"> Every week until race week</label>` : ''}
-      <div class="actions">${d.moved ? '<button id="swUndo">Undo change</button>' : ''}${d.kind !== 'rest' ? '<button id="swSkip">Skip this day</button>' : ''}</div>` : ''}`,
+      ${d.mpLong && !d.moved ? '<p class="muted small">This long run has marathon pace in it (Pfitzinger style). Higdon would run it all easy. Pick easy if your legs are flat or the last workout went badly.</p>' : ''}
+      <div class="actions">${d.moved ? '<button id="swUndo">Undo change</button>' : ''}${d.mpLong && !d.moved ? '<button id="swEasy">Run it all easy</button>' : ''}${d.kind !== 'rest' ? '<button id="swSkip">Skip this day</button>' : ''}</div>` : ''}`,
     { title: new Date(date + 'T12:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) });
   const save = async (patch, msg) => { await db.saveSettings({ ...s, training: { ...(s.training || {}), ...patch } }); ui.closeSheet(); ui.toast(msg); ui.render(); };
   const tr = s.training || {}, dw = x => new Date(x + 'T12:00').getDay();
@@ -394,11 +395,13 @@ async function openDay(s, date, ui) {
     : save({ swaps: [...(tr.swaps || []), [date, x.dataset.sw]] }, 'Swapped')));
   const undo = ui.$('#swUndo', b);
   if (undo) undo.onclick = () => save({
-    swaps: (tr.swaps || []).filter(p => !p.includes(date)), skips: (tr.skips || []).filter(x => x !== date),
+    swaps: (tr.swaps || []).filter(p => !p.includes(date)), skips: (tr.skips || []).filter(x => x !== date), easyLongs: (tr.easyLongs || []).filter(x => x !== date),
     weekSwaps: /^Every week/.test(d.moved) ? (tr.weekSwaps || []).filter(p => p[0] !== dw(date) && p[1] !== dw(date)) : tr.weekSwaps || [],
   }, 'Back to the plan');
   const skip = ui.$('#swSkip', b);
   if (skip) skip.onclick = () => save({ skips: [...(tr.skips || []), date] }, 'Skipped');
+  const easy = ui.$('#swEasy', b);
+  if (easy) easy.onclick = () => save({ easyLongs: [...(tr.easyLongs || []), date] }, 'Long run switched to all easy');
   // Lift tags: tap Push / Pull / Legs... on a watch "Strength" session. Saved with your settings.
   ui.$$('.lifttags', b).forEach(g => ui.$$('button', g).forEach(x => (x.onclick = async () => {
     const id = g.dataset.id, cur = new Set(tags[id] || []);
