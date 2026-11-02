@@ -25,11 +25,7 @@ async function load(s, ref = today()) {
   const cfg = T.config(s, ref);
   // 7 months: a season race months out predicts from 6 months of runs (training.js predict).
   // Whole calendar months back from this one (stepping 31 days skipped a month: Oct 1 → Aug 31 lost September).
-  const [y0, m0] = monthOf(ref).split('-').map(Number);
-  const months = Array.from({ length: 7 }, (_, i) => { const k = y0 * 12 + m0 - 1 - i; return `${Math.floor(k / 12)}-${String(k % 12 + 1).padStart(2, '0')}`; }).sort();
-  const gdays = Object.assign({}, ...(await Promise.all(months.map(m => sync.garminMonth(m).catch(() => ({ days: {} }))))).map(g => g.days || {}));
-  const manual = (await db.all('exercises')).filter(x => x.run && x.mi > 0);
-  for (const x of manual) (gdays[x.date] ??= { activities: [] }).activities = [...(gdays[x.date].activities || []), { name: x.name, type: 'running', distance: x.mi * 1609.34, duration: (x.min || 0) * 60 }];
+  const gdays = await garminDays(ref, 7);
   const runs = T.runsFrom(gdays), lifts = T.liftsFrom(gdays);
   const pred = T.predict(runs, ref, cfg.raceDate);
   const autoGoal = !cfg.goalSec;
@@ -38,6 +34,16 @@ async function load(s, ref = today()) {
   const adapted = T.adapt(plan, runs, gdays, cfg, ref);
   const gear = ((await sync.garminGear().catch(() => null))?.gear || []).filter(g => /shoe/i.test(g.type || ''));
   return { cfg, gdays, runs, lifts, pred, autoGoal, plan, adapted, gear };
+}
+
+// Garmin days for the last n calendar months, with manual runs from the exercise log folded in.
+async function garminDays(ref, n) {
+  const [y0, m0] = monthOf(ref).split('-').map(Number);
+  const months = Array.from({ length: n }, (_, i) => { const k = y0 * 12 + m0 - 1 - i; return `${Math.floor(k / 12)}-${String(k % 12 + 1).padStart(2, '0')}`; }).sort();
+  const gdays = Object.assign({}, ...(await Promise.all(months.map(m => sync.garminMonth(m).catch(() => ({ days: {} }))))).map(g => g.days || {}));
+  const manual = (await db.all('exercises')).filter(x => x.run && x.mi > 0);
+  for (const x of manual) (gdays[x.date] ??= { activities: [] }).activities = [...(gdays[x.date].activities || []), { name: x.name, type: 'running', distance: x.mi * 1609.34, duration: (x.min || 0) * 60 }];
+  return gdays;
 }
 
 // Plan day kinds by date plus the race date, for the weekly calorie budget. Today asks on every
@@ -141,13 +147,17 @@ function planView(data, s, ui) {
   // One tile per pace zone, colored like the calendar days that use it, fast–slow per mile.
   const chips = [['easy', 'Recovery', 'recovery'], ['easy', 'Easy', 'easy'], ['long', 'Long · <span class="k-medium">Medium</span>', 'long'], ['quality', 'Marathon', 'mp'], ['quality', 'Tempo', 'tempo'], ['quality', 'Intervals', 'interval']]
     .map(([k, l, z]) => `<div class="ptile k-${k}"><b>${l}</b><span>${T.fmtPace(Z(z)[2])}–${T.fmtPace(Z(z)[3])}</span></div>`).join('');
-  return hero(data, ui) + changedHtml + `<section class="card calcard"><h3>Plan to race day</h3>
+  // Change log: folded by default, worked out only when opened (it replays the plan day by day).
+  const logHtml = `<section class="card chlog"><details class="how" id="chLog" ${local.get('chLogOpen', false) ? 'open' : ''}><summary><h3>Change log</h3></summary>
+    <p class="muted small">Each day something changed the plan: what happened, then what moved.</p><div id="chLogBody"></div></details></section>`;
+  return hero(data, ui) + changedHtml + logHtml + `<section class="card calcard"><h3>Plan to race day</h3>
     <div class="calstick"><div class="ptiles">${chips}</div><div class="calrow dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div></div>
     ${pastHtml}${ahead.slice(0, 8).map(wkHtml).join('')}${ahead.length > 8 ? `<details class="pastwks" id="laterWks" ${local.get('calLaterOpen', false) ? 'open' : ''}><summary><span>${ahead.length - 8} more weeks</span><span class="muted">${mon(ahead[8].start)} – ${mon(cfg.raceDate)} · ${ahead.slice(8).map(w => w.phase).filter((x, i, a) => a.indexOf(x) === i && x !== 'Cutback').join(' → ')}</span></summary>${ahead.slice(8).map(wkHtml).join('')}</details>` : ''}
     <p class="muted small">Paces are per mile. Dots show how hard the day is, and any distance in the range counts. Done days show what you actually ran; a purple corner means you lifted. Tap a day to see the workout, swap it with another day, or skip it.</p></section>
   ${todayCardHtml}${notesHtml}
   <section class="card"><details class="how"><summary><h3>How this plan adjusts</h3></summary><ul class="tips">
     <li><b>Ranges, not exact miles.</b> Anything in the range counts as done. Long runs flex down, not up.</li>
+    <li><b>Missed a day or two?</b> The plan picks up as written and doesn't cram the miles back in. That's the standard rule: under 10 days lost, start back where the schedule is (Pfitzinger, <i>Advanced Marathoning</i>); 1-3 missed runs, don't make them up (RunnersConnect).</li>
     <li><b>Ran short on an easy day?</b> About half of it gets added to your remaining easy days this week (max +1.5 mi a day). The rest is let go; chasing missed miles is how knees get hurt.</li>
     <li><b>Ran extra?</b> Extra miles on any day (a longer long run, a run on a rest day) come off your later easy days that week, up to 2 mi a day.</li>
     <li><b>Went harder than planned?</b> A tempo-paced run on an easy day, or a long run near race pace or rated 9-10/10 effort, counts as a hard day. The next day becomes a short recovery run, a workout in the next 2 days turns easy, and after a hard long run the next workout gets shorter.</li>
@@ -309,6 +319,8 @@ export function bind(root, s, ui) {
   const pw = ui.$('#pastWks', root); if (pw) pw.ontoggle = () => local.set('calPastOpen', pw.open);
   const lw = ui.$('#laterWks', root); if (lw) lw.ontoggle = () => local.set('calLaterOpen', lw.open);
   const se = ui.$('#seasonEdit', root); if (se) se.onclick = () => openSeason(s, ui);
+  const cl = ui.$('#chLog', root);
+  if (cl) { cl.ontoggle = () => { local.set('chLogOpen', cl.open); if (cl.open) fillLog(cl, s, ui); }; if (cl.open) fillLog(cl, s, ui); }
   if (picked) bindCharts(root, (id, i, c) => {
     const P = picked, box = c.closest('.card').querySelector('.tipbox');
     if (id === 'wk' || id === 'pace') {
@@ -323,6 +335,27 @@ export function bind(root, s, ui) {
       box.querySelector('button').onclick = () => ui.goDay(d);
     }
   });
+}
+
+// ---------- Change log ----------
+const LOGK = { rest: 'Rest', miss: 'Missed', short: 'Short', long: 'Longer', extra: 'Extra', hard: 'Harder', body: 'Body', week: 'Week', you: 'You', goal: 'Goal', plan: 'Plan' };
+let logMemo = null;
+async function fillLog(el, s, ui) {
+  const body = ui.$('#chLogBody', el);
+  if (!body || body.dataset.done) return;
+  body.innerHTML = '<p class="muted small">Working it out…</p>';
+  const t = today();
+  // 11 months of Garmin: the oldest replayed morning (120 days back) still predicts from 6 months of runs.
+  const gdays = await garminDays(t, 11);
+  const key = t + JSON.stringify(s.training || {}) + JSON.stringify(Object.keys(gdays).map(d => [d, (gdays[d].activities || []).length]));
+  await new Promise(r => setTimeout(r, 30)); // let "Working it out" paint first
+  if (logMemo?.key !== key) logMemo = { key, log: T.changeLog(s, gdays, t) };
+  const log = logMemo.log;
+  body.dataset.done = '1';
+  body.innerHTML = log.length ? log.map(e => `<div class="chent"><div class="chd">${e.date > t ? 'Coming up · ' : ''}${wkday(e.date)} ${mon(e.date)}</div>
+    ${e.why.map(([k, txt]) => `<div class="chwhy"><span class="chk ck-${k}">${LOGK[k] || k}</span><span>${ui.esc(txt)}</span></div>`).join('')}
+    <ul class="chres">${e.res.map(r => `<li>${ui.esc(r)}</li>`).join('')}</ul></div>`).join('')
+    : '<p class="muted small">Nothing yet. Once you run, rest or swap days, every change to the plan lands here.</p>';
 }
 
 async function openDay(s, date, ui) {

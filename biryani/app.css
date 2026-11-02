@@ -669,3 +669,17 @@ ul.entries.road .r1 { display: flex; justify-content: space-between; gap: 8px; a
 ul.entries.road .r1 .muted { white-space: nowrap; }
 fieldset.srace label { display: block; }
 fieldset.srace .sDel { margin-top: 6px; }
+
+/* Training change log */
+.chlog .chent { padding: 10px 0; border-top: 1px solid var(--line); }
+.chlog .chent:first-of-type { border-top: 0; padding-top: 2px; }
+.chlog .chd { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.chwhy { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.35; margin-bottom: 4px; }
+.chk { flex: none; min-width: 52px; text-align: center; font-size: 11.5px; font-weight: 600; padding: 2px 6px; border-radius: 6px; background: var(--tile); color: var(--muted); margin-top: 1px; }
+.ck-rest, .ck-miss, .ck-short { background: var(--p-bg); color: var(--p); }
+.ck-hard, .ck-long, .ck-extra { background: var(--chip); color: var(--accent); }
+.ck-body { background: var(--warn-bg); color: var(--warn); }
+.ck-you { background: var(--f-bg); color: var(--f); }
+.chres { margin: 4px 0 0 60px; padding: 0 0 0 14px; font-size: 13.5px; line-height: 1.4; color: var(--ink); }
+.chres li { margin: 2px 0; }
+.chres li::marker { color: var(--accent); }
