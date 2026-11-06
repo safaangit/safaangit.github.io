@@ -493,7 +493,7 @@ function openExercise(id) {
       <div class="grid3"><label>Miles<input name="mi" type="number" min="0" step="0.01" inputmode="decimal" value="${x.mi ?? ''}"></label>
       <label>Minutes<input name="min" type="number" min="0" inputmode="numeric" value="${x.min ?? ''}"></label>
       <label>kcal<input name="kcal" type="number" min="0" inputmode="numeric" value="${x.kcal ?? ''}"></label></div>
-      <p class="muted small">Garmin activities show up on their own after the nightly sync; use this for anything not on your watch.</p>
+      <p class="muted small">Garmin activities show up on their own after the next auto sync; use this for anything not on your watch.</p>
       <div class="actions">${id ? '<button type="button" class="danger" id="del">Delete</button>' : ''}<button class="primary">Save</button></div></form>`, { title: id ? 'Edit exercise' : 'Add exercise' });
     const run = $('[name=run]', b), lift = $('[name=lift]', b);
     run.onchange = () => { if (run.checked) lift.checked = false; };
@@ -1344,7 +1344,7 @@ async function viewSettings() {
   <details><summary>Sync & Garmin</summary><form id="gh" class="form">
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
     <div class="grid2"><label>Repo<input name="ghRepo" value="${esc(local.get('ghRepo', 'safaangit/safaan-personal'))}"></label><label>Branch<input name="ghBranch" value="${esc(local.get('ghBranch', ''))}" placeholder="repo default"></label></div>
-    <p class="muted small">Food logs sync to <code>data/fuel/</code>. Garmin data comes from the nightly workflow into <code>data/garmin/</code>${meta?.lastSync ? `, last pulled ${new Date(meta.lastSync).toLocaleString()}${meta.backfillDone ? '' : ` (history back to ${meta.earliest || '…'}, still backfilling)`}` : ''}.</p>
+    <p class="muted small">Food logs sync to <code>data/fuel/</code>. Garmin data syncs into <code>data/garmin/</code> on weekdays at 8am + 4pm and weekends at noon + 5pm${meta?.lastSync ? `, last pulled ${new Date(meta.lastSync).toLocaleString()}${meta.backfillDone ? '' : ` (history back to ${meta.earliest || '…'}, still backfilling)`}` : ''}.</p>
     <div class="actions"><button type="button" id="syncNow">Sync now</button><button type="button" id="pullG" ${s.garminPulledOn === today() ? 'disabled' : ''}>${s.garminPulledOn === today() ? 'Pulled Garmin today' : 'Pull Garmin now (1/day)'}</button></div>
   </form></details>
   <details><summary>Food data & keys</summary><form id="keys" class="form">
@@ -1442,8 +1442,8 @@ bind.settings = root => {
     catch (e) { syncErr = e.message; syncBadge(); toast(e.message); }
   };
   $('#pullG', root).onclick = async () => {
-    // Capped at one manual pull a day (synced, so it holds across devices); auto runs at 8am and 8pm.
-    if (s.garminPulledOn === today()) return toast('Already pulled today. Next auto sync is 8am or 8pm.');
+    // Capped at one manual pull a day (synced, so it holds across devices); auto runs per nextGarminSync().
+    if (s.garminPulledOn === today()) return toast(`Already pulled today. Next auto sync is ${nextGarminSync()}.`);
     try { await sync.runGarminSync(); s.garminPulledOn = today(); await db.saveSettings(s); toast('Garmin sync started. Data lands in a few minutes.'); render(); }
     catch (e) { toast(e.status === 403 ? 'Token needs Actions: read & write' : e.message); }
   };
@@ -1455,6 +1455,17 @@ bind.settings = root => {
     a.click();
   };
 };
+
+// Auto Garmin sync times (Eastern, set in .github/workflows/garmin-sync.yml): weekdays 8am + 4pm, weekends noon + 5pm.
+function nextGarminSync(now = new Date()) {
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const slots = d => (d === 0 || d === 6) ? [[12, 'noon'], [17, '5pm']] : [[8, '8am'], [16, '4pm']];
+  const mins = et.getHours() * 60 + et.getMinutes();
+  const hit = slots(et.getDay()).find(([h]) => h * 60 + 7 > mins);
+  if (hit) return `${hit[1]} today`;
+  const d = (et.getDay() + 1) % 7;
+  return `${slots(d)[0][1]} tomorrow`;
+}
 
 async function openRecommend() {
   const s = state.s;
