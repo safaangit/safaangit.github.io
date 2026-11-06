@@ -14,6 +14,7 @@ import * as lifts from './lifts.js';
 import * as tasks from './tasks.js';
 import * as gb from './gbridge.js';
 import * as fixes from './fixes.js';
+import * as ai from './ai.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -963,7 +964,7 @@ function openVoice({ autostart = true } = {}) {
       </div></li>`;
     }).join('');
     const ok = rows.filter(r => r.food).length;
-    $('#vlog', b).innerHTML = rows.length ? `<div class="vlogbar"><button class="primary" id="logAll" ${ok ? '' : 'disabled'}>Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal</button></div>` : '';
+    $('#vlog', b).innerHTML = rows.length ? `<div class="vlogbar"><button class="primary" id="logAll" ${ok ? '' : 'disabled'}>Log ${ok} item${ok === 1 ? '' : 's'} · ${r0(total())} kcal</button></div>${vstate.ai ? '<p class="pv-ai small">✨ Split by Gemini</p>' : ''}` : '';
     $$('.vrow', b).forEach(li => {
       const r = rows[+li.dataset.i];
       $('.rm', li).onclick = () => { rows.splice(+li.dataset.i, 1); draw(); };
@@ -985,13 +986,26 @@ function openVoice({ autostart = true } = {}) {
   };
   // Re-match only items whose words changed, so edits and picks survive.
   const match = async () => {
-    const my = ++matchSeq, items = voice.parseItems(vstate.text);
-    if (!items.length) { vstate.rows = []; return draw(); }
+    const my = ++matchSeq, text = vstate.text, items = voice.parseItems(text);
+    if (!items.length) { vstate.rows = []; vstate.ai = false; return draw(); }
     const old = new Map(vstate.rows.map(r => [r.text, r]));
     $('#vlog', b).innerHTML = '<p class="muted small">Finding foods…</p>';
     const rows = await matchRows(items, old);
     if (my !== matchSeq) return;
-    vstate.rows = rows; draw();
+    vstate.rows = rows; vstate.ai = false; draw();
+    aiSplit(text, items, my);
+  };
+  // Optional Gemini pass (ai.js): the app's own split shows first; Gemini's replaces it only if it lands while the
+  // words are unchanged and you aren't typing in a row. Off, slow, over its limit or odd answer: nothing changes.
+  const editing = () => !!document.activeElement?.closest?.('#vrows');
+  const aiSplit = async (text, items, my) => {
+    if (!ai.ready('food').ok || !ai.worthIt(text, items.length)) return;
+    const its = await ai.start('food', text);
+    if (!its || my !== matchSeq || vstate.text !== text || editing()) return;
+    const same = its.length === items.length && its.every((x, i) => x.text === items[i].text && x.qty === items[i].qty && x.unit === items[i].unit);
+    const rows = same ? vstate.rows : await matchRows(its, new Map(vstate.rows.map(r => [r.text, r])));
+    if (my !== matchSeq || vstate.text !== text || editing()) return;
+    vstate.rows = rows; vstate.ai = true; draw();
   };
   const clear = () => { rec?.stop(); rec = null; vstate = { text: '', rows: [] }; ta.value = ''; draw(); setMic(false); };
   const setMic = on => {
@@ -1365,6 +1379,16 @@ async function viewSettings() {
     <div class="actions"><button type="button" id="tagCopy">Copy link</button><button type="button" class="primary" id="tagWrite">Write tag</button></div>
     <p id="tagRes" class="small muted"></p></div>
   </details>
+  <details><summary>AI helper (Gemini, free)</summary><form id="aiset" class="form">
+    <p class="small">Gemini can sort messy brain dumps in Quick add and the Tasks box, and split spoken food lists. The app's own sorting still shows instantly; Gemini's answer swaps in a moment later if it checks out. Off, offline, slow or over the limit, nothing changes.</p>
+    <label>Gemini API key<input name="geminiKey" type="password" autocomplete="off" value="${esc(ai.key())}" placeholder="leave empty to keep it off"></label>
+    <label class="check"><input type="checkbox" name="aiTasks" ${local.get('aiTasks', true) !== false ? 'checked' : ''}> Sort Quick add and the Tasks box</label>
+    <label class="check"><input type="checkbox" name="aiFood" ${local.get('aiFood', true) !== false ? 'checked' : ''}> Split spoken food lists</label>
+    <div class="grid2"><label>Daily cap (calls)<input name="aiCap" type="number" min="1" inputmode="numeric" value="${ai.cap()}"></label><label>Model<input name="aiModel" value="${esc(local.get('aiModel', '') || '')}" placeholder="${ai.DEFAULT_MODEL}"></label></div>
+    <p class="small muted" id="aiStat">${esc(ai.statusText())}</p>
+    <div class="actions"><button type="button" id="aiTest" ${ai.key() ? '' : 'disabled'}>Test the key</button><a class="btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free key</a></div>
+    <p class="muted small">Free: make the key at Google AI Studio in a project with no billing account, and Google can't charge it. The cap is yours; Google's own free limits are on its <a href="https://aistudio.google.com/rate-limit" target="_blank" rel="noopener">rate limit page</a>, and when Google says stop, the app pauses Gemini until midnight Pacific. On the free tier Google may use what's sent to improve its products, and people may read it, so only the words you type or say in those two boxes go out. Never logs, weight, goals or Garmin. The key stays on this phone.</p>
+  </form></details>
   <details><summary>Sync & Garmin</summary><form id="gh" class="form">
     <label>GitHub token<input name="ghToken" type="password" autocomplete="off" value="${esc(local.get('ghToken', ''))}" placeholder="fine-grained token"></label>
     <div class="grid2"><label>Repo<input name="ghRepo" value="${esc(local.get('ghRepo', 'safaangit/safaan-personal'))}"></label><label>Branch<input name="ghBranch" value="${esc(local.get('ghBranch', ''))}" placeholder="repo default"></label></div>
@@ -1436,6 +1460,23 @@ bind.settings = root => {
   $('#gbSetup', root).onclick = () => openGbSetup();
   $('#gbSync', root)?.addEventListener('click', async () => { try { await gb.sync(); toast('Synced with Google Tasks'); } catch (e) { toast(e.message); } render(); });
   $('#tset', root).onchange = e => { local.set('launchTo', e.currentTarget.launchTo.value); toast('Saved on this device'); };
+  $('#aiset', root).onchange = e => {
+    const f = e.currentTarget, newKey = f.geminiKey.value.trim(), newModel = f.aiModel.value.trim();
+    if (newKey !== ai.key() || newModel !== (local.get('aiModel', '') || '')) local.set('aiBlock', null); // a fixed key or model gets a fresh try
+    local.set('geminiKey', newKey); local.set('aiModel', newModel);
+    local.set('aiTasks', f.aiTasks.checked); local.set('aiFood', f.aiFood.checked);
+    local.set('aiCap', Math.max(1, Math.round(+f.aiCap.value || ai.DEFAULT_CAP)));
+    $('#aiTest', root).disabled = !newKey;
+    $('#aiStat', root).textContent = ai.statusText();
+    toast('Saved on this device');
+  };
+  $('#aiTest', root).onclick = async () => {
+    const st = $('#aiStat', root);
+    st.textContent = 'Asking Gemini…';
+    local.set('aiBlock', null);
+    const r = await ai.test();
+    st.textContent = r.ok ? `Works ✓ ${r.msg} in ${(r.ms / 1000).toFixed(1)} s. ${ai.statusText()}` : `Didn't work: ${r.msg}`;
+  };
   // Fridge tags: write a ?buy= link onto an NFC sticker (Web NFC, Chrome on Android), or copy it for the NFC Tools app.
   const tagItem = () => $('#tagItem', root).value.trim().replace(/\s+/g, ' ');
   const tagUrl = it => location.origin + location.pathname + '?buy=' + encodeURIComponent(it);

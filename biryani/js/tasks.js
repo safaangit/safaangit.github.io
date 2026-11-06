@@ -11,6 +11,7 @@ import * as db from './db.js';
 import { today, local } from './db.js';
 import * as voice from './voice.js';
 import * as P from './taskparse.js';
+import * as ai from './ai.js';
 
 const FILE = 'tasks';
 const DAY = 864e5;
@@ -310,14 +311,15 @@ async function toggle(id, ui) {
 // Live preview of what a capture will turn into, with a tap to switch an item's type.
 // On the Groceries list every comma or line is a grocery; elsewhere each piece is sorted on its own.
 // A brain dump split into several items gets a "Keep as one" link (`whole`), which keeps each line as one item.
-async function parseCap(text, s, mode, overrides = {}, whole = false) {
+// `aiItems`: Gemini's split of this exact text (see aiFollow), used instead of the rules when present.
+async function parseCap(text, s, mode, overrides = {}, whole = false, aiItems = null) {
   const base = mode === 'groceries'
     ? text.split(/\s*(?:,|;|\n)\s*/).map(t => t.trim()).filter(Boolean).map(t => ({ text: t, kind: 'grocery' }))
-    : P.splitCapture(text, { ...(await ctx(s)), noSplit: whole });
+    : aiItems && !whole ? aiItems : P.splitCapture(text, { ...(await ctx(s)), noSplit: whole });
   return base.map((it, i) => ({ ...it, kind: overrides[i] || it.kind }));
 }
-async function previewHtml(text, s, ui, overrides, mode, whole = false) {
-  const items = await parseCap(text, s, mode, overrides, whole);
+async function previewHtml(text, s, ui, overrides, mode, whole = false, aiItems = null) {
+  const items = await parseCap(text, s, mode, overrides, whole, aiItems);
   if (!text.trim()) return { items: [], html: '' };
   const lines = text.split(/\n+/).filter(l => l.trim()).length;
   const toggle = mode === 'groceries' ? '' : whole ? `<button class="link pv-split" data-whole="0">Split it up</button>`
@@ -329,9 +331,36 @@ async function previewHtml(text, s, ui, overrides, mode, whole = false) {
     else if (it.kind === 'grocery') { const g = P.groceryBits(it.text); detail = `${ui.esc(g.name)}${g.qty ? ` ×${ui.esc(g.qty)}` : ''} <span class="muted">· ${ui.esc(P.AISLES.find(a => a.k === P.aisleOf(g.name, s.aisleLearn))?.label || '')}${g.store ? ' · ' + ui.esc(P.storeLabel(g.store)) : ''}</span>`; }
     else detail = `${ui.esc(it.text)} <span class="muted">· opens the food logger</span>`;
     return `<div class="pv-it"><button class="kind k-${it.kind}" data-i="${i}">${ui.ico(ICON[it.kind])}${LBL[it.kind]}</button><span class="grow">${detail}</span></div>`;
-  }).join('') + (toggle ? `<div class="pv-tog">${items.length > 1 && !whole ? `<span class="muted small">Split into ${items.length}</span>` : ''}${toggle}</div>` : '');
+  }).join('') + (toggle ? `<div class="pv-tog">${items.length > 1 && !whole ? `<span class="muted small">Split into ${items.length}</span>` : ''}${toggle}</div>` : '')
+    + aiNote(text, items.length, mode, whole, aiItems);
   return { items, html };
 }
+// One quiet line under the preview: who sorted it. Nothing when there's no Gemini key.
+function aiNote(text, n, mode, whole, aiItems) {
+  if (mode === 'groceries' || whole || !ai.key()) return '';
+  if (aiItems) return '<div class="pv-ai small">✨ Sorted by Gemini</div>';
+  const r = ai.ready('tasks');
+  return !r.ok && r.why !== 'off' && ai.worthIt(text, n) ? `<div class="pv-ai small muted">Sorted on this phone · Gemini ${r.why}</div>` : '';
+}
+
+// Gemini follows the rules preview: once the text has settled (`delay` ms after the last change; 0 when the mic stops)
+// it asks once for that exact text and hands back its split if the text is still the same. The rules result shows
+// meanwhile and stays whenever Gemini is off, slow, over its limit or answers something that doesn't check out.
+function aiFollow(getText, onAnswer) {
+  let t;
+  return ({ mode, whole, n, delay = 1200 }) => {
+    clearTimeout(t);
+    const text = getText();
+    if (mode === 'groceries' || whole || !ai.worthIt(text, n) || !ai.ready('tasks').ok) return;
+    t = setTimeout(async () => {
+      const p = ai.start('tasks', text);
+      const items = p && await p;
+      if (items && getText() === text) onAnswer(text, items);
+    }, delay);
+  };
+}
+// At Add: Gemini's answer for this text if it's in or lands within a moment, else null (rules are used).
+const aiAtAdd = (text, mode, whole) => mode === 'groceries' || whole ? null : ai.settled('tasks', text, 1500);
 const PV_LIST = { ideas: 'Idea', watch: 'Watch', shop: 'Shopping', someday: 'Someday' };
 const NEXT_KIND = { task: 'grocery', grocery: 'food', food: 'task' };
 
@@ -339,24 +368,29 @@ function bindCapture(root, s, ui) {
   const { $, $$ } = ui;
   const inp = $('#capIn', root), prev = $('#capPrev', root);
   if (!inp) return;
-  let overrides = {}, items = [], seq = 0, whole = false;
-  const refresh = async () => {
+  let overrides = {}, items = [], seq = 0, whole = false, aiFor = null, aiItems = null;
+  // Gemini's split replaces the preview only if you haven't switched an item's type by hand meanwhile.
+  const follow = aiFollow(() => inp.value, (text, its) => { if (!Object.keys(overrides).length) { aiFor = text; aiItems = its; refresh(true); } });
+  const refresh = async (fromAi = false) => {
     const my = ++seq;
     if (!inp.value.trim()) whole = false;
-    const r = await previewHtml(inp.value, s, ui, overrides, st.mode, whole);
+    const r = await previewHtml(inp.value, s, ui, overrides, st.mode, whole, aiFor === inp.value ? aiItems : null);
     if (my !== seq) return;
     items = r.items; prev.innerHTML = r.html;
-    $$('.kind', prev).forEach(b => (b.onclick = () => { const i = +b.dataset.i; overrides[i] = NEXT_KIND[items[i].kind]; learn(items[i], overrides[i], s); refresh(); }));
+    $$('.kind', prev).forEach(b => (b.onclick = () => { const i = +b.dataset.i; overrides[i] = NEXT_KIND[items[i].kind]; learn(items[i], overrides[i], s); refresh(true); }));
     $$('.pv-split', prev).forEach(b => (b.onclick = () => { whole = b.dataset.whole === '1'; overrides = {}; refresh(); }));
+    if (!fromAi) follow({ mode: st.mode, whole, n: items.length });
   };
   const go = async () => {
     if (!inp.value.trim()) return inp.focus();
-    await refresh();
-    const text = inp.value; inp.value = ''; prev.innerHTML = ''; overrides = {}; whole = false;
+    const v = Object.keys(overrides).length ? null : await aiAtAdd(inp.value, st.mode, whole);
+    if (v) { aiFor = inp.value; aiItems = v; }
+    await refresh(true);
+    const text = inp.value; inp.value = ''; prev.innerHTML = ''; overrides = {}; whole = false; aiFor = aiItems = null;
     await capture(text, s, ui, { kinds: items });
     ui.render();
   };
-  inp.oninput = refresh;
+  inp.oninput = () => refresh();
   inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
   $('#capGo', root).onclick = go;
   $('#capMic', root)?.addEventListener('click', () => openQuick(s, ui, { mode: st.mode }));
@@ -382,16 +416,19 @@ export function openQuick(s, ui, { mode = 'tasks', autostart = true } = {}) {
     <div id="qPrev" class="cprev big"></div>
     <div class="actions"><button class="primary" id="qAdd" disabled>Add</button></div>`, { title: mode === 'groceries' ? 'Add groceries' : 'Quick add' });
   const ta = $('#qT', b), mic = $('#qMic', b), pv = $('#qPrev', b), add = $('#qAdd', b);
-  let rec = null, items = [], overrides = {}, seq = 0, typingT, whole = false;
-  const refresh = async () => {
+  let rec = null, items = [], overrides = {}, seq = 0, typingT, whole = false, aiFor = null, aiItems = null;
+  const follow = aiFollow(() => ta.value, (text, its) => { if (!Object.keys(overrides).length) { aiFor = text; aiItems = its; refresh({ fromAi: true }); } });
+  const refresh = async ({ fromAi = false, delay } = {}) => {
     const my = ++seq;
-    const r = await previewHtml(ta.value, s, ui, overrides, mode, whole);
+    const r = await previewHtml(ta.value, s, ui, overrides, mode, whole, aiFor === ta.value ? aiItems : null);
     if (my !== seq) return;
     items = r.items; pv.innerHTML = r.html;
     add.disabled = !items.length;
     add.textContent = items.length ? `Add ${items.length} item${items.length === 1 ? '' : 's'}` : 'Add';
-    $$('.kind', pv).forEach(k => (k.onclick = () => { const i = +k.dataset.i; overrides[i] = NEXT_KIND[items[i].kind]; learn(items[i], overrides[i], s); refresh(); }));
+    $$('.kind', pv).forEach(k => (k.onclick = () => { const i = +k.dataset.i; overrides[i] = NEXT_KIND[items[i].kind]; learn(items[i], overrides[i], s); refresh({ fromAi: true }); }));
     $$('.pv-split', pv).forEach(b => (b.onclick = () => { whole = b.dataset.whole === '1'; overrides = {}; refresh(); }));
+    // While the mic is still listening the text keeps growing, so Gemini waits for Done.
+    if (!fromAi && !rec) follow({ mode, whole, n: items.length, delay });
   };
   const setMic = on => { if (!mic) return; mic.textContent = on ? '■ Done' : '🎤 Start talking'; mic.classList.toggle('on', on); };
   const start = (auto = false) => {
@@ -399,14 +436,16 @@ export function openQuick(s, ui, { mode = 'tasks', autostart = true } = {}) {
     setMic(true);
     rec = voice.listen({
       onText: t => { ta.value = before + t; clearTimeout(typingT); typingT = setTimeout(refresh, 250); },
-      onEnd: (_, err) => { rec = null; setMic(false); if (err) ui.toast(auto ? 'Tap Start talking to begin' : 'Mic blocked: allow microphone access for this site'); refresh(); },
+      onEnd: (_, err) => { rec = null; setMic(false); if (err) ui.toast(auto ? 'Tap Start talking to begin' : 'Mic blocked: allow microphone access for this site'); refresh({ delay: 0 }); },
     });
   };
   if (mic) mic.onclick = () => (rec ? rec.stop() : start());
   ta.oninput = () => { clearTimeout(typingT); typingT = setTimeout(refresh, 300); };
   add.onclick = async () => {
-    rec?.stop();
-    await refresh();
+    rec?.stop(); rec = null;
+    const v = Object.keys(overrides).length ? null : await aiAtAdd(ta.value, mode, whole);
+    if (v) { aiFor = ta.value; aiItems = v; }
+    await refresh({ fromAi: true });
     const its = items;
     ui.closeSheet();
     await capture(ta.value, s, ui, { kinds: its });
