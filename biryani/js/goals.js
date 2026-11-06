@@ -52,16 +52,23 @@ export function goalsFor(s, gday, override) {
   return { type: active ? 'active' : 'rest', label: active ? dayLabel(gday) || 'Active day' : 'Rest day', auto: true, ...g, eatBack: back, exKcal: Math.round(net) };
 }
 
-// Weekly budget: what you ate vs goal on the earlier days of this week (Mon-Sun) is spread over
+// Weekly budget: what you ate vs goal on the earlier days of this week (Sun-Sat) is spread over
 // the days left. Gaps under 300 kcal are tracking noise and ignored. Paying back an overage is
 // capped at 250 kcal a day and skips protected days (long run, workout, the day after a long run,
-// race week); whatever doesn't fit by Sunday is let go, and every Monday starts clean.
-// prior: [{ eaten, goal }] for earlier days; rest: [{ date, protect }] from `date` to Sunday.
+// race week); whatever doesn't fit by Saturday is let go, and every Sunday starts clean. An unlogged day resets it (below).
+// prior: [{ eaten, goal }] for earlier days; rest: [{ date, protect }] from `date` to Saturday.
 export const WEEK = { dead: 300, cap: 250 };
+// A day that's unlogged or under half logged resets the week (Safaan's call, 2026-11-06): what you ate that day is
+// unknown and may well have been over, so credit saved before it is dropped, not spent. An overage from before it
+// still counts. Only the days after the gap build a new balance.
+export const gapDay = d => d.eaten < d.goal * 0.5;
 export function weekAdjust(prior, rest, date) {
-  const logged = prior.filter(d => d.eaten >= d.goal * 0.5); // half-logged days would read as a huge "under"
-  const balance = Math.round(logged.reduce((t, d) => t + d.eaten - d.goal, 0));
-  const out = { balance, logged: logged.length, adj: 0, protect: '', small: Math.abs(balance) < WEEK.dead };
+  const gi = prior.map(gapDay).lastIndexOf(true), before = prior.slice(0, Math.max(0, gi)).filter(d => !gapDay(d)), after = prior.slice(gi + 1);
+  const sum = a => a.reduce((t, d) => t + d.eaten - d.goal, 0);
+  const carried = gi >= 0 ? Math.max(0, sum(before)) : 0;
+  const balance = Math.round(carried + sum(gi >= 0 ? after : prior));
+  const logged = (gi >= 0 ? after : prior).length + (carried > 0 ? before.length : 0);
+  const out = { balance, logged, adj: 0, protect: '', small: Math.abs(balance) < WEEK.dead, reset: gi >= 0 ? prior[gi].date : '', dropped: gi >= 0 ? Math.round(Math.min(0, sum(before))) : 0 };
   if (out.small) return out;
   const me = rest.find(d => d.date === date);
   if (balance > 0 && me?.protect) { out.protect = me.protect; return out; }

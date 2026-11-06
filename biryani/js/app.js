@@ -6,7 +6,7 @@ import * as food from './food.js';
 import * as scan from './scan.js';
 import * as sync from './sync.js';
 import { goalsFor, recommend, measuredTdee, autoDayType, weekAdjust, withWeek } from './goals.js';
-import { weekStart, daysBetween } from './training.js';
+import { sunStart, daysBetween } from './training.js';
 import { bars, line, ema, bindCharts } from './charts.js';
 import * as voice from './voice.js';
 import * as train from './trainview.js';
@@ -189,7 +189,7 @@ async function dayContext(date, base = false) {
 // Where this week stands vs the goals so far, and what that moves today's goal by (goals.js weekAdjust).
 async function weekBudget(date, goals) {
   if (state.s.weekBudget === false || date > today()) return null;
-  const start = weekStart(date), prior = [], rest = [];
+  const start = sunStart(date), prior = [], rest = [];
   for (let d = start; d < date; d = addDays(d, 1)) {
     const [es, ctx] = await Promise.all([entriesFor(d), dayContext(d, true)]);
     prior.push({ date: d, eaten: N.entryTotals(es, state.s.caloriesFromMacros).kcal, goal: ctx.goals.kcal });
@@ -344,7 +344,7 @@ async function viewToday() {
     <div class="num">${showLeft ? `<b>${r0(left)}</b> kcal left` : `<b>${r0(tot.kcal)}</b> / ${r0(goals.kcal)} kcal`}</div></button>`;
   const w = weights.find(x => x.date === date)?.lb ?? gday?.weightLb;
   const wk = ctx.week, sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') + r0(Math.abs(v));
-  const weekLine = !wk?.logged ? '' : `<button class="weekline" id="weekBtn">${ico('cal')}<span>Week <b>${sgn(wk.balance)}</b> ${wk.small ? '· on track' : wk.balance > 0 ? 'over' : 'under'}${
+  const weekLine = !wk?.logged && !wk?.reset ? '' : `<button class="weekline" id="weekBtn">${ico('cal')}<span>Week <b>${sgn(wk.balance)}</b> ${wk.small ? '· on track' : wk.balance > 0 ? 'over' : 'under'}${wk.reset && wk.dropped < 0 ? ' · reset' : ''}${
     wk.adj ? ` · today <b>${sgn(wk.adj)}</b>` : wk.protect ? ` · not from today (${wk.protect})` : ''}</span>${ico('next')}</button>`;
 
   const single = s.meals.length === 1, sel = state.sel;
@@ -668,17 +668,20 @@ async function openWeek() {
   const day = d => new Date(d + 'T12:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   const rows = wk.prior.map(d => {
     const counted = d.eaten >= d.goal * 0.5, diff = d.eaten - d.goal;
-    return `<li><div class="grow"><div class="name">${day(d.date)}</div><div class="sub">${counted ? `${r0(d.eaten)} / ${r0(d.goal)} kcal` : d.eaten ? 'Not counted: under half logged' : 'Not logged'}</div></div>
-      ${counted ? `<b class="wdiff ${diff > 0 ? 'over' : 'under'}">${sgn(diff)}</b>` : ''}</li>`;
+    // Before an unlogged day, savings are dropped (overs still count).
+    const wiped = counted && wk.reset && d.date < wk.reset && wk.dropped < 0;
+    return `<li><div class="grow"><div class="name">${day(d.date)}</div><div class="sub">${counted ? `${r0(d.eaten)} / ${r0(d.goal)} kcal${wiped ? ' · dropped by the reset' : ''}` : `${d.eaten ? 'Under half logged' : 'Not logged'}: the week resets here`}</div></div>
+      ${counted ? `<b class="wdiff ${wiped ? '' : diff > 0 ? 'over' : 'under'}">${sgn(diff)}</b>` : ''}</li>`;
   }).join('');
+  const resetTxt = wk.reset ? ` ${day(wk.reset)} wasn't fully logged, so the ${wk.dropped < 0 ? `${r0(-wk.dropped)} kcal you'd saved before it doesn't carry over` : 'balance started over after it'}.` : '';
   const now = wk.small ? `That's within 300 kcal, which is tracking noise, so today's goal is unchanged.`
     : wk.adj < 0 ? `Today's goal is ${r0(-wk.adj)} kcal lower (taken from fat and carbs, never protein) to even it out over the days left.`
     : wk.adj > 0 ? `Today's goal is ${r0(wk.adj)} kcal higher, mostly carbs, to use what you saved.`
     : wk.protect ? `Nothing comes off today because it's a ${wk.protect}. Fuel it fully.` : 'No days left this week to spread it over, so it\'s let go.';
-  sheet(`<p class="wsum">This week (from ${day(wk.start)}): <b>${sgn(wk.balance)} kcal</b> ${wk.balance >= 0 ? 'over' : 'under'} your goals so far. ${now}</p>
+  sheet(`<p class="wsum">This week (from ${day(wk.start)}): <b>${sgn(wk.balance)} kcal</b> ${wk.balance >= 0 ? 'over' : 'under'} your goals so far.${resetTxt} ${now}</p>
     <ul class="entries card weekdays">${rows || '<li class="empty small">Today is the first day of the week.</li>'}</ul>
     <p class="hint">Today's goal: <b>${r0(goals.kcal)}</b> kcal · ${macroLine({ c: r0(goals.c), p: r0(goals.p), f: r0(goals.f) })}</p>
-    <p class="muted small">How it works: the week runs Monday to Sunday and starts clean every Monday. Gaps under 300 kcal are ignored. Bigger ones are spread over the days left, at most 250 kcal a day. Overs are never taken from a long run, workout, day after a long run, or race week. Anything left on Sunday is let go. Turn it off in Settings → Daily goals.</p>`, { title: 'Weekly budget' });
+    <p class="muted small">How it works: the week runs Sunday to Saturday and starts clean every Sunday. Gaps under 300 kcal are ignored. Bigger ones are spread over the days left, at most 250 kcal a day. Overs are never taken from a long run, workout, day after a long run, or race week. An unlogged or half-logged day resets the week: savings from before it are dropped (you may have eaten them that day), overs still count. Anything left on Saturday is let go. Turn it off in Settings → Daily goals.</p>`, { title: 'Weekly budget' });
 }
 
 // Suggest your own foods and recipes that fit what's left today, protein first.

@@ -712,3 +712,12 @@ details.fxhow { margin-top: 16px; }
 .wo .grade { margin-left: 8px; align-self: flex-start; }
 .lifttags.mini { margin-top: 6px; gap: 6px; }
 .lifttags.mini button { padding: 4px 9px; font-size: 12.5px; }
+
+/* Calendar: Miles / Grades toggle, blank days after the plan */
+.calhd { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.calhd h3 { margin: 0; }
+.seg.mini { display: inline-flex; padding: 2px; gap: 2px; border-radius: 9px; margin: 0; }
+.seg.mini button { padding: 4px 10px; font-size: 13px; }
+.cal.blank { visibility: hidden; }
+.cal .mi.gl { font-weight: 700; }
+.cal .mi.g-A { color: var(--ok); } .cal .mi.g-B { color: var(--p); } .cal .mi.g-C { color: var(--f); } .cal .mi.g-D, .cal .mi.g-F { color: var(--warn); }
