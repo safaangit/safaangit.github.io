@@ -498,14 +498,35 @@ export function adapt(plan, runs, gdays, cfg, ref = today()) {
       else if (longDay) set(q, { mi: Math.max(4, half(q.mi - 1.5)), title: q.title + ' (shorter)' }, `Shorter: ${what} was close to race effort. Cut the fast part short if your legs feel flat.`);
     }
   }
-  // Rebalance easy days in the current week.
+  // Ran on a rest day: the rest moves to a later easy day that week, so the week keeps its rest days
+  // (Pfitzinger, Advanced Marathoning: "juggle the days in the training schedule"). It goes to the day before
+  // the long run first (Higdon's plans rest on Friday before the Saturday long run), then a recovery day,
+  // then the last easy day. A day you
+  // skipped after it already gives the rest back. The run on the rest day stands in for that day's miles.
   const wk = wkOf(ref);
+  if (wk && wk.w >= 1) {
+    const wkdayS = d => DOW[dow(d)];
+    for (const r of wk.days.filter(d => d.kind === 'rest' && !d.was && d.date >= cfg.planStart && d.date <= ref && act(d.date) >= 1)) {
+      const back = wk.days.find(d => d.date > r.date && d.was && !d.restFor && !act(d.date));
+      if (back) {
+        Object.assign(back, { restFor: r.date, title: 'Rest (moved)', detail: `Off: this is ${wkdayS(r.date)}'s rest day, moved here because you ran then.`, moved: `Rest moved here from ${wkdayS(r.date)}, since you ran that day (was ${back.was.title.toLowerCase()}${back.was.mi ? `, ${back.was.mi} mi` : ''}).` });
+        r.coveredMi = back.was.mi || 0; continue;
+      }
+      const open = wk.days.filter(d => d.date > r.date && d.date >= ref && !act(d.date) && d.kind === 'easy' && !d.restFor && toRace(d.date) > 6);
+      const pick = open.find(d => at(addDays(d.date, 1))?.kind === 'long') || open.find(d => /^Recovery/.test(d.title)) || open.at(-1);
+      if (!pick) continue;
+      r.coveredMi = pick.mi;
+      set(pick, { kind: 'rest', mi: 0, title: 'Rest (moved)', detail: `Off: this is ${wkdayS(r.date)}'s rest day, moved here because you ran then. Walk or stretch if you like.`, pace: null, restFor: r.date, moved: '' },
+        `Rest moved here from ${wkdayS(r.date)}: you ran ${r1(act(r.date))} mi on that rest day.`);
+    }
+  }
+  // Rebalance easy days in the current week.
   if (wk && wk.w >= 1) {
     // Every day you've run counts: easy days both ways, runs on rest days as extra, and long runs or
     // workouts only when they went over (a short one is moved or dropped above, not made up here).
     const doneDays = wk.days.filter(d => d.date <= ref && d.date >= cfg.planStart && d.kind !== 'race' && (d.date < ref || act(d.date)));
     const left = wk.days.filter(d => d.date >= ref && !act(d.date) && (d.kind === 'easy' || d.kind === 'medium') && !d.adj);
-    const over = d => d.kind === 'easy' || d.kind === 'medium' ? act(d.date) - d.mi : d.kind === 'rest' || d.kind === 'recovery' ? act(d.date) : Math.max(0, act(d.date) - d.hi);
+    const over = d => d.kind === 'easy' || d.kind === 'medium' ? act(d.date) - d.mi : d.kind === 'rest' || d.kind === 'recovery' ? Math.max(0, act(d.date) - (d.coveredMi || 0)) : Math.max(0, act(d.date) - d.hi);
     let delta = doneDays.reduce((t, d) => t + over(d), 0);
     if (left.length && Math.abs(delta) >= 1.5) {
       const share = delta < 0 ? Math.min(1.5, (-delta / 2) / left.length) : -Math.min(2, delta / left.length);
@@ -620,11 +641,15 @@ export function changeLog(s, gdays, ref = today(), maxDays = 120) {
       const tempoSlow = z.list.find(x => x[0] === 'tempo')[3];
       const best = runs.filter(r => r.date === ev && r.mi >= 3 && r.sec).sort((a, b) => b.mi - a.mi)[0];
       const pace = best ? `${fmtPace(best.sec / best.mi)}/mi` : '';
-      if (d.was && !all) why.push(['rest', `Unplanned rest: skipped ${desc(d.was)}.`]);
+      if (d.restFor && !all) why.push(['rest', `Rest day, moved here from ${dayTag(d.restFor)} because you ran that day.`]);
+      else if (d.was && !all) why.push(['rest', `Unplanned rest: skipped ${desc(d.was)}.`]);
       else if (d.mi && !all) why.push(['miss', `Missed ${desc(d)}.`]);
       else if (!d.mi && all) why.push(['extra', `Ran ${r1(all)} mi on a rest day.`]);
       else if (d.mi && got > d.hi + 0.5) why.push(['long', `Went longer: ${r1(got)} mi (plan ${miTxt(d)}).`]);
       else if (d.mi && got < d.lo * 0.95) why.push(['short', `Cut short: ${r1(got)} of ${miTxt(d)}.`]);
+      // Inside the range but off the target: the week rebalances on the target, so say so.
+      else if (d.mi && (d.kind === 'easy' || d.kind === 'medium') && Math.abs(got - d.mi) >= 1)
+        why.push([got > d.mi ? 'long' : 'short', `Ran ${r1(got)} mi, ${r1(Math.abs(got - d.mi))} ${got > d.mi ? 'over' : 'under'} the ${d.mi} mi target (still in the ${miTxt(d)} range).`]);
       if (best && d.kind === 'long' && best.mi >= d.lo * 0.9 && isHard(best, z, runs, true))
         why.push(['hard', `Hard long run: ${r1(best.mi)} mi at ${pace}${best.rpe ? `, effort ${Math.round(best.rpe / 10)}/10` : ''}.`]);
       else if (best && d.kind !== 'quality' && d.kind !== 'long' && best.sec / best.mi <= tempoSlow + 10)
@@ -643,7 +668,8 @@ export function changeLog(s, gdays, ref = today(), maxDays = 120) {
     for (const w of cur.plan.weeks) for (const x of w.days) {
       const p = was.get(x.date);
       if (x.date < D || !p || (p.kind === x.kind && p.title === x.title && p.lo === x.lo && p.hi === x.hi)) continue;
-      if (daysBetween(D, x.date) < 7) res.push(`${dayTag(x.date)}: ${p.title === x.title ? `${ttl(x)} ${miTxt(p) || 'off'} → ${miTxt(x) || 'off'}` : `${desc(p)} → ${desc(x)}`}.`);
+      if (daysBetween(D, x.date) < 7 && x.restFor && p.kind === 'rest') res.push(`${dayTag(x.date)}: now ${DOW[dow(x.restFor)]}'s rest day.`);
+      else if (daysBetween(D, x.date) < 7) res.push(`${dayTag(x.date)}: ${p.title === x.title ? `${ttl(x)} ${miTxt(p) || 'off'} → ${miTxt(x) || 'off'}` : `${desc(p)} → ${desc(x)}`}.`);
       else weeks.set(w.start, w);
     }
     // Later weeks: the first two that changed, then a count (a new week can nudge the whole season).
@@ -679,7 +705,98 @@ export function changeLog(s, gdays, ref = today(), maxDays = 120) {
   }
   for (const x of cfg.easyLongs || []) if (x >= start)
     out.push({ date: x, why: [['you', `You switched ${shortDay(x)}'s long run to all easy.`]], res: ['Same distance, no marathon pace in it (Higdon style).'] });
-  for (const x of cfg.skips || []) if (x >= ref)
-    out.push({ date: x, why: [['you', `You skipped ${shortDay(x)} ahead of time.`]], res: ['That day is rest. Its miles aren\'t moved anywhere.'] });
+  const nowPlan = planAt(s, gdays, ref).plan;
+  for (const x of cfg.skips || []) if (x >= ref) {
+    const d = planFor(nowPlan, x);
+    out.push(d?.restFor ? { date: x, why: [['rest', `Rest day, moved here from ${dayTag(d.restFor)} because you ran that day.`]], res: [`The week keeps its ${cfg.restDays} rest days; ${desc(d.was)} isn't made up.`] }
+      : { date: x, why: [['you', `You skipped ${shortDay(x)} ahead of time.`]], res: ['That day is rest. Its miles aren\'t moved anywhere.'] });
+  }
   return out.filter(e => e.date >= start || e.why[0][0] === 'you').sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// ---------- Grades ----------
+// How each day and week went against the plan, and the goal against your fitness. Letters from a 0-100 score.
+// What's graded, and where the weights come from:
+// - Volume: miles done vs planned. Pfitzinger (Advanced Marathoning): "if you can do 90 percent of the planned
+//   training schedule, your preparation is going really well", so 90% scores full marks.
+// - Key runs: the long run and the workout, the two sessions Pfitzinger and Higdon build each week around.
+// - Easy days kept easy: Seiler (2010, IJSPP) finds ~80% of good endurance training is low intensity.
+// - Rest days taken, after any moves.
+// The weights (40 / 30 / 20 / 10) and the over-plan cut-off (more than 10% past the top of the range) are the app's own.
+export const letter = v => v == null ? '' : v >= 97 ? 'A+' : v >= 93 ? 'A' : v >= 90 ? 'A-' : v >= 87 ? 'B+' : v >= 83 ? 'B' : v >= 80 ? 'B-'
+  : v >= 77 ? 'C+' : v >= 73 ? 'C' : v >= 70 ? 'C-' : v >= 60 ? 'D' : 'F';
+const clamp = v => Math.max(0, Math.min(100, Math.round(v)));
+
+// One plan day. null when there's nothing to grade yet (future, today before you run, rest, race).
+export function dayGrade(d, runs, z, ref = today()) {
+  if (!d || d.kind === 'race' || d.date > ref || !d.mi) return null;
+  const got = doneMiles(runs, d);
+  if (!got && d.date === ref) return null;
+  if (!got) return { score: 0, letter: 'F', notes: ['Missed.'] };
+  const notes = [];
+  let dist = 100;
+  if (got < d.lo) { dist = 100 - ((d.lo - got) / d.lo) * 200; notes.push(`${r1(got)} of ${d.lo}-${d.hi} mi.`); }
+  else if (got > d.hi * 1.1) { dist = 100 - Math.min(30, ((got - d.hi) / d.hi) * 150); notes.push(`${r1(got)} mi, past the ${d.hi} mi top.`); }
+  const main = runs.filter(r => r.date === d.date && r.mi >= 3 && r.sec).sort((a, b) => b.mi - a.mi)[0];
+  let eff = 100;
+  // Workouts: hitting the pace counts; running well under it doesn't earn more (Daniels' Running Formula: faster
+  // than threshold pace adds fatigue, not fitness). Easy runs and long runs: workout effort costs points.
+  if (d.kind === 'quality') {
+    if (ranAs(runs, d.date, z)?.kind !== 'quality') { eff = 75; notes.push('Workout pace not reached.'); }
+    else if (main && d.pace && main.sec / main.mi < d.pace[0] - 10) { eff = 85; notes.push(`Averaged ${fmtPace(main.sec / main.mi)}/mi with the warm-up in, so the fast part beat the ${fmtPace(d.pace[0])}-${fmtPace(d.pace[1])} target. Faster isn't better here.`); }
+  }
+  else if (main && isHard(main, z, runs, d.kind === 'long')) { eff = 70; notes.push(`${fmtPace(main.sec / main.mi)}/mi is workout effort on ${d.kind === 'long' ? 'a long run' : 'an easy day'}.`); }
+  const score = clamp(dist * 0.6 + eff * 0.4);
+  return { score, letter: letter(score), notes };
+}
+
+// A plan week, so far if it's this week, graded against the week as planned on its Monday (planAt), so
+// adjustments made during the week don't move the goalposts. A skipped day still counts as planned miles and
+// a run on a rest day counts as done, so a moved rest day comes out even. null before anything is gradeable.
+export function weekGrade(w, runs, z, cfg, ref = today()) {
+  const days = w.days.filter(d => d.date <= ref && d.date >= cfg.planStart && d.kind !== 'race');
+  if (!days.length || (days.length === 1 && days[0].date === ref && !milesOn(runs, ref))) return null;
+  const parts = [];
+  // Volume: a skipped day still counts as planned (unless it's a rest that moved), today only once you've run.
+  const counted2 = days.filter(d => d.date < ref || milesOn(runs, d.date) || d.was);
+  const planned = counted2.reduce((t, d) => t + (d.was ? d.was.mi : d.mi), 0), done = counted2.reduce((t, d) => t + milesOn(runs, d.date), 0);
+  const top = counted2.reduce((t, d) => t + (d.was ? d.was.hi : d.hi), 0);
+  if (planned > 0) {
+    const pct = done / planned;
+    const v = done > top * 1.1 ? 100 - ((done / top - 1.1) * 200) : pct >= 0.9 ? 100 : 100 - (0.9 - pct) * 250;
+    parts.push({ k: 'Volume', w: 40, v: clamp(v), txt: `${r1(done)} of ${r1(planned)} mi planned (${Math.round(pct * 100)}%)${done > top * 1.1 ? ', well past the range' : ''}` });
+  }
+  // Key runs.
+  const key = [];
+  const lg = days.find(d => d.kind === 'long' && d.date < ref || (d.kind === 'long' && longestOn(runs, d.date)));
+  if (lg) key.push(['Long run', longestOn(runs, lg.date) >= lg.lo * 0.9 || days.some(d => longestOn(runs, d.date) >= lg.lo * 0.9)]);
+  const q = days.filter(d => d.kind === 'quality' && (d.date < ref || milesOn(runs, d.date)));
+  if (q.length) key.push(['Workout', days.some(d => ranAs(runs, d.date, z)?.kind === 'quality')]);
+  if (key.length) parts.push({ k: 'Key runs', w: 30, v: clamp(key.filter(x => x[1]).length / key.length * 100), txt: key.map(([n, ok]) => `${n} ${ok ? 'done' : 'missed'}`).join(', ') });
+  // Easy days kept easy.
+  const easy = days.filter(d => (d.kind === 'easy' || d.kind === 'medium') && milesOn(runs, d.date));
+  if (easy.length) {
+    const hot = easy.filter(d => runs.some(r => r.date === d.date && isHard(r, z, runs)));
+    parts.push({ k: 'Easy days easy', w: 20, v: clamp(100 - hot.length * 25), txt: hot.length ? `${hot.length} of ${easy.length} run at workout effort (${hot.map(d => DOW[dow(d.date)]).join(', ')})` : `all ${easy.length} kept easy` });
+  }
+  // Rest days.
+  const rests = days.filter(d => d.kind === 'rest' && !d.was).length;
+  if (rests) {
+    const taken = Math.min(rests, days.filter(d => !milesOn(runs, d.date) && (d.date < ref || d.kind === 'rest')).length);
+    parts.push({ k: 'Rest', w: 10, v: clamp(100 - (rests - taken) * 50), txt: `${taken} of ${rests} rest day${rests > 1 ? 's' : ''} taken${taken < rests ? '' : rests && days.some(d => d.kind === 'rest' && !d.was && milesOn(runs, d.date) >= 1) ? ' (one moved)' : ''}` });
+  }
+  if (!parts.length) return null;
+  const tw = parts.reduce((t, p) => t + p.w, 0), score = clamp(parts.reduce((t, p) => t + p.v * p.w, 0) / tw);
+  return { score, letter: letter(score), parts, partial: addDays(w.start, 6) >= ref };
+}
+
+// Fitness vs the goal: the app's marathon prediction (Riegel from your best recent runs, plus a low-mileage
+// penalty, frozen once the taper starts) against the goal time.
+export function goalGrade(runs, cfg, ref = today()) {
+  const p = predict(runs, ref, cfg.raceDate);
+  if (!p || !cfg.goalSec) return null;
+  const gap = (p.sec - cfg.goalSec) / cfg.goalSec;
+  // 1% slower than the goal (about 2 min on a 3:30) is a B-, 2% a C-, 3% failing.
+  const score = clamp(gap <= 0 ? 100 : 100 - gap * 1500);
+  return { score, letter: letter(score), pred: p.sec, gapSec: p.sec - cfg.goalSec };
 }
