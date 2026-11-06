@@ -9,7 +9,9 @@ const M = 1609.34, MARATHON = 26.2188;
 export const addDays = (d, k) => today(new Date(new Date(d + 'T12:00').getTime() + k * 864e5));
 export const daysBetween = (a, b) => Math.round((new Date(b + 'T12:00') - new Date(a + 'T12:00')) / 864e5);
 const dow = d => new Date(d + 'T12:00').getDay();
-export const weekStart = d => addDays(d, -((dow(d) + 6) % 7)); // Monday
+export const weekStart = d => addDays(d, -((dow(d) + 6) % 7)); // Monday: how the plan is built
+// Sunday: how weeks are shown (calendar, grades, weekly calorie budget), Safaan's pick 2026-11-06.
+export const sunStart = d => addDays(d, -dow(d));
 const half = v => Math.max(0, Math.round(v * 2) / 2);
 const pad2 = n => String(n).padStart(2, '0');
 export const fmtPace = sec => { const s = Math.round(sec); return `${Math.floor(s / 60)}:${pad2(s % 60)}`; };
