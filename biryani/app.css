@@ -683,3 +683,15 @@ fieldset.srace .sDel { margin-top: 6px; }
 .chres { margin: 4px 0 0 60px; padding: 0 0 0 14px; font-size: 13.5px; line-height: 1.4; color: var(--ink); }
 .chres li { margin: 2px 0; }
 .chres li::marker { color: var(--accent); }
+
+/* fix notes (header wrench) */
+header.top #fixBtn { position: relative; }
+header.top #fixBtn.has::after { content: ""; position: absolute; top: 5px; left: 5px; width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px var(--bar); }
+ul.fixes .name.wrap { white-space: normal; line-height: 1.35; }
+ul.fixes .sub { margin-top: 3px; }
+ul.fixes .accent { color: var(--accent); font-weight: 500; }
+ul.fixes .ask { color: var(--accent); }
+ul.fixes li.done { cursor: default; } ul.fixes li.done .name { color: var(--muted); }
+ul.fixes a { color: var(--accent); }
+details.fxdone summary { list-style: none; cursor: pointer; } details.fxdone summary::-webkit-details-marker { display: none; }
+details.fxhow { margin-top: 16px; }
