@@ -13,6 +13,7 @@ import * as train from './trainview.js';
 import * as lifts from './lifts.js';
 import * as tasks from './tasks.js';
 import * as gb from './gbridge.js';
+import * as fixes from './fixes.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -46,6 +47,7 @@ const ICONS = {
   pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
   tasks: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>',
   cart: '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 7H6"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   note: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
 };
 const ico = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
@@ -73,7 +75,16 @@ async function render() {
   $('#trendsBtn').classList.toggle('on', state.tab === 'trends');
   syncBadge();
   taskBadge();
+  fixBadge();
 }
+// Waiting fix notes show as a dot on the header wrench.
+async function fixBadge() {
+  const n = await fixes.openCount().catch(() => 0), btn = $('#fixBtn');
+  btn.classList.toggle('has', n > 0);
+  btn.setAttribute('aria-label', n ? `Fix notes for Claude (${n} waiting)` : 'Note a fix for Claude');
+}
+const TAB_NAMES = { today: 'Today', training: 'Training', trends: 'Trends', foods: 'Foods', tasks: 'Tasks', settings: 'Settings' };
+const whereNow = () => `${TAB_NAMES[state.tab] || state.tab} screen` + (state.tab === 'today' && state.date !== today() ? ` (viewing ${new Date(state.date + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : '');
 // Overdue + due-today count on the Tasks tab button.
 async function taskBadge() {
   const btn = $('nav button[data-tab="tasks"]'); if (!btn) return;
@@ -1542,6 +1553,8 @@ const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render, swipeToDelete, g
 $$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ico(b.dataset.tab)));
 $('#gear').innerHTML = ico('settings');
 $('#trendsBtn').innerHTML = ico('trends');
+$('#fixBtn').innerHTML = ico('wrench');
+$('#fixBtn').onclick = () => fixes.open(state.s, ui, { where: whereNow() });
 $('#trendsBtn').onclick = () => { state.tab = 'trends'; state.trEnd = null; state.trAll = false; render(); };
 $('#gear').onclick = () => { state.tab = 'settings'; state.sel = state.fsel = null; render(); };
 $$('nav button').forEach(b => (b.onclick = () => { if (b.dataset.tab === 'add') return openAdd(defaultMeal()); state.tab = b.dataset.tab; state.sel = state.fsel = null; render(); }));
@@ -1549,7 +1562,7 @@ function defaultMeal() {
   const h = new Date().getHours(), n = state.s?.meals.length || 1;
   return Math.min(n - 1, h < 15 ? 0 : h < 18 ? 1 : 2);
 }
-db.onChange(name => { scheduleSync(); if (name === 'tasks') scheduleBridge(); });
+db.onChange(name => { scheduleSync(); if (name === 'tasks') scheduleBridge(); if (name === 'fixes') fixBadge(); });
 addEventListener('online', () => scheduleSync(500));
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
@@ -1592,5 +1605,6 @@ async function launchAction() {
   else if (act === 'add') openAdd(defaultMeal());
   else if (act === 'scan') openScanner(defaultMeal());
   else if (act === 'fits') openFits(); // from Explore's "What fits from my own foods"
+  else if (act === 'fix') fixes.open(state.s, ui, { where: 'the app' });
 }
 render().then(() => { launchAction(); scheduleSync(300); scheduleBridge(600); });
