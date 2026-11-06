@@ -25,10 +25,12 @@ export const tagsOf = (s, id) => s.training?.lifts?.[String(id)] || [];
 
 // The line under a strength session on Today: "Push · Incline DB press 70 lb DBs × 12", or a prompt.
 export function rowLine(s, a, rec, esc) {
-  const tags = tagsOf(s, a.id).join(' + ');
-  const txt = rec ? `${tags ? `${esc(tags)} · ` : ''}${esc(rec.name)} <b>${esc(setText(rec))}</b>` : `${tags ? `${esc(tags)} · ` : ''}+ Best lift`;
+  const txt = rec ? `${esc(rec.name)} <b>${esc(setText(rec))}</b>` : '+ Best lift';
   return `<button class="bestlift ${rec ? 'set' : ''}" data-lift="${esc(String(a.id))}">${txt}</button>`;
 }
+
+// Tap-to-tag chips for the day's split, shown under the strength row on Today.
+export const tagRow = (s, a, esc) => `<div class="wkruns lifttags mini" data-id="${esc(String(a.id))}">${LIFTS.map(k => `<button type="button" data-t="${k}" class="${tagsOf(s, a.id).includes(k) ? 'on' : ''}">${k}</button>`).join('')}</div>`;
 
 export async function open(s, a, date, ui) {
   const id = String(a.id), rec = await forSession(id), all = (await db.all('lifts')).filter(r => r.id !== id);

@@ -390,7 +390,7 @@ async function viewToday() {
       ${stat('HRV', gday.hrv, gday.hrvStatus?.toLowerCase(), 'hrv')}${stat('Rest HR', gday.rhr, '', 'heart')}${stat('Readiness', gday.readiness, '', 'ready')}</div>` : `<p class="muted small">${sync.configured() ? 'No Garmin data for this day yet.' : 'Connect Garmin in Settings.'}</p>`}
     ${acts.length ? `<ul class="entries acts">${acts.map(a => `<li class="act ${actKind(a)}" ${a.manual ? `data-ex="${a.id}"` : ''}><span class="aicon">${ACT_ICON[actKind(a)]}</span><div class="grow"><div class="name">${esc(a.name)}</div><div class="qty">${[
       a.distance ? r1(a.distance / 1609.34) + ' mi' : '', a.duration ? Math.round(a.duration / 60) + ' min' : a.min ? a.min + ' min' : '',
-      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div>${best.has(a.id) ? lifts.rowLine(s, a, best.get(a.id), esc) : cardio.has(a.id) ? lifts.cardioLine(a, cardio.get(a.id), esc) : ''}</div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul>` : ''}</section>`;
+      a.distance && a.duration ? pace(a.duration, a.distance) : '', a.avgHR ? a.avgHR + ' bpm' : '', a.manual ? 'manual' : ''].filter(Boolean).join(' · ')}</div>${best.has(a.id) ? lifts.rowLine(s, a, best.get(a.id), esc) + lifts.tagRow(s, a, esc) : cardio.has(a.id) ? lifts.cardioLine(a, cardio.get(a.id), esc) : ''}</div><div class="kcol burn"><div class="kc">${r0(a.kcal)}</div><div class="kl">kcal</div></div></li>`).join('')}</ul>` : ''}</section>`;
 
   return `
   <section class="card summary">
@@ -476,9 +476,19 @@ bind.today = root => {
       $('#cgo', b).onclick = () => { const d = $('#cdate', b).value; if (d) { closeSheet(); copyTo(d); } };
     };
   }
-  const tc = $('#trainCard', root); if (tc) tc.onclick = () => { state.tab = 'training'; render(); };
+  // The Training card opens that day's sheet (swap, rest, lift tags, grade), with a link to the full plan.
+  const tc = $('#trainCard', root); if (tc) tc.onclick = () => train.openDay(state.s, state.date, ui, { fromToday: true });
   $('#addEx', root).onclick = () => openExercise();
   $$('li[data-ex]', root).forEach(li => (li.onclick = () => openExercise(li.dataset.ex)));
+  // Split tags right on the strength row, for any day (Push / Pull / Legs / Shoulders / Abs).
+  $$('.lifttags.mini', root).forEach(g => $$('button', g).forEach(x => (x.onclick = async ev => {
+    ev.stopPropagation();
+    const s = state.s, id = g.dataset.id, cur = new Set(lifts.tagsOf(s, id));
+    cur.has(x.dataset.t) ? cur.delete(x.dataset.t) : cur.add(x.dataset.t);
+    x.classList.toggle('on');
+    s.training = { ...(s.training || {}), lifts: { ...(s.training?.lifts || {}), [id]: [...cur] } };
+    await db.saveSettings({ ...s });
+  })));
   $$('.bestlift', root).forEach(x => (x.onclick = async ev => {
     ev.stopPropagation();
     const a = (await dayContext(state.date, true)).g.activities.find(a => String(a.id) === (x.dataset.lift || x.dataset.cardio));
@@ -1548,6 +1558,7 @@ function scheduleBridge(ms = 1200) {
 // ---------- boot ----------
 // Helpers the Training tab module borrows.
 const ui = { $, $$, esc, ico, sheet, closeSheet, toast, render, swipeToDelete, goDay: d => { state.date = d; state.tab = 'today'; render(); },
+  goTraining: () => { state.tab = 'training'; render(); },
   // Food lines from the Tasks quick add ("chicken 8.5 oz") open the voice logger with that text filled in.
   logFoodText: text => { vstate = { text, rows: [] }; openVoice({ autostart: false }); $('#vt')?.dispatchEvent(new Event('input')); } };
 $$('nav button').forEach(b => b.insertAdjacentHTML('afterbegin', ico(b.dataset.tab)));

@@ -695,3 +695,20 @@ ul.fixes li.done { cursor: default; } ul.fixes li.done .name { color: var(--mute
 ul.fixes a { color: var(--accent); }
 details.fxdone summary { list-style: none; cursor: pointer; } details.fxdone summary::-webkit-details-marker { display: none; }
 details.fxhow { margin-top: 16px; }
+/* Grades */
+.grade { flex: none; min-width: 34px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 700; font-size: 15px; padding: 0 6px; background: var(--tile); color: var(--ink); }
+.grade.g-A, .gparts b.g-A { color: var(--ok); } .grade.g-A { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.grade.g-B, .gparts b.g-B { color: var(--p); } .grade.g-B { background: var(--p-bg); }
+.grade.g-C, .gparts b.g-C { color: var(--f); } .grade.g-C { background: var(--f-bg); }
+.grade.g-D, .grade.g-F, .gparts b.g-D, .gparts b.g-F { color: var(--warn); } .grade.g-D, .grade.g-F { background: var(--warn-bg); }
+.grades h3 { margin-bottom: 6px; }
+.ghead { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.ghead .name { font-weight: 600; font-size: 15px; } .ghead .sub { font-size: 13px; color: var(--muted); }
+.gsmall { border-top: 1px solid var(--line); }
+.gparts { list-style: none; margin: 0 0 6px; padding: 0; font-size: 13.5px; }
+.gparts li { display: grid; grid-template-columns: 96px 1fr 28px; gap: 8px; padding: 4px 0; align-items: baseline; }
+.gparts li b { text-align: right; }
+.gwhy { margin-top: 4px; } .gwhy .tips { margin: 6px 0 0; padding-left: 18px; }
+.wo .grade { margin-left: 8px; align-self: flex-start; }
+.lifttags.mini { margin-top: 6px; gap: 6px; }
+.lifttags.mini button { padding: 4px 9px; font-size: 12.5px; }
