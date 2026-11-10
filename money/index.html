@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f9fc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a1a2b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="Money">
+<meta name="robots" content="noindex">
+<title>Money</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <h1>Money</h1>
+  <div class="hdr-r"><span id="status" class="muted small"></span>
+    <button id="refresh" class="icon" data-act="refresh" aria-label="Update now">↻</button>
+    <button class="icon" data-act="settings" aria-label="Settings">⚙</button></div>
+</header>
+<main></main>
+<nav>
+  <button data-tab="today">Today</button>
+  <button data-tab="invest">Invest</button>
+  <button data-tab="spend">Spend</button>
+  <button data-tab="bills">Bills</button>
+  <button data-tab="yearly">Yearly</button>
+</nav>
+<div id="sheet"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="js/money.js"></script>
+</body>
+</html>
