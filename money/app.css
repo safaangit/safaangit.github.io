@@ -3,9 +3,9 @@
    the rest holds: navy ink (never black), one purple accent, weight 300 for big numbers, tabular figures,
    4-8px radius, blue-tinted shadows. Dark values are derived from its brand navy (#0d253d) since the kit is light-only. */
 :root {
-  --bg: #f6f9fc; --surface: #ffffff; --surface-warm: #f6f9fc; --fg: #061b31; --fg-2: #273951; --muted: #64748d; --border: #e5edf5;
+  --bg: #f6f9fc; --surface: #ffffff; --surface-warm: #f6f9fc; --fg: #061b31; --fg-2: #273951; --muted: #5b6b80; --border: #e5edf5;
   --accent: #533afd; --accent-on: #ffffff; --accent-hover: #4434d4; --accent-soft: rgba(83, 58, 253, .08); --accent-line: #b9b9f9;
-  --success: #108c3d; --success-bg: rgba(21, 190, 83, .14); --warn: #9b6829; --warn-bg: rgba(155, 104, 41, .12); --danger: #d11a55; --danger-bg: rgba(234, 34, 97, .10);
+  --success: #0d7a33; --success-bg: rgba(21, 190, 83, .14); --warn: #855a22; --warn-bg: rgba(155, 104, 41, .12); --danger: #d11a55; --danger-bg: rgba(234, 34, 97, .10);
   --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px;
   --elev-1: rgba(23, 23, 23, .06) 0 3px 6px; --elev-raised: rgba(50, 50, 93, .25) 0 30px 45px -30px, rgba(0, 0, 0, .1) 0 18px 36px -18px;
   --font: "sohne-var", "Söhne", "SF Pro Display", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", Arial, sans-serif;
@@ -36,14 +36,14 @@ a, .link { color: var(--accent); text-decoration: none; }
 h2 { font-size: 22px; font-weight: 300; letter-spacing: -.02em; margin: 0 0 8px; }
 h3 { font-size: 14px; font-weight: 400; color: var(--fg-2); margin: 0; }
 
-button { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 14px; cursor: pointer; min-height: 40px; }
+button { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 14px; cursor: pointer; min-height: 44px; }
 button.primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
 button.primary:active { background: var(--accent-hover); }
 button.danger { color: var(--danger); border-color: var(--danger-bg); }
-button.link { border: 0; background: none; padding: 4px 0; min-height: 0; color: var(--accent); font-size: 14px; }
+button.link, a.link { border: 0; background: none; padding: 4px 0; min-height: 44px; display: inline-flex; align-items: center; color: var(--accent); font-size: 14px; }
 button:disabled { opacity: .45; }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-input, select { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; min-width: 0; min-height: 42px; font-size: 16px; }
+input, select { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; min-width: 0; min-height: 44px; font-size: 16px; }
 
 header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; background: var(--bg); }
 header.top h1 { font-size: 22px; font-weight: 300; letter-spacing: -.02em; margin: 0; }
@@ -80,7 +80,7 @@ nav button.on { color: var(--accent); background: var(--accent-soft); }
 .stat b, .triple b { font-size: 17px; font-weight: 400; }
 
 .alerts { display: grid; gap: 6px; margin: 0 0 12px; }
-.alert { display: block; width: 100%; text-align: left; border-radius: var(--radius-md); padding: 10px 12px; font-size: 14px; border: 1px solid transparent; min-height: 0; }
+.alert { display: block; width: 100%; text-align: left; border-radius: var(--radius-md); padding: 10px 12px; font-size: 14px; border: 1px solid transparent; min-height: 44px; }
 .alert.bad, .note.bad { background: var(--danger-bg); color: var(--danger); }
 .alert.warn, .note.warn { background: var(--warn-bg); color: var(--warn); }
 .note { border-radius: var(--radius-md); padding: 8px 10px; font-size: 13px; background: var(--surface-warm); color: var(--fg-2); margin: 8px 0 0; }
@@ -98,9 +98,9 @@ ul.rows li.late .when { color: var(--danger); }
 .what b { font-weight: 500; }
 .amt { flex: none; text-align: right; white-space: nowrap; }
 .amt small.up { color: var(--success); } .amt small.down { color: var(--danger); }
-.tick { flex: none; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: var(--radius-md); color: var(--muted); }
+.tick { flex: none; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: var(--radius-md); color: var(--muted); }
 .tick-gap { flex: none; width: 36px; }
-.chip { display: inline-block; font-size: 11px; line-height: 1.5; padding: 0 6px; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--fg-2); vertical-align: 1px; white-space: nowrap; }
+.chip { display: inline-block; font-size: 12px; line-height: 1.5; padding: 0 6px; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--fg-2); vertical-align: 1px; white-space: nowrap; }
 .chip.ok { background: var(--success-bg); color: var(--success); border-color: transparent; }
 .chip.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
 .chip.bad { background: var(--danger-bg); color: var(--danger); border-color: transparent; }

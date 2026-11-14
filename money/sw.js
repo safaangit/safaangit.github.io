@@ -1,7 +1,7 @@
 // Network-first for the app shell so updates show up on the next open; the cache is only an offline fallback.
 // Caches are shared by every app on safaangit.github.io, so this worker only ever deletes its own (money-*).
 // Account data never goes through here: it comes from the GitHub API and lives in IndexedDB.
-const CACHE = 'money-v1';
+const CACHE = 'money-v2';
 const SHELL = ['./', 'index.html', 'app.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/money.js', 'js/calc.js', 'js/gh.js', 'js/db.js', 'js/sync.js', 'js/sample.js'];
 
