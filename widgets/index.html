@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Baro's Widgets</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #000; color: #fff; font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 440px; margin: 0 auto; padding: 48px 20px; }
+  h1 { font-size: 34px; letter-spacing: -0.04em; margin: 0 0 8px; }
+  p { margin: 0 0 20px; color: #ededed; }
+  a.btn { display: block; text-align: center; padding: 16px; margin: 0 0 12px; border-radius: 12px; font-weight: 700; text-decoration: none; background: #fff; color: #000; }
+  a.btn.two { background: #3ddc84; }
+  .note { font-size: 15px; color: #c9c9c9; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Baro's Widgets</h1>
+  <p>Home screen widgets for Android: Macros, Tasks, Logged food, Bills, Weather.</p>
+  <a class="btn" href="barowidgets.apk">1. Install the app</a>
+  <a class="btn two" id="link" hidden>2. Link my widgets</a>
+  <p class="note" id="note">Allow the install when Android asks. Then hold the home screen, tap Widgets, find Baro's Widgets and add each one at 4x4.</p>
+</main>
+<script>
+  // The link details ride after the # so they never leave this phone: they go straight into the app.
+  const q = new URLSearchParams(location.hash.slice(1));
+  if (q.get('dk')) {
+    const a = document.getElementById('link');
+    a.href = 'intent://link?' + q.toString() + '#Intent;scheme=barowidgets;package=app.baro.widgets;end';
+    a.hidden = false;
+  } else {
+    document.getElementById('note').textContent += ' To link it, open the app and paste your Baro’s phone link.';
+  }
+</script>
+</body>
+</html>
