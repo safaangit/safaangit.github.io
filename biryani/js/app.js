@@ -334,6 +334,12 @@ async function viewToday() {
   const carbs = s.netCarbs ? netC(tot) : tot.c;
   // The Explore app (../explore/, same site) reads today's goals from here for "Fits today".
   if (date === today()) local.set('goalsToday', { date, kcal: goals.kcal, p: goals.p, c: goals.c, f: goals.f });
+  // The home screen widgets (widgets/, a native Android app) read today's goal from the synced day record,
+  // so they show exactly this number, weekly budget included. Saved only when it changes.
+  if (date === today()) {
+    const g = Object.fromEntries(['kcal', 'p', 'c', 'f'].map(k => [k, Math.round(goals[k])])), old = ctx.dayRec?.g;
+    if (!old || Object.keys(g).some(k => old[k] !== g[k])) db.put('days', { ...(ctx.dayRec || {}), id: date, g }).catch(() => {});
+  }
   const left = goals.kcal - tot.kcal, pLeft = goals.p - tot.p;
   const showLeft = local.get('kcalView', 'eaten') === 'left';
   // Past the goal (with 8% slack) the bar stays full: goal part in color, the overshoot in red.
@@ -1402,6 +1408,11 @@ async function viewSettings() {
     <label>Claude model<input name="claudeModel" value="${esc(local.get('claudeModel', 'claude-opus-5-5'))}"></label></details>
     <p class="muted small">Keys stay on this phone and never sync to GitHub. With no Anthropic key, nothing here can cost money.</p>
   </form></details>
+  <details><summary>Home screen widgets</summary>
+    <p class="small muted">Macros, Bills and Weather as real Android widgets (a small separate app, free). Install it, then tap Link so it can read your data with this phone's GitHub token. The token goes only to that app.</p>
+    <div class="actions"><a class="btn" href="../widgets/barowidgets.apk">1. Install the widget app</a>
+    ${local.get('ghToken', '') ? `<a class="btn" href="intent://link?t=${encodeURIComponent(local.get('ghToken', ''))}#Intent;scheme=barowidgets;package=app.baro.widgets;end">2. Link widgets</a>` : '<span class="small muted">Set up GitHub sync above first.</span>'}</div>
+  </details>
   <details><summary>Export data</summary><div class="actions"><button id="export">Export everything (JSON)</button></div></details>
   <p class="small muted">Recipe ideas, eating out and grocery deals moved to their own app: <a href="../explore/">Explore</a>. It uses this app's sync, and what you log there lands here.</p>
   </section>`;
